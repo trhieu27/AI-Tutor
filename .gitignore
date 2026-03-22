@@ -1,0 +1,40 @@
+# AI Tutor - Root .gitignore
+
+# Common
+node_modules/
+.DS_Store
+*.pem
+.env*
+.vercel
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# AI Agents & Editors
+.cursorrules
+.aichat/
+.anthropic/
+.claude/
+*.agents
+**/AGENTS.md
+**/CLAUDE.md
+
+# Frontend (ai-tutor-frontend)
+ai-tutor-frontend/node_modules/
+ai-tutor-frontend/.next/
+ai-tutor-frontend/out/
+ai-tutor-frontend/build/
+ai-tutor-frontend/npm-debug.log*
+ai-tutor-frontend/next-env.d.ts
+ai-tutor-frontend/*.tsbuildinfo
+
+# Backend (ai-tutor-backend)
+ai-tutor-backend/__pycache__/
+ai-tutor-backend/.venv/
+ai-tutor-backend/venv/
+ai-tutor-backend/*.pyc
+ai-tutor-backend/.env
