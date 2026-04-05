@@ -5,8 +5,8 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { authService } from '@/services/auth.service';
 import { AUTH_TEXTS } from '@/constants/texts';
-
 import AuthBranding from '@/components/AuthBranding';
+import GoogleIcon from '@/components/icons/GoogleIcon';
 
 export default function RegisterPage() {
   const [name, setName] = useState('');
@@ -32,7 +32,6 @@ export default function RegisterPage() {
 
     try {
       await authService.register(name, email, password);
-      // Thay vì tự động login, chuyển sang bước yêu cầu xác minh email
       setIsRegistered(true);
     } catch (err) {
       setError(AUTH_TEXTS.REGISTER.REGISTER_ERROR);
@@ -82,7 +81,7 @@ export default function RegisterPage() {
                 onClick={handleGoogleRegister}
                 className="w-full flex items-center justify-center gap-3 bg-[#f3f4f6] text-[#111827] rounded-xl py-3.5 px-4 font-semibold hover:bg-[#e5e7eb] transition-colors mb-8"
               >
-                <img src="/google.svg" alt="Google" className="w-5 h-5" />
+                <GoogleIcon size={20} />
                 {AUTH_TEXTS.REGISTER.CONTINUE_WITH_GOOGLE}
               </button>
 
@@ -177,7 +176,6 @@ export default function RegisterPage() {
               </p>
             </>
           ) : (
-            // Form Xác thực Email
             <>
               <button
                 onClick={() => setIsRegistered(false)}
@@ -228,13 +226,6 @@ export default function RegisterPage() {
               </p>
             </>
           )}
-        </div>
-
-        <div className="mt-8 w-full flex lg:justify-start justify-center">
-          <div className="inline-flex items-center gap-2 px-3 py-1.5 bg-[#f4f6fa] rounded-lg">
-            <span className="material-symbols-outlined text-[14px] text-[#4b5563]">verified</span>
-            <span className="text-[10px] text-[#4b5563] font-bold tracking-widest uppercase">{AUTH_TEXTS.LOGIN.SYSTEM_BADGE}</span>
-          </div>
         </div>
       </div>
     </div>
