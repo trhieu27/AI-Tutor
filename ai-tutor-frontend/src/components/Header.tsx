@@ -2,13 +2,16 @@
 
 import { HEADER_TEXTS } from '@/constants/texts';
 import { useAuth } from '@/context/AuthContext';
-import { useRouter } from 'next/navigation';
+import { useRouter, usePathname } from 'next/navigation';
 import { useState } from 'react';
 
 export default function Header({ onMenuClick }: { onMenuClick?: () => void }) {
   const { logout } = useAuth();
   const router = useRouter();
+  const pathname = usePathname();
   const [showUserMenu, setShowUserMenu] = useState(false);
+  
+  const isChatPage = pathname?.includes('/chat/');
 
   const handleLogout = () => {
     logout();
@@ -16,8 +19,8 @@ export default function Header({ onMenuClick }: { onMenuClick?: () => void }) {
   };
 
   return (
-    <header className="h-[88px] flex items-center justify-between px-4 lg:px-8 bg-white shrink-0 border-b border-outline/50 shadow-sm z-10 w-full relative">
-      <div className="flex items-center gap-2 sm:gap-4 flex-1 lg:w-[500px] lg:flex-none">
+    <header className="h-16 flex items-center justify-between px-4 lg:px-8 bg-white shrink-0 border-b border-outline/50 shadow-sm z-10 w-full relative">
+      <div className="flex items-center gap-2 sm:gap-4 flex-1 lg:max-w-xl">
         {onMenuClick && (
           <button 
             type="button"
@@ -28,14 +31,6 @@ export default function Header({ onMenuClick }: { onMenuClick?: () => void }) {
             <span className="material-symbols-outlined text-[24px] text-on-surface">menu</span>
           </button>
         )}
-        <div className="relative flex items-center w-full max-w-xl">
-          <span className="material-symbols-outlined absolute left-4 text-on-surface-variant text-xl">search</span>
-          <input 
-            type="text" 
-            placeholder={HEADER_TEXTS.searchPlaceholder} 
-            className="w-full bg-[#f6f6fc] rounded-full py-3.5 pl-12 pr-4 outline-none border border-transparent focus:border-primary text-sm transition-colors text-on-surface placeholder-on-surface-variant/80"
-          />
-        </div>
       </div>
 
       <div className="flex items-center gap-3 sm:gap-6 shrink-0 pl-2">

@@ -15,25 +15,9 @@ export default function AuthBranding() {
         <h1 className="text-2xl font-bold tracking-tight mb-20 text-white">{AUTH_TEXTS.LOGIN.HERO_TITLE} </h1>
 
         <div className="mb-8">
-          <span className="material-symbols-outlined text-white/50 text-5xl mb-4 rotate-180 inline-block">format_quote</span>
           <h2 className="text-[38px] font-bold leading-tight mb-8 max-w-lg text-white">
             {AUTH_TEXTS.LOGIN.HERO_QUOTE}
           </h2>
-          <div className="flex items-center gap-4">
-            <div className="w-8 h-px bg-white/40"></div>
-            <p className="text-white/80 text-lg">{AUTH_TEXTS.LOGIN.HERO_QUOTE_AUTHOR}</p>
-          </div>
-        </div>
-      </div>
-
-      <div className="relative z-10 flex gap-20">
-        <div>
-          <p className="text-2xl font-bold text-white mb-2">{AUTH_TEXTS.LOGIN.HERO_STAT_1_TITLE}</p>
-          <p className="text-white/50 text-xs font-bold tracking-widest uppercase">{AUTH_TEXTS.LOGIN.HERO_STAT_1_SUBTITLE}</p>
-        </div>
-        <div>
-          <p className="text-2xl font-bold text-white mb-2">{AUTH_TEXTS.LOGIN.HERO_STAT_2_TITLE}</p>
-          <p className="text-white/50 text-xs font-bold tracking-widest uppercase">{AUTH_TEXTS.LOGIN.HERO_STAT_2_SUBTITLE}</p>
         </div>
       </div>
     </div>

@@ -1,9 +1,19 @@
 "use client";
 
 import Link from 'next/link';
+import { usePathname } from 'next/navigation';
 import { SIDEBAR_TEXTS } from '@/constants/texts';
 
+const navItems = [
+  { href: "/", icon: "dashboard", label: SIDEBAR_TEXTS.dashboard },
+  { href: "/learning", icon: "school", label: SIDEBAR_TEXTS.learning },
+  { href: "/practice", icon: "quiz", label: SIDEBAR_TEXTS.practice },
+  { href: "/mindmap", icon: "account_tree", label: SIDEBAR_TEXTS.mindmap },
+];
+
 export default function Sidebar({ onClose }: { onClose?: () => void }) {
+  const pathname = usePathname();
+
   return (
     <aside className="w-[280px] bg-white h-screen border-r border-outline flex flex-col p-4 shrink-0 overflow-y-auto w-full max-w-[280px]">
       <div className="flex items-start justify-between px-2 pb-8 pt-2">
@@ -17,7 +27,7 @@ export default function Sidebar({ onClose }: { onClose?: () => void }) {
           </div>
         </div>
         {onClose && (
-          <button 
+          <button
             className="lg:hidden w-8 h-8 rounded-full flex items-center justify-center hover:bg-surface text-on-surface-variant transition-colors"
             onClick={onClose}
           >
@@ -27,29 +37,33 @@ export default function Sidebar({ onClose }: { onClose?: () => void }) {
       </div>
 
       <nav className="flex-1 flex flex-col gap-1">
-        <Link href="#" className="flex items-center gap-3 px-4 py-3 rounded-xl bg-primary-container text-primary font-medium">
-          <span className="material-symbols-outlined">dashboard</span>
-          {SIDEBAR_TEXTS.dashboard}
-        </Link>
-        <Link href="#" className="flex items-center gap-3 px-4 py-3 rounded-xl text-on-surface-variant hover:bg-primary-container/50 hover:text-on-surface transition-colors font-medium">
-          <span className="material-symbols-outlined">school</span>
-          {SIDEBAR_TEXTS.learning}
-        </Link>
-        <Link href="#" className="flex items-center gap-3 px-4 py-3 rounded-xl text-on-surface-variant hover:bg-primary-container/50 hover:text-on-surface transition-colors font-medium">
-          <span className="material-symbols-outlined">help</span>
-          {SIDEBAR_TEXTS.practice}
-        </Link>
-        <Link href="#" className="flex items-center gap-3 px-4 py-3 rounded-xl text-on-surface-variant hover:bg-primary-container/50 hover:text-on-surface transition-colors font-medium">
-          <span className="material-symbols-outlined">account_tree</span>
-          {SIDEBAR_TEXTS.mindmap}
-        </Link>
+        {navItems.map((item) => {
+          const isActive = pathname === item.href;
+          return (
+            <Link
+              key={item.href}
+              href={item.href}
+              className={`flex items-center gap-3 px-4 py-3 rounded-xl font-medium transition-colors ${
+                isActive
+                  ? "bg-primary-container text-primary"
+                  : "text-on-surface-variant hover:bg-primary-container/50 hover:text-on-surface"
+              }`}
+            >
+              <span className="material-symbols-outlined">{item.icon}</span>
+              {item.label}
+            </Link>
+          );
+        })}
       </nav>
 
       <div className="mt-auto flex flex-col gap-2">
-        <button className="flex items-center justify-center gap-2 w-full py-3 bg-primary text-white font-medium rounded-xl hover:bg-primary/90 transition-colors shadow-sm mb-4">
+        <Link
+          href="/"
+          className="flex items-center justify-center gap-2 w-full py-3 bg-primary text-white font-medium rounded-xl hover:bg-primary/90 transition-colors shadow-sm mb-4"
+        >
           <span className="material-symbols-outlined text-lg">add</span>
           {SIDEBAR_TEXTS.uploadBtn}
-        </button>
+        </Link>
 
         <Link href="#" className="flex items-center gap-3 px-4 py-2.5 rounded-xl text-on-surface-variant hover:bg-primary-container/50 hover:text-on-surface transition-colors text-sm font-medium">
           <span className="material-symbols-outlined text-xl">settings</span>
