@@ -5,9 +5,8 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
 import { AUTH_TEXTS } from '@/constants/texts';
-import { APP_COLORS } from '@/constants/colors';
-
 import AuthBranding from '@/components/AuthBranding';
+import GoogleIcon from '@/components/icons/GoogleIcon';
 
 export default function LoginPage() {
   const [email, setEmail] = useState('');
@@ -55,7 +54,7 @@ export default function LoginPage() {
             onClick={handleGoogleLogin}
             className="w-full flex items-center justify-center gap-3 bg-[#f3f4f6] text-[#111827] rounded-xl py-3.5 px-4 font-semibold hover:bg-[#e5e7eb] transition-colors mb-8"
           >
-            <img src="/google.svg" alt="Google" className="w-5 h-5" />
+            <GoogleIcon size={20} />
             {AUTH_TEXTS.LOGIN.CONTINUE_WITH_GOOGLE}
           </button>
 
@@ -121,15 +120,6 @@ export default function LoginPage() {
           <p className="text-center text-[#6b7280] text-[14px] mt-8">
             {AUTH_TEXTS.LOGIN.NO_ACCOUNT} <Link href="/register" className="font-bold text-[#0052ff] hover:underline">{AUTH_TEXTS.LOGIN.REGISTER_NOW}</Link>
           </p>
-        </div>
-
-        <div className="absolute bottom-6 left-6 hidden lg:inline-flex items-center gap-2 px-3 py-1.5 bg-[#f4f6fa] rounded-lg">
-          <span className="material-symbols-outlined text-[14px] text-[#4b5563]">verified</span>
-          <span className="text-[10px] text-[#4b5563] font-bold tracking-widest uppercase">{AUTH_TEXTS.LOGIN.SYSTEM_BADGE}</span>
-        </div>
-        <div className="absolute bottom-6 lg:hidden inline-flex items-center gap-2 px-3 py-1.5 bg-[#f4f6fa] rounded-lg">
-          <span className="material-symbols-outlined text-[14px] text-[#4b5563]">verified</span>
-          <span className="text-[10px] text-[#4b5563] font-bold tracking-widest uppercase">{AUTH_TEXTS.LOGIN.SYSTEM_BADGE}</span>
         </div>
       </div>
     </div>

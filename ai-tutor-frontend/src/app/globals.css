@@ -26,4 +26,26 @@ body {
   .material-symbols-outlined {
     font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
   }
+
+  .animate-jumping-dot {
+    animation: jumping-dot 1.4s infinite ease-in-out both;
+  }
+
+  @keyframes jumping-dot {
+    0%, 80%, 100% { 
+      transform: scale(1);
+      opacity: 0.6;
+    } 
+    40% { 
+      transform: scale(1.4);
+      opacity: 1;
+    }
+  }
+
+  .delay-200 {
+    animation-delay: 0.2s;
+  }
+  .delay-400 {
+    animation-delay: 0.4s;
+  }
 }
