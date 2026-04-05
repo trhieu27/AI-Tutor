@@ -17,9 +17,9 @@ export default function ClientShell({ children }: { children: React.ReactNode })
       {/* Sidebar - Mobile Overlay */}
       {isSidebarOpen && (
         <div className="fixed inset-0 z-[100] flex lg:hidden">
-          <div 
-            className="absolute inset-0 bg-black/40 backdrop-blur-sm" 
-            onClick={() => setIsSidebarOpen(false)} 
+          <div
+            className="absolute inset-0 bg-black/40 backdrop-blur-sm"
+            onClick={() => setIsSidebarOpen(false)}
           />
           <div className="relative w-[280px] h-full bg-white shadow-2xl animate-in slide-in-from-left duration-200">
             <Sidebar onClose={() => setIsSidebarOpen(false)} />
