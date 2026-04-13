@@ -1,26 +1,29 @@
-from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
-from sqlalchemy.orm import DeclarativeBase
+from motor.motor_asyncio import AsyncIOMotorClient
 from app.core.config import get_settings
 
 settings = get_settings()
 
-engine = create_async_engine(settings.DATABASE_URL, echo=settings.DEBUG)
-AsyncSessionLocal = async_sessionmaker(engine, expire_on_commit=False)
+class MongoDB:
+    client: AsyncIOMotorClient = None
+    db = None
 
+db_container = MongoDB()
 
-class Base(DeclarativeBase):
-    pass
-
-
-async def get_db() -> AsyncSession:
-    async with AsyncSessionLocal() as session:
-        try:
-            yield session
-        finally:
-            await session.close()
-
+async def get_db():
+    """Dependency to get MongoDB database instance."""
+    return db_container.db
 
 async def init_db():
-    """Create all tables on startup."""
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
+    """Initialize MongoDB connection on startup."""
+    print(f"🔗 Connecting to MongoDB at {settings.MONGO_URL}...")
+    db_container.client = AsyncIOMotorClient(settings.MONGO_URL)
+    db_container.db = db_container.client[settings.DATABASE_NAME]
+    # Check connection health by accessing a collection
+    await db_container.client.admin.command('ping')
+    print(f"✅ Connected to MongoDB: {settings.DATABASE_NAME}")
+
+async def close_db():
+    """Close MongoDB connection on shutdown."""
+    if db_container.client:
+        db_container.client.close()
+        print("🔌 MongoDB connection closed")
