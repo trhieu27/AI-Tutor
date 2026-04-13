@@ -5,8 +5,8 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.core.config import get_settings
-from app.core.database import init_db
-from app.api import documents, chat
+from app.core.database import init_db, close_db
+from app.api import documents, chat, auth
 
 settings = get_settings()
 
@@ -22,6 +22,7 @@ async def lifespan(app: FastAPI):
     print("✅ Database initialized")
     yield
     # Shutdown
+    await close_db()
     print("👋 Shutting down")
 
 
@@ -58,6 +59,7 @@ async def log_requests(request, call_next):
             content={"detail": f"Internal Server Error: {str(e)}"}
         )
 
+app.include_router(auth.router, prefix="/api/v1")
 app.include_router(documents.router, prefix="/api/v1")
 app.include_router(chat.router, prefix="/api/v1")
 
