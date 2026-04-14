@@ -13,7 +13,7 @@ class AuthService {
     return AuthService.instance;
   }
 
-  public async login(email: string, password: string): Promise<{ user: User; token: string }> {
+  public async login(email: string, password: string): Promise<{ user: User; accessToken: string; refreshToken: string }> {
     try {
       const response = await fetch(`${this.baseUrl}/login`, {
         method: 'POST',
@@ -24,58 +24,105 @@ class AuthService {
       });
 
       if (!response.ok) {
-        throw new Error('Login failed on backend');
+        const errorData = await response.json();
+        throw new Error(errorData.detail || 'Login failed');
       }
 
       const data = await response.json();
+      
+      // Save tokens to localStorage
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('access_token', data.access_token);
+        localStorage.setItem('refresh_token', data.refresh_token);
+        localStorage.setItem('user', JSON.stringify(data.user));
+      }
+
       return {
         user: new Student(data.user.id, data.user.full_name, data.user.email),
-        token: data.access_token,
+        accessToken: data.access_token,
+        refreshToken: data.refresh_token,
       };
     } catch (error) {
-      console.warn('Backend login error, falling back to Demo account:', error);
-      // FALLBACK TO DEMO ACCOUNT (Cho phép bạn vào giao diện chính)
-      return {
-        user: new Student('demo-id', 'Học viên Demo', email || 'demo@gmail.com'),
-        token: 'demo-token-123',
-      };
+      console.error('Backend login error:', error);
+      throw error;
     }
   }
 
-  public async register(name: string, email: string, password: string, studentId: string = 'S001'): Promise<{ user: User; token: string }> {
+  public async register(name: string, email: string, password: string): Promise<{ user: User; accessToken: string; refreshToken: string }> {
     try {
+      const student_id = "STU" + Math.floor(100000 + Math.random() * 900000).toString();
+      
       const response = await fetch(`${this.baseUrl}/register`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({ 
-          full_name: name, 
+          student_id: student_id,
+          full_name: name,
           email, 
-          password,
-          student_id: studentId 
+          password 
         }),
       });
 
       if (!response.ok) {
-        throw new Error('Registration failed on backend');
+        const errorData = await response.json();
+        throw new Error(errorData.detail || 'Registration failed');
       }
 
       const data = await response.json();
+      
+      // Save tokens
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('access_token', data.access_token);
+        localStorage.setItem('refresh_token', data.refresh_token);
+        localStorage.setItem('user', JSON.stringify(data.user));
+      }
+
       return {
         user: new Student(data.user.id, data.user.full_name, data.user.email),
-        token: data.access_token,
+        accessToken: data.access_token,
+        refreshToken: data.refresh_token,
       };
     } catch (error) {
-      console.warn('Backend register error, falling back to Demo account:', error);
-      return {
-        user: new Student('demo-id', name || 'Người dùng mới', email),
-        token: 'demo-token-123',
-      };
+      console.error('Backend register error:', error);
+      throw error;
+    }
+  }
+
+  public async refreshToken(): Promise<string | null> {
+    try {
+      const refreshToken = localStorage.getItem('refresh_token');
+      if (!refreshToken) return null;
+
+      const response = await fetch(`${this.baseUrl}/refresh`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ refresh_token: refreshToken }),
+      });
+
+      if (!response.ok) {
+        this.logout();
+        return null;
+      }
+
+      const data = await response.json();
+      localStorage.setItem('access_token', data.access_token);
+      return data.access_token;
+    } catch (error) {
+      console.error('Refresh token error:', error);
+      return null;
     }
   }
 
   public logout(): void {
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem('access_token');
+      localStorage.removeItem('refresh_token');
+      localStorage.removeItem('user');
+    }
   }
 }
 

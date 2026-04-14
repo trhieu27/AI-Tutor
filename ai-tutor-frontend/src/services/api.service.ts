@@ -1,6 +1,14 @@
 // API base URL - sử dụng đường dẫn tương đối để đi qua Next.js Rewrite Proxy
 const API_BASE = "/api/v1";
-console.log("📍 API_BASE:", API_BASE);
+
+// Helper để lấy token
+const getAuthHeaders = () => {
+  if (typeof window !== 'undefined') {
+    const token = localStorage.getItem('access_token');
+    return token ? { 'Authorization': `Bearer ${token}` } : {};
+  }
+  return {};
+};
 
 export interface DocumentResponse {
   id: string;
@@ -60,6 +68,9 @@ export async function uploadDocument(file: File): Promise<DocumentResponse> {
 
   const res = await fetch(`${API_BASE}/documents/upload`, {
     method: "POST",
+    headers: {
+      ...getAuthHeaders(),
+    },
     body: formData,
   });
 
@@ -72,13 +83,17 @@ export async function uploadDocument(file: File): Promise<DocumentResponse> {
 }
 
 export async function fetchDocuments(): Promise<DocumentResponse[]> {
-  const res = await fetch(`${API_BASE}/documents`);
+  const res = await fetch(`${API_BASE}/documents`, {
+    headers: { ...getAuthHeaders() }
+  });
   if (!res.ok) throw new Error("Không thể tải danh sách tài liệu");
   return res.json();
 }
 
 export async function fetchDocument(documentId: string): Promise<DocumentResponse> {
-  const res = await fetch(`${API_BASE}/documents/${documentId}`);
+  const res = await fetch(`${API_BASE}/documents/${documentId}`, {
+    headers: { ...getAuthHeaders() }
+  });
   if (!res.ok) throw new Error("Không tìm thấy tài liệu");
   return res.json();
 }
@@ -86,6 +101,7 @@ export async function fetchDocument(documentId: string): Promise<DocumentRespons
 export async function deleteDocument(documentId: string): Promise<void> {
   const res = await fetch(`${API_BASE}/documents/${documentId}`, {
     method: "DELETE",
+    headers: { ...getAuthHeaders() }
   });
   if (!res.ok) throw new Error("Xóa tài liệu thất bại");
 }
@@ -99,7 +115,10 @@ export async function askQuestion(
 ): Promise<AskResponse> {
   const res = await fetch(`${API_BASE}/chat/${documentId}/ask`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: { 
+      "Content-Type": "application/json",
+      ...getAuthHeaders() 
+    },
     body: JSON.stringify(request),
     signal
   });
@@ -113,13 +132,17 @@ export async function askQuestion(
 }
 
 export async function fetchChatSessions(documentId: string): Promise<ChatSessionResponse[]> {
-  const res = await fetch(`${API_BASE}/chat/${documentId}/sessions`);
+  const res = await fetch(`${API_BASE}/chat/${documentId}/sessions`, {
+    headers: { ...getAuthHeaders() }
+  });
   if (!res.ok) throw new Error("Không thể tải lịch sử chat");
   return res.json();
 }
 
 export async function fetchSessionDetail(sessionId: string): Promise<ChatSessionDetail> {
-  const res = await fetch(`${API_BASE}/chat/sessions/${sessionId}`);
+  const res = await fetch(`${API_BASE}/chat/sessions/${sessionId}`, {
+    headers: { ...getAuthHeaders() }
+  });
   if (!res.ok) {
     const errorData = await res.json().catch(() => ({}));
     const message = errorData.detail || "Không tìm thấy phiên chat";
@@ -131,33 +154,42 @@ export async function fetchSessionDetail(sessionId: string): Promise<ChatSession
 export async function deleteChatSession(sessionId: string): Promise<void> {
   const res = await fetch(`${API_BASE}/chat/sessions/${sessionId}`, {
     method: "DELETE",
+    headers: { ...getAuthHeaders() }
   });
   if (!res.ok) throw new Error("Xóa phiên chat thất bại");
 }
 
 export async function fetchDocumentSummary(documentId: string): Promise<string> {
-  const res = await fetch(`${API_BASE}/chat/${documentId}/summarize`);
+  const res = await fetch(`${API_BASE}/chat/${documentId}/summarize`, {
+    headers: { ...getAuthHeaders() }
+  });
   if (!res.ok) throw new Error("Không thể tạo bản tóm tắt");
   const data = await res.json();
   return data.summary;
 }
 
 export async function fetchDocumentQuiz(documentId: string): Promise<any[]> {
-  const res = await fetch(`${API_BASE}/chat/${documentId}/quiz`);
+  const res = await fetch(`${API_BASE}/chat/${documentId}/quiz`, {
+    headers: { ...getAuthHeaders() }
+  });
   if (!res.ok) throw new Error("Không thể tạo bài kiểm tra");
   const data = await res.json();
   return data.quiz;
 }
 
 export async function fetchDocumentMindmap(documentId: string): Promise<string> {
-  const res = await fetch(`${API_BASE}/chat/${documentId}/mindmap`);
+  const res = await fetch(`${API_BASE}/chat/${documentId}/mindmap`, {
+    headers: { ...getAuthHeaders() }
+  });
   if (!res.ok) throw new Error("Không thể tạo sơ đồ tư duy");
   const data = await res.json();
   return data.mindmap;
 }
 
 export async function fetchDocumentStudyQuestions(documentId: string): Promise<string[]> {
-  const res = await fetch(`${API_BASE}/chat/${documentId}/study-questions`);
+  const res = await fetch(`${API_BASE}/chat/${documentId}/study-questions`, {
+    headers: { ...getAuthHeaders() }
+  });
   if (!res.ok) throw new Error("Không thể tạo câu hỏi ôn tập");
   const data = await res.json();
   return data.questions;

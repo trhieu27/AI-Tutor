@@ -1,25 +1,30 @@
 "use client";
 
 import Link from 'next/link';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
 import { AUTH_TEXTS } from '@/constants/texts';
 import AuthBranding from '@/components/AuthBranding';
 import GoogleIcon from '@/components/icons/GoogleIcon';
+import { useGoogleLogin } from '@react-oauth/google';
 
 export default function LoginPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
-  const { login } = useAuth();
+  const { login, isLoading } = useAuth();
   const router = useRouter();
+  const [mounted, setMounted] = useState(false);
+
+  // Đảm bảo chỉ render nội dung liên quan đến Google ở phía Client
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
-    setIsLoading(true);
 
     try {
       await login(email, password);
@@ -27,23 +32,33 @@ export default function LoginPage() {
     } catch (err) {
       setError(AUTH_TEXTS.LOGIN.LOGIN_ERROR);
       console.error('Login error:', err);
-    } finally {
-      setIsLoading(false);
     }
   };
 
+  const googleLogin = useGoogleLogin({
+    onSuccess: async (tokenResponse) => {
+      console.log('Google login success:', tokenResponse);
+      alert('Đăng nhập Google thành công! Thông tin token đã được in ra console.');
+      router.push('/');
+    },
+    onError: () => {
+      console.log('Login Failed');
+      setError('Đăng nhập bằng Google thất bại');
+    },
+  });
+
   const handleGoogleLogin = () => {
-    console.log('Google login attempt');
+    if (mounted) {
+      googleLogin();
+    }
   };
 
   return (
     <div className="h-screen flex w-full font-sans bg-white overflow-hidden">
-      {/* Left Side - Hero / Branding (Hidden on mobile, block on lg screens) */}
       <AuthBranding />
 
-      {/* Right Side - Login Form */}
       <div className="w-full lg:w-1/2 flex flex-col justify-center items-center py-12 px-6 sm:px-12 relative overflow-y-auto h-full">
-        <div className="w-full max-w-105">
+        <div className="w-full max-w-[420px]">
           <div className="mb-10 text-center lg:text-left">
             <h2 className="text-3xl font-bold text-[#111827] mb-3">{AUTH_TEXTS.LOGIN.WELCOME_TITLE}</h2>
             <p className="text-[#6b7280] text-[15px]">{AUTH_TEXTS.LOGIN.WELCOME_SUBTITLE}</p>

@@ -11,11 +11,13 @@ from app.models.db_models import Document, DocumentStatus
 from app.models.schemas import DocumentResponse
 from app.rag import rag_engine
 
+from app.api.auth import get_current_user
+
 router = APIRouter(prefix="/documents", tags=["Documents"])
 settings = get_settings()
 
 ALLOWED_EXTENSIONS = {".pdf", ".doc", ".docx"}
-DEMO_USER_ID = "00000000-0000-0000-0000-000000000001"
+
 
 async def process_document_background(document_id: str, file_path: str):
     """Background task: extract text and build ChromaDB index using MongoDB."""
@@ -55,6 +57,7 @@ async def upload_document(
     background_tasks: BackgroundTasks,
     file: UploadFile = File(...),
     db: AsyncIOMotorDatabase = Depends(get_db),
+    current_user_id: str = Depends(get_current_user)
 ):
     """Upload a PDF/DOC file and process it in the background using MongoDB."""
     suffix = Path(file.filename or "").suffix.lower()
@@ -76,7 +79,7 @@ async def upload_document(
 
     document = Document(
         id=document_id,
-        owner_id=DEMO_USER_ID,
+        owner_id=current_user_id,
         file_name=file.filename or safe_name,
         file_size_mb=round(size_mb, 2),
         status=DocumentStatus.UPLOADING,
@@ -96,26 +99,35 @@ async def upload_document(
 
 
 @router.get("", response_model=list[DocumentResponse])
-async def list_documents(db: AsyncIOMotorDatabase = Depends(get_db)):
+async def list_documents(
+    db: AsyncIOMotorDatabase = Depends(get_db),
+    current_user_id: str = Depends(get_current_user)
+):
     """List all documents for the current user from MongoDB."""
-    cursor = db.documents.find({"owner_id": DEMO_USER_ID}).sort("uploaded_at", -1)
+    cursor = db.documents.find({"owner_id": current_user_id}).sort("uploaded_at", -1)
     docs = await cursor.to_list(length=100)
     return docs
 
 
 @router.get("/{document_id}", response_model=DocumentResponse)
-async def get_document(document_id: str, db: AsyncIOMotorDatabase = Depends(get_db)):
+async def get_document(    document_id: str, 
+    db: AsyncIOMotorDatabase = Depends(get_db),
+    current_user_id: str = Depends(get_current_user)
+):
     """Get a single document by ID from MongoDB."""
-    doc = await db.documents.find_one({"id": document_id, "owner_id": DEMO_USER_ID})
+    doc = await db.documents.find_one({"id": document_id, "owner_id": current_user_id})
     if not doc:
         raise HTTPException(status_code=404, detail="Tài liệu không tồn tại.")
     return doc
 
 
 @router.delete("/{document_id}", status_code=204)
-async def delete_document(document_id: str, db: AsyncIOMotorDatabase = Depends(get_db)):
+async def delete_document(    document_id: str, 
+    db: AsyncIOMotorDatabase = Depends(get_db),
+    current_user_id: str = Depends(get_current_user)
+):
     """Delete a document and its associated data from MongoDB."""
-    doc = await db.documents.find_one({"id": document_id, "owner_id": DEMO_USER_ID})
+    doc = await db.documents.find_one({"id": document_id, "owner_id": current_user_id})
     if not doc:
         raise HTTPException(status_code=404, detail="Tài liệu không tồn tại.")
 

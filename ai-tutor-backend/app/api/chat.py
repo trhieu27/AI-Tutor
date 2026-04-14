@@ -8,16 +8,18 @@ from app.core.database import get_db
 from app.models.db_models import ChatSession, ChatMessage
 from app.models.schemas import AskRequest, AskResponse, MessageResponse, ChatSessionResponse, ChatSessionDetail
 from app.rag.rag_engine import ask_question, summarize_document, generate_quiz, generate_mindmap, generate_study_questions
+from app.api.auth import get_current_user
 
 router = APIRouter(prefix="/chat", tags=["Chat"])
 
-DEMO_USER_ID = "00000000-0000-0000-0000-000000000001"
+
 
 @router.post("/{document_id}/ask", response_model=AskResponse)
 async def chat_with_document(
     document_id: str,
     request: AskRequest,
-    db: AsyncIOMotorDatabase = Depends(get_db)
+    db: AsyncIOMotorDatabase = Depends(get_db),
+    current_user_id: str = Depends(get_current_user)
 ):
     """Ask a question using MongoDB and RAG."""
     # 1. Verify document exists
@@ -31,7 +33,7 @@ async def chat_with_document(
         session_id = str(uuid4())
         new_session = ChatSession(
             id=session_id,
-            user_id=DEMO_USER_ID,
+            user_id=current_user_id,
             document_id=document_id,
             title=request.question[:50] + "..."
         )
@@ -130,8 +132,12 @@ async def get_document_mindmap(document_id: str, db: AsyncIOMotorDatabase = Depe
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.get("/{document_id}/sessions", response_model=list[ChatSessionResponse])
-async def list_sessions(document_id: str, db: AsyncIOMotorDatabase = Depends(get_db)):
-    cursor = db.chat_sessions.find({"document_id": document_id, "user_id": DEMO_USER_ID}).sort("updated_at", -1)
+async def list_sessions(
+    document_id: str, 
+    db: AsyncIOMotorDatabase = Depends(get_db),
+    current_user_id: str = Depends(get_current_user)
+):
+    cursor = db.chat_sessions.find({"document_id": document_id, "user_id": current_user_id}).sort("updated_at", -1)
     sessions = await cursor.to_list(length=100)
     # Map messages to message_count for response schema
     for s in sessions:
@@ -139,8 +145,12 @@ async def list_sessions(document_id: str, db: AsyncIOMotorDatabase = Depends(get
     return sessions
 
 @router.get("/sessions/{session_id}", response_model=ChatSessionDetail)
-async def get_session_detail(session_id: str, db: AsyncIOMotorDatabase = Depends(get_db)):
-    session = await db.chat_sessions.find_one({"id": session_id, "user_id": DEMO_USER_ID})
+async def get_session_detail(
+    session_id: str, 
+    db: AsyncIOMotorDatabase = Depends(get_db),
+    current_user_id: str = Depends(get_current_user)
+):
+    session = await db.chat_sessions.find_one({"id": session_id, "user_id": current_user_id})
     if not session:
         raise HTTPException(status_code=404, detail="Không tìm thấy phiên chat")
     
@@ -152,8 +162,12 @@ async def get_session_detail(session_id: str, db: AsyncIOMotorDatabase = Depends
     return session
 
 @router.delete("/sessions/{session_id}")
-async def delete_session(session_id: str, db: AsyncIOMotorDatabase = Depends(get_db)):
-    result = await db.chat_sessions.delete_one({"id": session_id, "user_id": DEMO_USER_ID})
+async def delete_session(
+    session_id: str, 
+    db: AsyncIOMotorDatabase = Depends(get_db),
+    current_user_id: str = Depends(get_current_user)
+):
+    result = await db.chat_sessions.delete_one({"id": session_id, "user_id": current_user_id})
     if result.deleted_count == 0:
         raise HTTPException(status_code=404, detail="Không thể xóa phiên chat")
     return {"status": "success"}
