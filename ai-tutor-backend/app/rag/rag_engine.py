@@ -1,6 +1,8 @@
 import os
 import json
 import re
+import logging
+import asyncio
 import fitz  # PyMuPDF
 import docx2txt
 from typing import List, Tuple, Dict, Any, Optional
@@ -26,6 +28,17 @@ from app.rag.texts import (
     PROMPT_STUDY_QUESTIONS
 )
 
+logger = logging.getLogger(__name__)
+
+def _extract_text(content: Any) -> str:
+    """Helper to extract plain text from LLM response which could be str or list of dicts."""
+    if isinstance(content, str):
+        return content
+    if isinstance(content, list):
+        return "".join([part.get("text", "") if isinstance(part, dict) else str(part) for part in content])
+    return str(content)
+
+
 settings = get_settings()
 
 # Ensure directories exist
@@ -33,19 +46,28 @@ os.makedirs(settings.CHROMA_PERSIST_DIR, exist_ok=True)
 os.makedirs(settings.UPLOAD_DIR, exist_ok=True)
 
 
+_embeddings = None
+_llm = None
+
 def get_embeddings():
-    return GoogleGenerativeAIEmbeddings(
-        model="models/gemini-embedding-001",
-        google_api_key=settings.GEMINI_API_KEY or os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY"),
-    )
+    global _embeddings
+    if _embeddings is None:
+        _embeddings = GoogleGenerativeAIEmbeddings(
+            model="models/text-embedding-004",
+            google_api_key=settings.GEMINI_API_KEY,
+        )
+    return _embeddings
 
 
 def get_llm():
-    return ChatGoogleGenerativeAI(
-        model="models/gemini-2.5-flash",
-        google_api_key=settings.GEMINI_API_KEY or os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY"),
-        temperature=0.3,
-    )
+    global _llm
+    if _llm is None:
+        _llm = ChatGoogleGenerativeAI(
+            model="gemini-1.5-flash",
+            google_api_key=settings.GEMINI_API_KEY,
+            temperature=0.2,
+        )
+    return _llm
 
 
 def extract_text_from_pdf(file_path: str) -> tuple[list[str], int]:
@@ -139,9 +161,10 @@ def get_vectorstore(collection_name: str) -> Chroma:
 
 
 def build_chat_history(messages: list[dict]) -> list:
-    """Convert stored messages to LangChain message format."""
+    """Convert stored messages to LangChain message format, limiting to last 6 messages."""
     history = []
-    for msg in messages:
+    # Only take last 6 messages to save memory and context window
+    for msg in messages[-6:]:
         if msg["role"] == "user":
             history.append(HumanMessage(content=msg["content"]))
         else:
@@ -160,15 +183,14 @@ async def ask_question(
     Returns {'answer': str, 'sources': list[dict]}
     """
     import asyncio
+    import gc
     try:
-        print(f"🔍 DEBUG: Loading Vectorstore for collection: {collection_name}")
-        # Run synchronous Chroma initialization in a thread
         vectorstore = await asyncio.to_thread(get_vectorstore, collection_name)
-        
-        print(f"🔍 DEBUG: Performing similarity search for: '{question}'")
-        # Use asynchronous search for better performance
         retrieved_docs = await vectorstore.asimilarity_search(question, k=5)
-        print(f"✅ DEBUG: Retrieved {len(retrieved_docs)} document chunks.")
+        
+        # Free memory reference to vectorstore early if possible
+        # (Though we still need it for context, but we can call gc)
+        gc.collect() 
 
         llm = get_llm()
 
@@ -188,16 +210,11 @@ async def ask_question(
         # Create chain using LCEL
         chain = prompt | llm | StrOutputParser()
 
-        print(f"🚀 DEBUG: Invoking LLM chain for: {collection_name}")
-        # Build payload
-        payload = {
+        answer = await chain.ainvoke({
             "context": context_text,
             "chat_history": lc_history,
             "question": question,
-        }
-        
-        answer = await chain.ainvoke(payload)
-        print(f"✅ DEBUG: LLM successfully replied.")
+        })
         
         # Format sources
         sources = []
@@ -217,9 +234,6 @@ async def ask_question(
         return {"answer": answer, "sources": sources[:3]}
 
     except Exception as e:
-        import traceback
-        traceback.print_exc()
-        print(f"❌ DEBUG: Error during RAG ask_question: {str(e)}")
         # Raise the exception so the API layer can handle it with proper HTTP codes
         raise e
 
@@ -227,72 +241,78 @@ async def ask_question(
 async def summarize_document(collection_name: str) -> str:
     """Generate a comprehensive summary of the document."""
     try:
-        print(f"📄 DEBUG: Loading vectorstore for summary: {collection_name}")
-        vectorstore = get_vectorstore(collection_name)
+        vectorstore = await asyncio.to_thread(get_vectorstore, collection_name)
         
-        print(f"📄 DEBUG: Searching for summary context with query: '{QUERY_SUMMARIZE}'")
-        # Get a good sample of the document content
-        docs = await vectorstore.asimilarity_search(QUERY_SUMMARIZE, k=15) 
-        print(f"📄 DEBUG: Found {len(docs)} chunks for summary.")
+        # Check if collection has any data
+        try:
+            count = vectorstore._collection.count()
+            if count == 0:
+                return "Tài liệu chưa được xử lý. Vui lòng tải lên lại."
+        except Exception:
+            return "Không tìm thấy dữ liệu tài liệu."
+
+        docs = await vectorstore.asimilarity_search(QUERY_SUMMARIZE, k=10) 
         
         if not docs:
-            print("⚠️ DEBUG: No documents found for summary context.")
-            return "Không tìm thấy nội dung để tóm tắt tài liệu này."
-
+            return "Không tìm thấy nội dung để tóm tắt."
+        
         context = "\n\n".join([doc.page_content for doc in docs])
         
         llm = get_llm()
         prompt = PROMPT_SUMMARIZE.replace("{context}", context)
-
-        print("🚀 DEBUG: Invoking LLM for summary...")
         response = await llm.ainvoke(prompt)
-        print("✅ DEBUG: Summary generated successfully.")
-        return response.content
+        return _extract_text(response.content).strip()
     except Exception as e:
-        import traceback
-        traceback.print_exc()
-        print(f"🔥 ERROR in summarize_document: {str(e)}")
+        if "429" in str(e):
+            return "AI đang bận, vui lòng thử lại sau vài giây."
         raise e
 
 
 async def generate_quiz(collection_name: str) -> list[dict]:
-    """Generate 5 multiple choice questions from the document."""
+    """Generate multiple choice questions from the document."""
     try:
-        print(f"🧠 DEBUG: Generating quiz for collection: {collection_name}")
-        vectorstore = get_vectorstore(collection_name)
-        # Search for key concepts using async search
-        docs = await vectorstore.asimilarity_search(QUERY_QUIZ, k=25)
+        vectorstore = await asyncio.to_thread(get_vectorstore, collection_name)
+        # Search for key concepts across the whole document
+        docs = await vectorstore.asimilarity_search(QUERY_QUIZ, k=50)
         context = "\n\n".join([doc.page_content for doc in docs])
         
         if not context.strip():
-            print("⚠️ DEBUG: No context found for quiz generation.")
             return []
 
         llm = get_llm()
         prompt = PROMPT_QUIZ.replace("{context}", context)
+        # Tell LLM to generate enough questions for the whole content
+        prompt += "\n\nYÊU CẦU: Hãy tạo số lượng câu hỏi phù hợp (từ 10-30 câu) để bao quát toàn bộ các nội dung quan trọng có trong văn bản trên."
 
         response = await llm.ainvoke(prompt)
-        content = response.content.strip()
+        content = _extract_text(response.content).strip()
         
-        # Clean response in case LLM adds markdown wrappers
-        if "```json" in content:
-            content = content.split("```json")[1].split("```")[0].strip()
-        elif "```" in content:
-            content = content.split("```")[1].split("```")[0].strip()
+        # Use regex to find the first JSON-like array []
+        import re
+        import json
+        json_match = re.search(r'\[\s*\{.*\}\s*\]', content, re.DOTALL)
+        if json_match:
+            content = json_match.group(0)
+        else:
+            # Fallback for simple cleaning
+            if "```json" in content:
+                content = content.split("```json")[1].split("```")[0].strip()
+            elif "```" in content:
+                content = content.split("```")[1].split("```")[0].strip()
         
-        print(f"✅ DEBUG: Quiz generated, length of content: {len(content)}")
         quiz_data = json.loads(content)
+        logger.info(f"Successfully generated {len(quiz_data)} questions")
         return quiz_data if isinstance(quiz_data, list) else []
         
     except Exception as e:
-        print(f"🔥 ERROR in generate_quiz: {str(e)}")
+        logging.error(f"ERROR in generate_quiz: {str(e)}")
         raise e
 
 
 async def generate_mindmap(collection_name: str) -> str:
     """Generate a Mermaid.js mindmap string of the document."""
     try:
-        vectorstore = get_vectorstore(collection_name)
+        vectorstore = await asyncio.to_thread(get_vectorstore, collection_name)
         docs = await vectorstore.asimilarity_search(QUERY_MINDMAP, k=10)
         context = "\n\n".join([doc.page_content for doc in docs])
         
@@ -300,7 +320,7 @@ async def generate_mindmap(collection_name: str) -> str:
         prompt = PROMPT_MINDMAP.replace("{context}", context)
 
         response = await llm.ainvoke(prompt)
-        content = response.content.strip()
+        content = _extract_text(response.content).strip()
         # Ensure it starts with mindmap and remove markdown
         if "```" in content:
             content = content.split("```")[1]
@@ -315,7 +335,7 @@ async def generate_mindmap(collection_name: str) -> str:
 async def generate_study_questions(collection_name: str) -> list[str]:
     """Generate 10 open-ended study questions for the document."""
     try:
-        vectorstore = get_vectorstore(collection_name)
+        vectorstore = await asyncio.to_thread(get_vectorstore, collection_name)
         docs = await vectorstore.asimilarity_search(QUERY_STUDY_QUESTIONS, k=15)
         context = "\n\n".join([doc.page_content for doc in docs])
         
@@ -323,7 +343,7 @@ async def generate_study_questions(collection_name: str) -> list[str]:
         prompt = PROMPT_STUDY_QUESTIONS.replace("{context}", context)
 
         response = await llm.ainvoke(prompt)
-        content = response.content.strip()
+        content = _extract_text(response.content).strip()
         lines = content.split('\n')
         questions = [line.strip().lstrip('0123456789.- ').strip('"') for line in lines if '?' in line]
         return questions[:10]

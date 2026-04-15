@@ -49,7 +49,6 @@ async def process_document_background(document_id: str, file_path: str):
             {"id": document_id},
             {"$set": {"status": DocumentStatus.FAILED}}
         )
-        print(f"[ERROR] Failed to process document {document_id}: {e}")
 
 
 @router.post("/upload", response_model=DocumentResponse, status_code=201)

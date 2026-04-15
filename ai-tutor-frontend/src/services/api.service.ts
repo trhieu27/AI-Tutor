@@ -115,9 +115,9 @@ export async function askQuestion(
 ): Promise<AskResponse> {
   const res = await fetch(`${API_BASE}/chat/${documentId}/ask`, {
     method: "POST",
-    headers: { 
+    headers: {
       "Content-Type": "application/json",
-      ...getAuthHeaders() 
+      ...getAuthHeaders()
     },
     body: JSON.stringify(request),
     signal
@@ -128,7 +128,16 @@ export async function askQuestion(
     throw new Error(error.detail || "Hỏi thất bại");
   }
 
-  return res.json();
+  const data = await res.json();
+  const msgContent = data.message.content;
+  
+  if (Array.isArray(msgContent)) {
+    data.message.content = msgContent.map(part => part.text || "").join("");
+  } else if (typeof msgContent === 'object' && msgContent !== null) {
+    data.message.content = msgContent.text || JSON.stringify(msgContent);
+  }
+
+  return data;
 }
 
 export async function fetchChatSessions(documentId: string): Promise<ChatSessionResponse[]> {
@@ -163,9 +172,23 @@ export async function fetchDocumentSummary(documentId: string): Promise<string> 
   const res = await fetch(`${API_BASE}/chat/${documentId}/summarize`, {
     headers: { ...getAuthHeaders() }
   });
-  if (!res.ok) throw new Error("Không thể tạo bản tóm tắt");
-  const data = await res.json();
-  return data.summary;
+  const text = await res.text();
+  let data: any;
+  try {
+    data = JSON.parse(text);
+  } catch (e) {
+    return "Hệ thống đang bận hoặc gặp lỗi xử lý. Vui lòng thử lại sau.";
+  }
+  const summaryRaw = data.summary;
+  
+  if (typeof summaryRaw === 'string') return summaryRaw;
+  if (Array.isArray(summaryRaw)) {
+    return summaryRaw.map(part => part.text || "").join("");
+  }
+  if (typeof summaryRaw === 'object' && summaryRaw !== null) {
+      return summaryRaw.text || JSON.stringify(summaryRaw);
+  }
+  return data.detail || "Không thể tạo bản tóm tắt";
 }
 
 export async function fetchDocumentQuiz(documentId: string): Promise<any[]> {
@@ -181,9 +204,23 @@ export async function fetchDocumentMindmap(documentId: string): Promise<string> 
   const res = await fetch(`${API_BASE}/chat/${documentId}/mindmap`, {
     headers: { ...getAuthHeaders() }
   });
-  if (!res.ok) throw new Error("Không thể tạo sơ đồ tư duy");
-  const data = await res.json();
-  return data.mindmap;
+  const text = await res.text();
+  let data: any;
+  try {
+    data = JSON.parse(text);
+  } catch (e) {
+    return "Không thể tạo sơ đồ tư duy ngay lúc này.";
+  }
+  const mmRaw = data.mindmap;
+  
+  if (typeof mmRaw === 'string') return mmRaw;
+  if (Array.isArray(mmRaw)) {
+    return mmRaw.map(part => part.text || "").join("");
+  }
+  if (typeof mmRaw === 'object' && mmRaw !== null) {
+      return mmRaw.text || JSON.stringify(mmRaw);
+  }
+  return data.detail || "Không thể tạo sơ đồ tư duy";
 }
 
 export async function fetchDocumentStudyQuestions(documentId: string): Promise<string[]> {

@@ -1,2 +1,0 @@
-invalid type: string "OOAD\n24\nAbstraction: abstract method\n□\nA method should be defined at the highest possible abstraction \nlevel\n■\nAt this level, the method can be abstract (i.e., no implementation)\n■\nIn this case, the class is also abstract\n■\nIf a class has an abstract method, at least one of its subclasses \nmust implement this method\n□\n -0.0145991575,
-        -0.0065099

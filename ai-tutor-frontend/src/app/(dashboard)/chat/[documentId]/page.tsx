@@ -511,7 +511,7 @@ export default function ChatPage() {
 
       {/* Summary/Quiz Modal */}
       {showModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-md animate-in fade-in duration-300">
+        <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-md animate-in fade-in duration-300">
           <div className="bg-white w-full max-w-3xl max-h-[85vh] rounded-[32px] shadow-2xl flex flex-col overflow-hidden animate-in zoom-in-95 duration-300">
             <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-white sticky top-0">
               <h3 className="text-xl font-bold text-slate-800 flex items-center gap-3">
@@ -545,7 +545,7 @@ export default function ChatPage() {
                   </div>
                 ) : (
                   <div className="prose prose-slate max-w-none prose-p:leading-relaxed prose-li:my-1">
-                    <ReactMarkdown>{summary || CHAT_TEXTS.MODALS.EMPTY.SUMMARY}</ReactMarkdown>
+                    <ReactMarkdown>{String(summary || CHAT_TEXTS.MODALS.EMPTY.SUMMARY)}</ReactMarkdown>
                   </div>
                 )
               ) : showModal === 'mindmap' ? (

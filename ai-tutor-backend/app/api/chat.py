@@ -1,6 +1,9 @@
 from fastapi import APIRouter, Depends, HTTPException
 import json
+import logging
 from uuid import uuid4
+
+logger = logging.getLogger(__name__)
 from datetime import datetime
 from motor.motor_asyncio import AsyncIOMotorDatabase
 
@@ -90,10 +93,11 @@ async def chat_with_document(
             "message": ai_msg
         }
     except Exception as e:
-        print(f"🔥 ERROR in MongoDB chat: {str(e)}")
+        import logging
+        logging.error(f"Chat Error: {str(e)}")
         if "429" in str(e) or "RESOURCE_EXHAUSTED" in str(e):
             raise HTTPException(status_code=429, detail="AI đang quá tải lượt dùng. Thử lại sau nhé.")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=f"Lỗi hệ thống: {str(e)}")
 
 @router.get("/{document_id}/summarize")
 async def get_summary(document_id: str, db: AsyncIOMotorDatabase = Depends(get_db)):
@@ -104,8 +108,8 @@ async def get_summary(document_id: str, db: AsyncIOMotorDatabase = Depends(get_d
     try:
         summary = await summarize_document(doc["chroma_collection_id"])
         return {"summary": summary}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+    except Exception:
+        return {"summary": "Không thể tạo bản tóm tắt tại thời điểm này. Vui lòng tải lại tài liệu và thử lại."}
 
 @router.get("/{document_id}/quiz")
 async def get_document_quiz(document_id: str, db: AsyncIOMotorDatabase = Depends(get_db)):
@@ -116,8 +120,8 @@ async def get_document_quiz(document_id: str, db: AsyncIOMotorDatabase = Depends
     try:
         quiz = await generate_quiz(doc["chroma_collection_id"])
         return {"quiz": quiz}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+    except Exception:
+        return {"quiz": []}  # Trả về mảng rỗng để không lỗi giao diện
 
 @router.get("/{document_id}/mindmap")
 async def get_document_mindmap(document_id: str, db: AsyncIOMotorDatabase = Depends(get_db)):
@@ -128,8 +132,8 @@ async def get_document_mindmap(document_id: str, db: AsyncIOMotorDatabase = Depe
     try:
         mindmap = await generate_mindmap(doc["chroma_collection_id"])
         return {"mindmap": mindmap}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+    except Exception:
+        return {"mindmap": "mindmap\n  root((Lỗi))\n    Không thể tạo sơ đồ tư duy"}
 
 @router.get("/{document_id}/sessions", response_model=list[ChatSessionResponse])
 async def list_sessions(
