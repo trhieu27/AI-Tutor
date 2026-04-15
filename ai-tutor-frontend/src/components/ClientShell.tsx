@@ -16,7 +16,7 @@ export default function ClientShell({ children }: { children: React.ReactNode })
 
       {/* Sidebar - Mobile Overlay */}
       {isSidebarOpen && (
-        <div className="fixed inset-0 z-[100] flex lg:hidden">
+        <div className="fixed inset-0 z-[1000] flex lg:hidden">
           <div
             className="absolute inset-0 bg-black/40 backdrop-blur-sm"
             onClick={() => setIsSidebarOpen(false)}
@@ -29,7 +29,9 @@ export default function ClientShell({ children }: { children: React.ReactNode })
 
       {/* Main Content Area */}
       <div className="flex-1 flex flex-col min-w-0 h-full overflow-hidden w-full relative">
-        <Header onMenuClick={() => setIsSidebarOpen(true)} />
+        <div className="z-[100] relative">
+          <Header onMenuClick={() => setIsSidebarOpen(true)} />
+        </div>
         <main className="flex-1 overflow-x-hidden overflow-y-auto w-full bg-surface">
           {children}
         </main>

@@ -1,4 +1,5 @@
 import os
+import logging
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
@@ -8,22 +9,23 @@ from app.core.config import get_settings
 from app.core.database import init_db, close_db
 from app.api import documents, chat, auth
 
+logger = logging.getLogger(__name__)
 settings = get_settings()
+settings.APP_VERSION = "1.0.1" # Force version bump for verification
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Startup
-    print(f"🚀 Starting {settings.APP_NAME} v{settings.APP_VERSION}")
+    logger.info(f"Starting {settings.APP_NAME} v{settings.APP_VERSION}")
     os.makedirs("./storage", exist_ok=True)
     os.makedirs(settings.UPLOAD_DIR, exist_ok=True)
     os.makedirs(settings.CHROMA_PERSIST_DIR, exist_ok=True)
     await init_db()
-    print("✅ Database initialized")
     yield
     # Shutdown
     await close_db()
-    print("👋 Shutting down")
+    logger.info("Shutting down")
 
 
 app = FastAPI(
@@ -46,17 +48,15 @@ app.add_middleware(
 # Routers
 @app.middleware("http")
 async def log_requests(request, call_next):
-    print(f"📥 REQUEST: {request.method} {request.url.path}")
     try:
         response = await call_next(request)
-        print(f"📤 RESPONSE: {response.status_code}")
         return response
     except Exception as e:
-        print(f"❌ CRITICAL ERROR: {str(e)}")
+        logging.error(f"CRITICAL ERROR: {str(e)}")
         from fastapi.responses import JSONResponse
         return JSONResponse(
             status_code=500,
-            content={"detail": f"Internal Server Error: {str(e)}"}
+            content={"detail": f"Backend Error: {str(e)}"}
         )
 
 app.include_router(auth.router, prefix="/api/v1")

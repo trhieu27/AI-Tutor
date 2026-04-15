@@ -3,15 +3,28 @@
 import { HEADER_TEXTS } from '@/constants/texts';
 import { useAuth } from '@/context/AuthContext';
 import { useRouter, usePathname } from 'next/navigation';
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 
 export default function Header({ onMenuClick }: { onMenuClick?: () => void }) {
   const { logout } = useAuth();
   const router = useRouter();
   const pathname = usePathname();
   const [showUserMenu, setShowUserMenu] = useState(false);
-  
+  const menuRef = useRef<HTMLDivElement>(null);
+
   const isChatPage = pathname?.includes('/chat/');
+
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
+        setShowUserMenu(false);
+      }
+    }
+    if (showUserMenu) {
+      document.addEventListener("mousedown", handleClickOutside);
+    }
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [showUserMenu]);
 
   const handleLogout = () => {
     logout();
@@ -22,7 +35,7 @@ export default function Header({ onMenuClick }: { onMenuClick?: () => void }) {
     <header className="h-16 flex items-center justify-between px-4 lg:px-8 bg-white shrink-0 border-b border-outline/50 shadow-sm z-10 w-full relative">
       <div className="flex items-center gap-2 sm:gap-4 flex-1 lg:max-w-xl">
         {onMenuClick && (
-          <button 
+          <button
             type="button"
             className="lg:hidden w-11 h-11 shrink-0 flex items-center justify-center rounded-full hover:bg-surface transition-colors cursor-pointer border border-outline/50 bg-white shadow-sm"
             onClick={() => onMenuClick()}
@@ -43,22 +56,24 @@ export default function Header({ onMenuClick }: { onMenuClick?: () => void }) {
             <span className="material-symbols-outlined text-[26px]">history</span>
           </button>
         </div>
-        
+
         <div className="hidden sm:block w-px h-8 bg-outline"></div>
 
-        <div className="relative">
-          <button 
+        <div className="relative" ref={menuRef}>
+          <button
             onClick={() => setShowUserMenu(!showUserMenu)}
             className="flex items-center gap-4 cursor-pointer hover:opacity-80 transition-opacity"
           >
             <div className="text-right hidden sm:block">
               <p className="text-sm font-semibold text-on-surface">{HEADER_TEXTS.userName}</p>
             </div>
-            <div className="w-11 h-11 rounded-full bg-[#f4b39b] shadow-sm shrink-0"></div>
+            <div className="w-11 h-11 rounded-full bg-gradient-to-tr from-blue-600 to-blue-400 shadow-lg shadow-blue-100 shrink-0 flex items-center justify-center text-white font-bold text-sm">
+              {HEADER_TEXTS.userName.split(' ').map(n => n[0]).join('').slice(-2).toUpperCase()}
+            </div>
           </button>
 
           {showUserMenu && (
-            <div className="absolute right-0 top-full mt-2 w-48 bg-white rounded-lg shadow-lg border border-outline/50 py-2 z-50">
+            <div className="absolute right-0 top-full mt-2 w-48 bg-white rounded-2xl shadow-2xl border border-outline/30 py-2 z-[9999] animate-in fade-in zoom-in duration-200">
               <button
                 onClick={handleLogout}
                 className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-red-600 hover:bg-red-50 transition-colors text-left"

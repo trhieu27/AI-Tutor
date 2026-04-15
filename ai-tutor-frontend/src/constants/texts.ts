@@ -19,7 +19,7 @@ export const SIDEBAR_TEXTS = {
 
 export const HEADER_TEXTS = {
   searchPlaceholder: "Tìm kiếm tài liệu, bài giảng...",
-  userName: "Học viên Demo"
+  userName: "Trần Hiếu"
 };
 
 export const UPLOAD_AREA_TEXTS = {

@@ -18,26 +18,21 @@ async def get_db():
 
 async def init_db():
     """Initialize MongoDB connection on startup."""
-    print(f"🔗 Connecting to MongoDB at {settings.MONGO_URL}...")
+    logger.info("Connecting to MongoDB...")
     try:
-        # Use certifi for SSL/TLS certificate verification
         db_container.client = AsyncIOMotorClient(
             settings.MONGO_URL,
             tlsCAFile=certifi.where(),
-            serverSelectionTimeoutMS=5000  # 5 seconds timeout
+            serverSelectionTimeoutMS=5000
         )
         db_container.db = db_container.client[settings.DATABASE_NAME]
-        
-        # Check connection health
         await db_container.client.admin.command('ping')
-        print(f"✅ Connected to MongoDB: {settings.DATABASE_NAME}")
+        logger.info(f"Connected to MongoDB: {settings.DATABASE_NAME}")
     except Exception as e:
-        print(f"❌ DATABASE CONNECTION ERROR: {str(e)}")
-        # We don't raise here to allow the app to start and show health check status
-        # but the app might fail later if DB is required.
+        logger.error(f"DATABASE CONNECTION ERROR: {str(e)}")
 
 async def close_db():
     """Close MongoDB connection on shutdown."""
     if db_container.client:
         db_container.client.close()
-        print("🔌 MongoDB connection closed")
+        logger.info("MongoDB connection closed")
