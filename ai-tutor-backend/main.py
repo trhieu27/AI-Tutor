@@ -11,7 +11,7 @@ from app.api import documents, chat, auth
 
 logger = logging.getLogger(__name__)
 settings = get_settings()
-settings.APP_VERSION = "1.0.1" # Force version bump for verification
+settings.APP_VERSION = "1.0.2" # Fixed Model Names
 
 
 @asynccontextmanager
@@ -66,7 +66,13 @@ app.include_router(chat.router, prefix="/api/v1")
 
 @app.get("/")
 async def root():
-    return {"status": "ok", "app": settings.APP_NAME, "version": settings.APP_VERSION}
+    from datetime import datetime
+    return {
+        "status": "ok", 
+        "app": settings.APP_NAME, 
+        "version": settings.APP_VERSION,
+        "updated_at": datetime.utcnow().isoformat()
+    }
 
 
 @app.get("/health")

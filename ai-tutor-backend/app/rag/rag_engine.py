@@ -53,7 +53,7 @@ def get_embeddings():
     global _embeddings
     if _embeddings is None:
         _embeddings = GoogleGenerativeAIEmbeddings(
-            model="models/text-embedding-004",
+            model="models/gemini-embedding-001",
             google_api_key=settings.GEMINI_API_KEY,
         )
     return _embeddings
@@ -63,7 +63,7 @@ def get_llm():
     global _llm
     if _llm is None:
         _llm = ChatGoogleGenerativeAI(
-            model="gemini-1.5-flash",
+            model="gemini-flash-latest",
             google_api_key=settings.GEMINI_API_KEY,
             temperature=0.2,
         )
