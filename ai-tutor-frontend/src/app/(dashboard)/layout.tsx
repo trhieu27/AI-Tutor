@@ -30,10 +30,10 @@ export default function DashboardLayout({
         <Sidebar />
       </div>
 
-      {/* Main Content Area - Added padding left to account for fixed sidebar */}
+      {/* Main Content Area */}
       <div className="flex-1 flex flex-col min-w-0 min-h-screen relative bg-[var(--background)] lg:pl-64">
         {/* Organic Background Mesh */}
-        <div className="fixed inset-0 z-0 opacity-30 pointer-events-none">
+        <div className="fixed inset-0 z-0 opacity-0 dark:opacity-30 pointer-events-none transition-opacity duration-500">
           <div className="absolute top-[-10%] right-[-10%] w-[40%] h-[40%] bg-indigo-600/20 blur-[150px] rounded-full"></div>
           <div className="absolute bottom-[-10%] left-[-10%] w-[40%] h-[40%] bg-purple-600/20 blur-[150px] rounded-full"></div>
         </div>
@@ -54,8 +54,11 @@ export default function DashboardLayout({
           background: transparent;
         }
         .custom-scrollbar::-webkit-scrollbar-thumb {
-          background: rgba(255, 255, 255, 0.05);
+          background: rgba(148, 163, 184, 0.3);
           border-radius: 10px;
+        }
+        .dark .custom-scrollbar::-webkit-scrollbar-thumb {
+          background: rgba(255, 255, 255, 0.05);
         }
         .custom-scrollbar::-webkit-scrollbar-thumb:hover {
           background: rgba(99, 102, 241, 0.3);

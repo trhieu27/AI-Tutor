@@ -19,7 +19,7 @@ export function ThemeToggle() {
   return (
     <button
       onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
-      className="w-10 h-10 flex items-center justify-center rounded-xl bg-white/5 dark:bg-white/5 light:bg-slate-100 text-slate-400 dark:text-indigo-400 light:text-slate-500 hover:bg-white/10 dark:hover:bg-indigo-500/10 light:hover:bg-slate-200 transition-all active:scale-95 group relative overflow-hidden"
+      className="w-10 h-10 flex items-center justify-center rounded-xl bg-slate-100 dark:bg-white/5 text-slate-500 dark:text-indigo-400 hover:bg-slate-200 dark:hover:bg-indigo-500/10 transition-all active:scale-95 group relative overflow-hidden"
       aria-label="Toggle theme"
     >
       <div className="relative w-6 h-6 flex items-center justify-center">
@@ -33,7 +33,7 @@ export function ThemeToggle() {
         </span>
       </div>
       
-      {/* Subtle background glow that changes color */}
+      {/* Subtle background glow */}
       <div className={`absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none ${theme === 'dark' ? 'bg-indigo-500/10' : 'bg-amber-500/10'}`}></div>
     </button>
   );
