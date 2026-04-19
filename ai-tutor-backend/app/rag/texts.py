@@ -41,21 +41,20 @@ Nội dung tài liệu:
 {context}"""
 
 PROMPT_MINDMAP = """Dựa trên nội dung tài liệu học tập dưới đây, hãy tạo ra một sơ đồ tư duy (Mindmap) về các khái niệm chính.
-    Yêu cầu:
+    Yêu cầu quan trọng về cú pháp:
     1. Sử dụng định dạng Mermaid.js mindmap.
-    2. Cấu trúc rõ ràng, phân cấp từ chủ đề lớn đến các chi tiết nhỏ.
-    3. KHÔNG trả về gì khác ngoài mã Mermaid, không có block markdown (```).
-    4. Các nút trong sơ đồ phải bằng tiếng Việt.
+    2. LUÔN LUÔN bao bọc nội dung văn bản của mỗi node trong dấu ngoặc vuông `[ ]`. Ví dụ: `Nhánh chính[Nội dung có (ngoặc)]`.
+    3. Cấu trúc rõ ràng, phân cấp từ chủ đề lớn đến các chi tiết nhỏ.
+    4. KHÔNG trả về gì khác ngoài mã Mermaid, không có block markdown (```).
+    5. Các nút trong sơ đồ phải bằng tiếng Việt.
 
-    Ví dụ định dạng:
+    Ví dụ định dạng đúng:
     mindmap
       root((Chủ đề chính))
-        Khái niệm 1
-          Chi tiết 1.1
-          Chi tiết 1.2
-        Khái niệm 2
-          Chi tiết 2.1
-          Chi tiết 2.2
+        Nhánh 1[Khái niệm phức tạp (có ngoặc)]
+          Ý 1.1[Chi tiết cụ thể: mô tả ngắn]
+          Ý 1.2[Chi tiết khác]
+        Nhánh 2[Khái niệm 2]
 
     Nội dung tài liệu:
     {context}"""

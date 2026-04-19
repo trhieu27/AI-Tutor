@@ -63,7 +63,7 @@ def get_llm():
     global _llm
     if _llm is None:
         _llm = ChatGoogleGenerativeAI(
-            model="gemini-flash-latest",
+            model="gemini-1.5-flash",
             google_api_key=settings.GEMINI_API_KEY,
             temperature=0.2,
         )
@@ -321,11 +321,25 @@ async def generate_mindmap(collection_name: str) -> str:
 
         response = await llm.ainvoke(prompt)
         content = _extract_text(response.content).strip()
-        # Ensure it starts with mindmap and remove markdown
-        if "```" in content:
-            content = content.split("```")[1]
-            if content.startswith("mermaid"):
-                content = content[7:]
+        # Cleaner way to extract mermaid block
+        import re
+        content = _extract_text(response.content).strip()
+        
+        # Look for mindmap block
+        mm_match = re.search(r'(mindmap[\s\S]*?)(?:```|$)', content)
+        if mm_match:
+            content = mm_match.group(1).strip()
+        else:
+            # Fallback for code blocks
+            if "```" in content:
+                content = content.split("```")[1]
+                if content.startswith("mermaid"):
+                    content = content[7:]
+        
+        # Final safety check: ensure the word mindmap is there
+        if "mindmap" not in content.lower():
+            content = "mindmap\n  root((Sơ đồ tư duy))\n" + content
+            
         return content.strip()
     except Exception as e:
         print(f"🔥 ERROR in generate_mindmap: {str(e)}")

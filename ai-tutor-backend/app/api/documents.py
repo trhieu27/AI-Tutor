@@ -84,7 +84,7 @@ async def upload_document(
         status=DocumentStatus.UPLOADING,
     )
     
-    await db.documents.insert_one(document.model_dump())
+    await db.documents.insert_one(document.dict())
 
     if suffix in [".pdf", ".docx", ".doc"]:
         background_tasks.add_task(process_document_background, document_id, file_path)
