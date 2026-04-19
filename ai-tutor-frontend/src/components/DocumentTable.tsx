@@ -3,53 +3,42 @@
 import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { DocumentResponse, fetchDocuments, deleteDocument } from "@/services/api.service";
+import { DocumentResponse, deleteDocument } from "@/services/api.service";
 import { DOCUMENT_TABLE_TEXTS } from "@/constants/texts";
-import { APP_COLORS } from "@/constants/colors";
+import { useUpload } from "@/context/UploadContext";
+import { useDocuments } from "@/context/DocumentContext";
 
 interface DocumentTableProps {
-  refreshTrigger?: number; // Increment to trigger a re-fetch
+  refreshTrigger?: number;
   showActions?: boolean;
+  defaultAction?: "summary" | "quiz" | "mindmap" | "questions";
+  limit?: number;
 }
 
-export default function DocumentTable({ refreshTrigger = 0, showActions = false }: DocumentTableProps) {
+export default function DocumentTable({
+  refreshTrigger = 0,
+  showActions = false,
+  defaultAction,
+  limit
+}: DocumentTableProps) {
   const router = useRouter();
-  const [documents, setDocuments] = useState<DocumentResponse[]>([]);
+  const { lastUploadTime } = useUpload();
+  const { documents, loading, refreshDocuments } = useDocuments();
+
+  const getRedirectUrl = (docId: string) => {
+    if (defaultAction === "mindmap") return `/mindmap/${docId}`;
+    const baseUrl = `/chat/${docId}`;
+    return defaultAction ? `${baseUrl}?action=${defaultAction}` : baseUrl;
+  };
+
   const [searchTerm, setSearchTerm] = useState("");
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
-  const loadDocuments = useCallback(async () => {
-    console.log("🔄 Calling fetchDocuments()...");
-    setLoading(true);
-    setError("");
-    try {
-      const docs = await fetchDocuments();
-      console.log("✅ fetchDocuments() success:", docs.length, "docs");
-      setDocuments(docs);
-    } catch (err) {
-      console.error("❌ fetchDocuments() error:", err);
-      setError("Không thể tải danh sách tài liệu.");
-    } finally {
-      setLoading(false);
+  useEffect(() => {
+    if (refreshTrigger > 0) {
+      refreshDocuments();
     }
-  }, []);
-
-  useEffect(() => {
-    loadDocuments();
-  }, [loadDocuments, refreshTrigger]);
-
-  // Poll documents that are still processing
-  useEffect(() => {
-    const processingDocs = documents.filter(
-      (d) => d.status === "UPLOADING" || d.status === "PROCESSING"
-    );
-    if (processingDocs.length === 0) return;
-
-    const timer = setTimeout(() => loadDocuments(), 3000);
-    return () => clearTimeout(timer);
-  }, [documents, loadDocuments]);
+  }, [refreshTrigger, refreshDocuments]);
 
   const handleDelete = async (documentId: string, fileName: string) => {
     if (!confirm(`Xóa "${fileName}"? Thao tác này không thể hoàn tác.`)) return;
@@ -68,24 +57,27 @@ export default function DocumentTable({ refreshTrigger = 0, showActions = false 
     switch (status) {
       case "READY":
         return (
-          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold whitespace-nowrap" style={{ backgroundColor: APP_COLORS.successBg, color: APP_COLORS.success }}>
-            <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ backgroundColor: APP_COLORS.success }} />
+          <span className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-[11px] font-black uppercase tracking-widest bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 shadow-[0_0_15px_rgba(16,185,129,0.1)] whitespace-nowrap">
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,1)] animate-pulse shrink-0" />
             {DOCUMENT_TABLE_TEXTS.status.processed}
           </span>
         );
       case "PROCESSING":
       case "UPLOADING":
         return (
-          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold whitespace-nowrap" style={{ backgroundColor: APP_COLORS.warningBg, color: APP_COLORS.warning }}>
-            <span className="w-1.5 h-1.5 rounded-full shrink-0 animate-pulse" style={{ backgroundColor: APP_COLORS.warning }} />
-            {status === "UPLOADING" ? "Đang tải lên" : DOCUMENT_TABLE_TEXTS.status.extracting}
+          <span className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-[11px] font-black uppercase tracking-widest bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 shadow-[0_0_15px_rgba(99,102,241,0.1)] whitespace-nowrap">
+            <svg className="w-3 h-3 animate-spin shrink-0" fill="none" viewBox="0 0 24 24">
+              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+            </svg>
+            {status === "UPLOADING" ? "ĐANG TẢI" : "ĐANG PHÂN TÍCH"}
           </span>
         );
       case "FAILED":
         return (
-          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold whitespace-nowrap bg-red-100 text-red-600">
-            <span className="w-1.5 h-1.5 rounded-full shrink-0 bg-red-600" />
-            Thất bại
+          <span className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-[11px] font-black uppercase tracking-widest bg-red-500/10 text-red-400 border border-red-500/20">
+            <span className="w-1.5 h-1.5 rounded-full bg-red-500" />
+            LỖI
           </span>
         );
     }
@@ -93,172 +85,130 @@ export default function DocumentTable({ refreshTrigger = 0, showActions = false 
 
   const getFileIcon = (fileName: string) => {
     const ext = fileName.split(".").pop()?.toLowerCase();
-    if (ext === "pdf") {
-      return (
-        <div className="w-10 h-10 sm:w-12 sm:h-12 flex items-center justify-center shrink-0" style={{ color: APP_COLORS.pdfIcon }}>
-          <span className="material-symbols-outlined text-[28px] sm:text-[32px]">picture_as_pdf</span>
-        </div>
-      );
-    }
+    const isPdf = ext === "pdf";
     return (
-      <div className="w-10 h-10 sm:w-12 sm:h-12 flex items-center justify-center shrink-0" style={{ color: APP_COLORS.docIcon }}>
-        <span className="material-symbols-outlined text-[28px] sm:text-[32px]">description</span>
+      <div className={`w-12 h-12 rounded-[18px] flex items-center justify-center shrink-0 border border-white/10 transition-all group-hover:scale-110 shadow-lg ${isPdf ? 'bg-red-500/10 text-red-400' : 'bg-blue-500/10 text-blue-400'}`}>
+        <span className="material-symbols-outlined text-[28px]">{isPdf ? 'picture_as_pdf' : 'description'}</span>
       </div>
     );
   };
 
   if (loading && documents.length === 0) {
     return (
-      <div className="bg-white rounded-2xl sm:rounded-[24px] mt-6 sm:mt-8 shadow-sm border border-outline/20 p-16 flex items-center justify-center">
-        <div className="flex flex-col items-center gap-3">
-          <svg className="w-8 h-8 animate-spin text-primary" fill="none" viewBox="0 0 24 24">
-            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-          </svg>
-          <p className="text-on-surface-variant text-sm">Đang tải tài liệu...</p>
-        </div>
+      <div className="p-20 flex flex-col items-center gap-4 bg-slate-900/20 rounded-[48px] border border-white/5">
+        <div className="w-10 h-10 border-2 border-indigo-500/20 border-t-indigo-400 rounded-full animate-spin"></div>
+        <p className="text-[10px] text-white/30 font-black uppercase tracking-[0.3em]">Đang đồng bộ dữ liệu...</p>
       </div>
     );
   }
 
-  if (error) {
-    return (
-      <div className="bg-white rounded-2xl sm:rounded-[24px] mt-6 sm:mt-8 shadow-sm border border-red-200 p-10 flex flex-col items-center gap-3">
-        <span className="material-symbols-outlined text-4xl text-red-400">wifi_off</span>
-        <p className="text-red-600 font-medium text-center max-w-sm">{error}</p>
-        <button onClick={loadDocuments} className="px-5 py-2 bg-primary text-white rounded-xl text-sm font-semibold hover:bg-primary/90 transition-colors">
-          Thử lại
-        </button>
-      </div>
-    );
-  }
-
-  const filteredDocuments = documents.filter((doc) =>
+  const filteredDocuments = documents.filter(doc =>
     doc.file_name.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   return (
-    <div className="bg-white rounded-[24px] border border-outline/10 shadow-sm overflow-hidden mt-6 sm:mt-8">
-      <div className="px-5 py-5 sm:px-8 sm:py-6 flex flex-col lg:flex-row lg:items-center justify-between border-b border-outline/30 gap-4 bg-white">
-        <div className="flex flex-col sm:flex-row sm:items-center gap-4 flex-1">
-          <div>
-            <h2 className="text-[20px] sm:text-[22px] font-bold text-on-surface tracking-tight">{DOCUMENT_TABLE_TEXTS.title}</h2>
-            <p className="text-sm text-on-surface-variant mt-0.5">{documents.length} tài liệu</p>
-          </div>
-
-          {/* Search Bar */}
-          <div className="relative flex-1 max-w-md ml-0 sm:ml-4 group">
-            <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant group-focus-within:text-primary transition-colors text-[20px]">search</span>
-            <input
-              type="text"
-              placeholder="Tra cứu tài liệu của bạn..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-10 pr-4 py-2.5 bg-white border border-outline/40 rounded-xl focus:outline-none focus:ring-4 focus:ring-primary/5 focus:border-primary transition-all text-sm text-on-surface"
-            />
+    <div className="flex flex-col h-fit max-h-full bg-slate-900/20 rounded-[48px] overflow-hidden border border-[var(--border-color)] transition-all duration-500">
+      {/* Header with Search */}
+      <div className="px-8 py-5 flex flex-col lg:flex-row lg:items-center justify-between gap-6 bg-slate-50 dark:bg-slate-900/40 border-b border-slate-200 dark:border-white/10 transition-colors duration-500">
+        <div>
+          <h2 className="text-2xl font-black text-slate-900 dark:text-white tracking-tight leading-none mb-2">{DOCUMENT_TABLE_TEXTS.title}</h2>
+          <div className="flex items-center gap-2">
+            <span className="w-1.5 h-1.5 rounded-full bg-indigo-500 shadow-[0_0_8px_rgba(99,102,241,1)]"></span>
+            <p className="text-[11px] text-slate-500 dark:text-slate-400 font-bold uppercase tracking-widest">{documents.length} TÀI LIỆU TRONG THƯ VIỆN</p>
           </div>
         </div>
 
-        <div className="flex items-center gap-2">
-          <button onClick={loadDocuments} className="flex items-center gap-2 px-4 sm:px-5 py-2 sm:py-2.5 bg-white border border-outline/70 rounded-xl hover:bg-surface transition-colors font-semibold text-[13px] text-on-surface shadow-sm active:scale-95">
-            <span className="material-symbols-outlined text-base">refresh</span>
-            Làm mới
+        <div className="flex items-center gap-4 flex-1 max-w-xl">
+          <div className="relative flex-1 group">
+            <span className="material-symbols-outlined absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 dark:text-white/40 group-focus-within:text-indigo-500 transition-colors text-[20px]">search</span>
+            <input
+              type="text"
+              placeholder="Tìm kiếm tài liệu học tập..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="w-full pl-12 pr-6 py-3 bg-slate-100 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-2xl focus:outline-none focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500/30 transition-all text-sm text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-white/40 font-bold"
+            />
+          </div>
+          <button onClick={() => refreshDocuments()} className="w-12 h-12 flex items-center justify-center bg-slate-100 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-2xl text-slate-500 dark:text-white/60 hover:text-indigo-600 dark:hover:text-white hover:bg-slate-200 dark:hover:bg-white/10 transition-all active:scale-90">
+            <span className="material-symbols-outlined text-[22px]">refresh</span>
           </button>
         </div>
       </div>
 
-      {documents.length === 0 ? (
-        <div className="p-16 flex flex-col items-center gap-3">
-          <span className="material-symbols-outlined text-5xl text-on-surface-variant/40">folder_open</span>
-          <p className="text-on-surface-variant font-medium">Chưa có tài liệu nào. Hãy tải lên tài liệu đầu tiên!</p>
-        </div>
-      ) : (
-        <div className="overflow-x-auto w-full custom-scrollbar pb-2">
-          <table className="w-full text-left border-collapse min-w-[900px]">
-            <thead>
-              <tr className="border-b border-outline/30">
-                <th className="py-4 px-5 sm:px-8 text-[11px] font-bold tracking-widest uppercase text-on-surface-variant w-[40%] whitespace-nowrap">{DOCUMENT_TABLE_TEXTS.colName}</th>
-                <th className="py-4 px-4 text-[11px] font-bold tracking-widest uppercase text-on-surface-variant whitespace-nowrap">{DOCUMENT_TABLE_TEXTS.colDate}</th>
-                <th className="py-4 px-4 text-[11px] font-bold tracking-widest uppercase text-on-surface-variant whitespace-nowrap">Trang</th>
-                <th className="py-4 px-5 sm:px-8 text-[11px] font-bold tracking-widest uppercase text-on-surface-variant text-right whitespace-nowrap">
-                  {DOCUMENT_TABLE_TEXTS.colStatus}
-                </th>
-                {showActions && (
-                  <th className="py-4 px-5 sm:px-8 text-[11px] font-bold tracking-widest uppercase text-on-surface-variant text-right whitespace-nowrap">{DOCUMENT_TABLE_TEXTS.colActions}</th>
-                )}
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-outline/30">
-              {filteredDocuments.map((doc) => (
+      {/* Table Content - Height follows parent (stretched grid), inner content scrolls */}
+      <div className="overflow-x-auto h-auto overflow-y-auto w-full custom-scrollbar relative">
+        <table className="w-full text-left border-collapse table-fixed min-w-full">
+          <thead className="sticky top-0 z-20 bg-slate-900 shadow-sm">
+            <tr className="border-b border-white/10">
+              <th className="py-5 px-8 text-[10px] font-black tracking-[0.2em] uppercase text-slate-200" style={{ width: '38%' }}>{DOCUMENT_TABLE_TEXTS.colName}</th>
+              <th className="py-5 px-4 text-[10px] font-black tracking-[0.2em] uppercase text-slate-200 text-center" style={{ width: '15%' }}>{DOCUMENT_TABLE_TEXTS.colDate}</th>
+              <th className="py-5 px-4 text-[10px] font-black tracking-[0.2em] uppercase text-slate-200 text-center" style={{ width: '12%' }}>QUY MÔ</th>
+              <th className="py-5 px-4 text-[10px] font-black tracking-[0.2em] uppercase text-slate-200 text-center" style={{ width: '15%' }}>{DOCUMENT_TABLE_TEXTS.colStatus}</th>
+              {showActions && <th className="py-5 px-8 text-[10px] font-black tracking-[0.2em] uppercase text-slate-200 text-center" style={{ width: '20%' }}>THAO TÁC</th>}
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-slate-200 dark:divide-white/[0.05]">
+            {filteredDocuments.length > 0 ? (
+              filteredDocuments.map((doc) => (
                 <tr
                   key={doc.id}
-                  onClick={() => doc.status === "READY" && router.push(`/chat/${doc.id}`)}
-                  className={`transition-colors group border-b border-outline/10 ${doc.status === "READY"
-                    ? "hover:bg-blue-50/40 cursor-pointer"
-                    : "opacity-75"
-                    }`}
+                  onClick={() => doc.status === "READY" && router.push(getRedirectUrl(doc.id))}
+                  className={`transition-all duration-300 relative group ${doc.status === "READY" ? "hover:bg-slate-50 dark:hover:bg-white/[0.04] cursor-pointer" : "opacity-60 cursor-wait"}`}
                 >
-                  <td className="py-4 sm:py-6 px-5 sm:px-8">
-                    <div className="flex items-center gap-3 sm:gap-5">
+                  <td className="py-6 px-8 relative overflow-hidden min-w-0">
+                    <div className="flex items-center gap-5 w-full min-w-0">
                       {getFileIcon(doc.file_name)}
-                      <div className="min-w-0 max-w-[180px] sm:max-w-[400px] overflow-hidden whitespace-nowrap group">
-                        <p
-                          className={`font-bold text-[15px] sm:text-[16px] text-on-surface mb-0.5 truncate ${doc.file_name.length > 30 ? 'marquee-text' : ''}`}
-                          title={doc.file_name}
-                        >
-                          {doc.file_name}
-                        </p>
-                        <p className="text-[12px] sm:text-[13px] text-on-surface-variant font-medium">
-                          {doc.file_size_mb} MB
-                        </p>
+                      <div className="min-w-0 flex-1 relative overflow-hidden group/name">
+                        <div className="flex flex-col min-w-0">
+                          <p className="font-bold text-[14px] sm:text-[15px] text-slate-900 dark:text-white mb-1 leading-snug group-hover/name:text-indigo-600 dark:group-hover/name:text-indigo-300 transition-colors truncate whitespace-nowrap group-hover/name:text-clip group-hover/name:overflow-visible group-hover/name:animate-marquee">
+                            {doc.file_name}
+                          </p>
+                          <p className="text-[10px] text-slate-500 dark:text-slate-400 font-bold uppercase tracking-wider whitespace-nowrap overflow-hidden text-ellipsis">
+                            {doc.file_size_mb} MB • {doc.file_name.split('.').pop()?.toUpperCase()}
+                          </p>
+                        </div>
                       </div>
                     </div>
                   </td>
-                  <td className="py-4 sm:py-6 px-4 whitespace-nowrap">
-                    <p className="text-[14px] font-medium text-slate-500">
+                  <td className="py-6 px-4 whitespace-nowrap text-center">
+                    <p className="text-[13px] font-bold text-slate-600 dark:text-slate-300">
                       {new Date(doc.uploaded_at).toLocaleDateString("vi-VN")}
                     </p>
                   </td>
-                  <td className="py-4 sm:py-6 px-4">
-                    <p className="text-[14px] text-slate-500 font-medium">
-                      {doc.page_count > 0 ? `${doc.page_count} trang` : "—"}
+                  <td className="py-6 px-4 whitespace-nowrap text-center">
+                    <p className="text-[13px] font-bold text-slate-600 dark:text-slate-300">
+                      {doc.page_count > 0 ? `${doc.page_count} TRANG` : "—"}
                     </p>
                   </td>
-                  <td className="py-4 sm:py-6 px-5 sm:px-8 text-right">
-                    {getStatusBadge(doc.status)}
+                  <td className="py-6 px-4 text-center">
+                    <div className="flex justify-center scale-90">
+                      {getStatusBadge(doc.status)}
+                    </div>
                   </td>
                   {showActions && (
-                    <td className="py-4 sm:py-6 px-5 sm:px-8 text-right" onClick={(e) => e.stopPropagation()}>
-                      <div className="flex items-center justify-end gap-3 sm:gap-4">
-                        {doc.status === "READY" ? (
-                          <div className="flex items-center gap-2">
-                            <Link
-                              href={`/chat/${doc.id}`}
-                              className="flex items-center gap-1.5 text-[13px] sm:text-[14px] text-primary hover:text-primary/80 font-semibold px-3 py-1.5 rounded-lg hover:bg-primary-container/50 transition-colors whitespace-nowrap"
-                            >
-                              <span className="material-symbols-outlined text-base">chat</span>
-                              Hỏi AI
+                    <td className="py-6 px-8 text-center" onClick={(e) => e.stopPropagation()}>
+                      <div className="flex items-center justify-center gap-3">
+                        {doc.status === "READY" && (
+                          <>
+                            <Link href={getRedirectUrl(doc.id)} className="w-9 h-9 rounded-xl bg-white/5 border border-white/10 text-indigo-400 hover:bg-indigo-500 hover:text-white flex items-center justify-center transition-all shadow-lg active:scale-95" title="Hỏi AI">
+                              <span className="material-symbols-outlined text-base">chat_bubble</span>
                             </Link>
-                            <Link
-                              href={`/chat/${doc.id}?action=quiz`}
-                              className="flex items-center gap-1.5 text-[13px] sm:text-[14px] text-orange-600 hover:text-orange-700 font-semibold px-3 py-1.5 rounded-lg hover:bg-orange-50 transition-colors whitespace-nowrap"
-                            >
+                            <Link href={`/chat/${doc.id}?action=quiz`} className="w-9 h-9 rounded-xl bg-white/5 border border-white/10 text-orange-400 hover:bg-orange-500 hover:text-white flex items-center justify-center transition-all shadow-lg active:scale-95" title="Luyện tập">
                               <span className="material-symbols-outlined text-base">quiz</span>
-                              Luyện tập
                             </Link>
-                          </div>
-                        ) : (
-                          <span className="text-[13px] text-on-surface-variant/50 px-3 py-1.5 italic">Đang chờ...</span>
+                            <Link href={`/mindmap/${doc.id}`} className="w-9 h-9 rounded-xl bg-white/5 border border-white/10 text-cyan-400 hover:bg-cyan-500 hover:text-white flex items-center justify-center transition-all shadow-lg active:scale-95" title="Sơ đồ tư duy">
+                              <span className="material-symbols-outlined text-base">hub</span>
+                            </Link>
+                          </>
                         )}
                         <button
                           onClick={() => handleDelete(doc.id, doc.file_name)}
                           disabled={deletingId === doc.id}
-                          className="flex items-center gap-1 text-on-surface-variant hover:text-red-500 font-medium p-2 rounded-lg hover:bg-red-50 transition-colors disabled:opacity-50"
+                          className="w-9 h-9 rounded-xl bg-white/5 border border-white/10 text-slate-400 hover:bg-red-500 hover:text-white flex items-center justify-center transition-all disabled:opacity-50"
+                          title="Xóa"
                         >
                           {deletingId === doc.id ? (
-                            <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
-                              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-                            </svg>
+                            <div className="w-3 h-3 border-2 border-white/20 border-t-white rounded-full animate-spin"></div>
                           ) : (
                             <span className="material-symbols-outlined text-base">delete</span>
                           )}
@@ -267,33 +217,69 @@ export default function DocumentTable({ refreshTrigger = 0, showActions = false 
                     </td>
                   )}
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
+              ))
+            ) : (
+              <tr>
+                <td
+                  colSpan={showActions ? 5 : 4}
+                  className="p-0 border-none"
+                >
+                  <div
+                    className="min-h-[280px] flex flex-col items-center justify-center text-center cursor-pointer group/empty py-10"
+                    onClick={() => {
+                      if (window.location.pathname !== '/') {
+                        router.push('/?action=upload');
+                      } else {
+                        document.getElementById('upload-area')?.scrollIntoView({ behavior: 'smooth' });
+                        const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement;
+                        if (fileInput) fileInput.click();
+                      }
+                    }}
+                  >
+                    <div className="flex flex-col items-center gap-6 max-w-sm mx-auto transition-all duration-300 group-hover/empty:scale-105">
+                      <div className="relative group">
+                        <div className="w-24 h-24 bg-white/5 rounded-[40px] flex items-center justify-center border border-white/10 shadow-2xl transition-all duration-500 group-hover/empty:bg-indigo-500/20 group-hover/empty:border-indigo-500/30 group-hover/empty:shadow-indigo-500/20">
+                          <span className="material-symbols-outlined text-indigo-400 text-5xl drop-shadow-[0_0_15px_rgba(99,102,241,0.5)] group-hover/empty:text-indigo-300">cloud_upload</span>
+                        </div>
+                      </div>
+                      <div className="space-y-2">
+                        <h3 className="text-xl font-black text-white tracking-tight group-hover/empty:text-indigo-300 transition-colors">{DOCUMENT_TABLE_TEXTS.empty?.title}</h3>
+                        <p className="text-[13px] text-slate-300 font-medium leading-relaxed px-4">
+                          {DOCUMENT_TABLE_TEXTS.empty?.subtitle}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </div>
 
-      <style jsx>{`
-        .marquee-text {
-          display: block;
-          overflow: hidden;
-          text-overflow: ellipsis;
-          white-space: nowrap;
+      <style jsx global>{`
+        .custom-scrollbar::-webkit-scrollbar {
+          width: 5px;
+          height: 8px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-track {
+          background: transparent;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+          background: rgba(255, 255, 255, 0.1);
+          border-radius: 10px;
         }
 
-        .marquee-text:hover {
-          display: inline-block;
-          animation: marquee-scroll 8s linear infinite;
-          text-overflow: clip;
-          overflow: visible;
-          white-space: nowrap;
-          width: fit-content;
-        }
-
-        @keyframes marquee-scroll {
+        @keyframes marquee {
           0% { transform: translateX(0); }
-          50% { transform: translateX(-30%); }
+          5% { transform: translateX(0); }
+          85% { transform: translateX(-40%); }
           100% { transform: translateX(0); }
+        }
+        .group\/name:hover .group-hover\/name\:animate-marquee {
+          animation: marquee 8s linear infinite;
+          display: inline-block;
+          padding-right: 50px;
         }
       `}</style>
     </div>

@@ -1,10 +1,9 @@
 "use client";
 
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
-import Image from "next/image";
-import Link from "next/link";
 import ReactMarkdown from "react-markdown";
+import MermaidChart from "@/components/MermaidChart";
 
 import { 
   fetchDocument, 
@@ -13,13 +12,11 @@ import {
   askQuestion,
   fetchDocumentSummary,
   fetchDocumentQuiz,
-  fetchDocumentMindmap,
   fetchDocumentStudyQuestions,
   deleteChatSession,
   DocumentResponse,
   ChatSessionResponse,
   MessageResponse,
-  ChatSource
 } from "@/services/api.service";
 import { CHAT_TEXTS } from "@/constants/texts";
 
@@ -43,8 +40,8 @@ export default function ChatPage() {
   const [isSummaryLoading, setIsSummaryLoading] = useState(false);
   const [quiz, setQuiz] = useState<any[] | null>(null);
   const [isQuizLoading, setIsQuizLoading] = useState(false);
-  const [mindmap, setMindmap] = useState<string | null>(null);
-  const [isMindmapLoading, setIsMindmapLoading] = useState(false);
+  const [mindmap] = useState<string | null>(null);
+  const [isMindmapLoading] = useState(false);
   const [studyQuestions, setStudyQuestions] = useState<string[] | null>(null);
   const [isStudyQuestionsLoading, setIsStudyQuestionsLoading] = useState(false);
   const [showModal, setShowModal] = useState<"summary" | "quiz" | "mindmap" | "questions" | null>(null);
@@ -60,7 +57,6 @@ export default function ChatPage() {
     scrollToBottom();
   }, [messages]);
 
-  // Load document and sessions
   useEffect(() => {
     const loadInitialData = async () => {
       try {
@@ -74,13 +70,10 @@ export default function ChatPage() {
           loadSession(docSessions[0].id);
         }
 
-        // Auto trigger action if specified in URL
         if (initialAction === "quiz") {
           handleGetQuiz();
         } else if (initialAction === "summary") {
           handleGetSummary();
-        } else if (initialAction === "mindmap") {
-          handleGetMindmap();
         } else if (initialAction === "questions") {
           handleGetStudyQuestions();
         }
@@ -132,22 +125,48 @@ export default function ChatPage() {
         setSessions(updatedSessions);
       }
 
-      setMessages((prev) => [...prev, response.message]);
+      // Typewriter Effect logic
+      const fullContent = response.message.content;
+      const assistantId = response.message.id;
+      
+      const newAssistantMessage: MessageResponse = {
+        ...response.message,
+        content: ""
+      };
+      
+      setMessages((prev) => [...prev, newAssistantMessage]);
+      
+      let currentIdx = 0;
+      const interval = setInterval(() => {
+        if (currentIdx < fullContent.length) {
+          const nextChar = fullContent[currentIdx];
+          setMessages((prev) => {
+            const last = prev[prev.length - 1];
+            if (last.id === assistantId) {
+              return [...prev.slice(0, -1), { ...last, content: last.content + nextChar }];
+            }
+            return prev;
+          });
+          currentIdx++;
+          // Scroll while typing
+          scrollToBottom();
+        } else {
+          clearInterval(interval);
+          setIsLoading(false);
+          abortControllerRef.current = null;
+        }
+      }, 10); // Adjust typing speed here (ms per char)
+
     } catch (error: any) {
-      if (error.name === 'AbortError') {
-        console.log("Request cancelled by user");
-        return;
-      }
-      console.error("Error sending message:", error);
+      if (error.name === 'AbortError') return;
       const errorMessage: MessageResponse = {
         id: (Date.now() + 1).toString(),
         session_id: currentSessionId || "",
         role: "assistant",
-        content: error.message || "Đã xảy ra lỗi không xác định. Vui lòng thử lại sau.",
+        content: error.message || "Đã xảy ra lỗi không xác định.",
         created_at: new Date().toISOString()
       };
       setMessages((prev) => [...prev, errorMessage]);
-    } finally {
       setIsLoading(false);
       abortControllerRef.current = null;
     }
@@ -157,16 +176,13 @@ export default function ChatPage() {
     if (abortControllerRef.current) {
       abortControllerRef.current.abort();
       setIsLoading(false);
-      // Remove the last message from the user if you want, but normally just stopping LLM is enough
-      // Or add a "Cancelled" notice
-      const cancelNotice: MessageResponse = {
+      setMessages((prev) => [...prev, {
         id: Date.now().toString(),
         session_id: currentSessionId || "",
         role: "assistant",
         content: "_Đã hủy yêu cầu._",
         created_at: new Date().toISOString()
-      };
-      setMessages((prev) => [...prev, cancelNotice]);
+      }]);
     }
   };
 
@@ -176,17 +192,13 @@ export default function ChatPage() {
   };
 
   const handleDeleteSession = async (sessionId: string) => {
-    if (!confirm("Bạn có chắc chắn muốn xóa phiên thảo luận này không?")) return;
-    
+    if (!confirm("Xóa phiên thảo luận này?")) return;
     try {
       await deleteChatSession(sessionId);
       setSessions((prev) => prev.filter(s => s.id !== sessionId));
-      if (currentSessionId === sessionId) {
-        startNewChat();
-      }
+      if (currentSessionId === sessionId) startNewChat();
     } catch (error) {
-      console.error("Error deleting session:", error);
-      alert("Không thể xóa phiên thảo luận.");
+      console.error(error);
     }
   };
 
@@ -197,7 +209,7 @@ export default function ChatPage() {
       const result = await fetchDocumentSummary(documentId);
       setSummary(result);
     } catch (error) {
-      console.error("Error fetching summary:", error);
+      console.error(error);
     } finally {
       setIsSummaryLoading(false);
     }
@@ -210,32 +222,9 @@ export default function ChatPage() {
       const result = await fetchDocumentQuiz(documentId);
       setQuiz(result);
     } catch (error: any) {
-      console.error("Error fetching quiz:", error);
-      // We can use a more specific error state here if needed
+      console.error(error);
     } finally {
       setIsQuizLoading(false);
-    }
-  };
-
-  const handleGetMindmap = async () => {
-    setIsMindmapLoading(true);
-    setShowModal("mindmap");
-    try {
-      const result = await fetchDocumentMindmap(documentId);
-      setMindmap(result);
-      
-      // Dynamically load mermaid and render
-      if (typeof window !== 'undefined') {
-        const mermaid = (await import('mermaid')).default;
-        mermaid.initialize({ startOnLoad: true, theme: 'neutral' });
-        setTimeout(() => {
-          mermaid.contentLoaded();
-        }, 100);
-      }
-    } catch (error) {
-      console.error("Error fetching mindmap:", error);
-    } finally {
-      setIsMindmapLoading(false);
     }
   };
 
@@ -246,56 +235,54 @@ export default function ChatPage() {
       const result = await fetchDocumentStudyQuestions(documentId);
       setStudyQuestions(result);
     } catch (error) {
-      console.error("Error fetching study questions:", error);
+      console.error(error);
     } finally {
       setIsStudyQuestionsLoading(false);
     }
   };
 
   return (
-    <div className="flex h-full bg-[#F8FAFC] overflow-hidden selection:bg-blue-100">
-      {/* Sessions Sidebar - Independent Scroll */}
+    <div className="flex h-full bg-slate-950 overflow-hidden relative selection:bg-indigo-500/30">
+      {/* Sessions Sidebar */}
       {isSidebarOpen && (
-        <aside className="w-80 bg-white border-r border-[#E2E8F0] flex flex-col h-full shrink-0 z-30 shadow-xl shadow-slate-200/50">
-          <div className="p-6 border-b border-[#E2E8F0] flex justify-between items-center bg-white">
-            <h2 className="font-bold text-[#1E293B] flex items-center gap-2">
-              <span className="material-symbols-outlined text-blue-600">history</span>
+        <aside className="w-64 bg-slate-900/50 backdrop-blur-xl border-r border-white/5 flex flex-col h-full shrink-0 z-30 shadow-2xl">
+          <div className="p-5 border-b border-white/5 flex justify-between items-center">
+            <h2 className="font-extrabold text-white text-xs flex items-center gap-2.5 tracking-tight uppercase opacity-80">
+              <span className="material-symbols-outlined text-indigo-400 text-[18px]">history</span>
               {CHAT_TEXTS.SIDEBAR.TITLE}
             </h2>
             <button 
               onClick={startNewChat}
-              className="w-8 h-8 flex items-center justify-center hover:bg-blue-50 text-blue-600 rounded-lg transition-all active:scale-95 border border-blue-100"
+              className="w-8 h-8 flex items-center justify-center bg-indigo-500/10 text-indigo-400 rounded-lg hover:bg-indigo-500 hover:text-white transition-all active:scale-95 border border-indigo-500/20"
               title={CHAT_TEXTS.SIDEBAR.NEW_CHAT_TOOLTIP}
             >
               <span className="material-symbols-outlined text-[18px]">add</span>
             </button>
           </div>
           
-          <div className="flex-1 overflow-y-auto p-4 space-y-2 custom-scrollbar bg-slate-50/30">
+          <div className="flex-1 overflow-y-auto p-4 space-y-3 custom-scrollbar">
             {sessions.length === 0 ? (
-              <div className="text-center py-10 px-4">
-                <p className="text-sm text-slate-400">{CHAT_TEXTS.SIDEBAR.NO_SESSIONS}</p>
+              <div className="text-center py-12 px-6">
+                <p className="text-sm text-slate-500 font-medium">{CHAT_TEXTS.SIDEBAR.NO_SESSIONS}</p>
               </div>
             ) : (
               sessions.map((session) => (
-                <div key={session.id} className="relative group">
+                <div key={session.id} className="relative group px-1">
                   <button
                     onClick={() => loadSession(session.id)}
-                    className={`w-full text-left p-3 rounded-xl transition-all border group-hover:border-slate-200 ${
+                    className={`w-full text-left p-3 rounded-xl transition-all border ${
                       currentSessionId === session.id 
-                        ? "bg-white border-blue-200 text-blue-700 shadow-sm ring-1 ring-blue-50" 
-                        : "border-transparent hover:bg-white text-slate-600"
+                        ? "bg-indigo-500/10 border-indigo-500/30 text-white shadow-lg shadow-indigo-500/5 ring-1 ring-indigo-500/20" 
+                        : "border-transparent hover:bg-white/5 text-slate-400 hover:text-slate-200"
                     }`}
                   >
-                    <div className="flex items-center gap-3 pr-6">
-                      <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 transition-colors ${
-                        currentSessionId === session.id ? "bg-blue-100 text-blue-600" : "bg-slate-100 text-slate-400 group-hover:bg-blue-50 group-hover:text-blue-500"
-                      }`}>
-                        <span className="material-symbols-outlined text-[18px]">chat_bubble</span>
-                      </div>
+                    <div className="flex items-center gap-3">
+                       <span className={`material-symbols-outlined text-[16px] ${currentSessionId === session.id ? "text-indigo-400" : "text-slate-500"}`}>
+                        chat_bubble
+                      </span>
                       <div className="flex-1 min-w-0">
-                        <p className="font-medium text-[13px] truncate">{session.title}</p>
-                        <p className="text-[10px] opacity-50 mt-0.5 uppercase tracking-tighter">
+                        <p className="font-bold text-[12px] truncate">{session.title}</p>
+                        <p className="text-[9px] text-slate-500 font-bold uppercase tracking-widest mt-0.5">
                           {new Date(session.updated_at).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })} • {new Date(session.updated_at).toLocaleDateString('vi-VN')}
                         </p>
                       </div>
@@ -306,10 +293,9 @@ export default function ChatPage() {
                       e.stopPropagation();
                       handleDeleteSession(session.id);
                     }}
-                    className="absolute right-2 top-1/2 -translate-y-1/2 w-7 h-7 flex items-center justify-center rounded-lg bg-white/80 backdrop-blur-sm text-slate-400 hover:text-red-500 hover:bg-red-50 opacity-0 group-hover:opacity-100 transition-all shadow-sm border border-slate-100"
-                    title="Xóa phiên chat"
+                    className="absolute right-3 top-1/2 -translate-y-1/2 w-8 h-8 flex items-center justify-center rounded-xl bg-slate-800 text-slate-500 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-all border border-white/5 shadow-xl"
                   >
-                    <span className="material-symbols-outlined text-[16px]">delete</span>
+                    <span className="material-symbols-outlined text-[18px]">delete</span>
                   </button>
                 </div>
               ))
@@ -318,181 +304,159 @@ export default function ChatPage() {
         </aside>
       )}
 
-       {/* Main Chat Area */}
-      <main className="flex-1 flex flex-col h-full min-w-0 bg-white">
-        {/* Header - Fixed height, No Scroll */}
-        <header className="h-20 bg-white/80 backdrop-blur-md border-b border-[#E2E8F0] flex items-center justify-between px-8 shrink-0 z-20">
-          <div className="flex items-center gap-6 min-w-0">
+      {/* Main Chat Area */}
+      <main className="flex-1 flex flex-col h-full min-w-0 bg-slate-950 relative">
+        {/* Header */}
+        <header className="h-16 bg-slate-900/80 backdrop-blur-xl border-b border-white/5 flex items-center justify-between px-6 shrink-0 z-20 shadow-xl">
+          <div className="flex items-center gap-4 min-w-0">
             <button 
               onClick={() => setIsSidebarOpen(!isSidebarOpen)}
-              className="w-10 h-10 flex items-center justify-center rounded-xl bg-white border border-slate-200 text-slate-600 transition-all hover:bg-slate-50 active:scale-95 shadow-sm"
+              className="w-9 h-9 flex items-center justify-center rounded-xl bg-white/5 border border-white/10 text-slate-300 hover:text-white transition-all shadow-sm"
             >
-              <span className="material-symbols-outlined text-[24px]">
+              <span className="material-symbols-outlined text-[20px]">
                 {isSidebarOpen ? "menu_open" : "menu"}
               </span>
             </button>
             <div className="min-w-0">
-              <h1 className="font-bold text-slate-900 text-lg flex items-center gap-2">
-                <span className="material-symbols-outlined text-red-500 shrink-0">picture_as_pdf</span>
-                <span className={`text-[17px] font-bold text-slate-800 truncate transition-all duration-300 ${
-                  isSidebarOpen ? "max-w-[200px] sm:max-w-[300px]" : "max-w-[250px] sm:max-w-[600px]"
-                }`} title={docData?.file_name}>
+               <h1 className="font-black text-white text-sm flex items-center gap-2">
+                <span className="w-8 h-8 rounded-lg bg-red-500/10 text-red-400 flex items-center justify-center shrink-0 border border-red-500/20">
+                  <span className="material-symbols-outlined text-[18px]">description</span>
+                </span>
+                <span className="truncate tracking-tight max-w-[200px]" title={docData?.file_name}>
                   {docData?.file_name || CHAT_TEXTS.HEADER.LOADING_DOC}
                 </span>
               </h1>
             </div>
           </div>
           
-          <div className="flex items-center gap-2 shrink-0">
-            <button 
-              onClick={handleGetSummary}
-              className="flex items-center gap-2 px-4 py-2.5 bg-purple-50 text-purple-600 rounded-xl hover:bg-purple-100 transition-all text-[13px] font-bold border border-purple-100"
-            >
-              <span className="material-symbols-outlined text-[18px]">summarize</span>
-              {CHAT_TEXTS.HEADER.ACTIONS.SUMMARY}
-            </button>
-            <button 
-              onClick={handleGetQuiz}
-              className="flex items-center gap-2 px-4 py-2.5 bg-orange-50 text-orange-600 rounded-xl hover:bg-orange-100 transition-all text-[13px] font-bold border border-orange-100"
-            >
-              <span className="material-symbols-outlined text-[18px]">quiz</span>
-              {CHAT_TEXTS.HEADER.ACTIONS.QUIZ}
-            </button>
-            <button 
-              onClick={handleGetMindmap}
-              className="flex items-center gap-2 px-4 py-2.5 bg-blue-50 text-blue-600 rounded-xl hover:bg-blue-100 transition-all text-[13px] font-bold border border-blue-100"
-            >
-              <span className="material-symbols-outlined text-[18px]">account_tree</span>
-              {CHAT_TEXTS.HEADER.ACTIONS.MINDMAP}
-            </button>
+          <div className="flex items-center gap-3 shrink-0">
+            {[
+              { onClick: handleGetSummary, icon: "summarize", label: CHAT_TEXTS.HEADER.ACTIONS.SUMMARY, color: "bg-purple-500/10 text-purple-400 hover:bg-purple-500 border-purple-500/20" },
+              { onClick: handleGetQuiz, icon: "quiz", label: CHAT_TEXTS.HEADER.ACTIONS.QUIZ, color: "bg-orange-500/10 text-orange-400 hover:bg-orange-500 border-orange-500/20" },
+              { onClick: () => router.push(`/mindmap/${documentId}`), icon: "hub", label: CHAT_TEXTS.HEADER.ACTIONS.MINDMAP, color: "bg-blue-500/10 text-blue-400 hover:bg-blue-500 border-blue-500/20" }
+            ].map((btn, i) => (
+              <button 
+                key={i}
+                onClick={btn.onClick}
+                className={`flex items-center justify-center h-10 w-10 rounded-xl ${btn.color} hover:text-white transition-all duration-300 border shadow-lg group relative`}
+              >
+                <span className="material-symbols-outlined text-[20px]">{btn.icon}</span>
+                {/* Modern Note/Tooltip */}
+                <div className="absolute top-12 left-1/2 -translate-x-1/2 px-3 py-1.5 bg-slate-900 text-white text-[10px] font-black uppercase tracking-widest rounded-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-300 pointer-events-none whitespace-nowrap border border-white/10 shadow-2xl z-[100]">
+                  {btn.label}
+                  <div className="absolute bottom-full left-1/2 -translate-x-1/2 border-8 border-transparent border-b-slate-900"></div>
+                </div>
+              </button>
+            ))}
           </div>
         </header>
 
-        {/* Message Container - Independent Scroll */}
-        <div className="flex-1 overflow-y-auto p-6 md:p-10 space-y-10 custom-scrollbar bg-slate-50/30 relative">
+        {/* Message Container */}
+        <div className="flex-1 overflow-y-auto px-6 md:px-10 py-6 space-y-8 custom-scrollbar bg-slate-950/50 relative">
           {messages.length === 0 ? (
-            <div className="h-full flex flex-col items-center justify-center text-center space-y-8 max-w-2xl mx-auto py-10">
+            <div className="h-full flex flex-col items-center justify-center text-center space-y-8 max-w-xl mx-auto py-1 animate-in fade-in zoom-in duration-700">
               <div className="relative">
-                <div className="w-24 h-24 bg-gradient-to-tr from-blue-600 to-blue-400 text-white rounded-[32px] flex items-center justify-center shadow-2xl shadow-blue-200">
-                  <span className="material-symbols-outlined text-[48px] drop-shadow-lg">smart_toy</span>
+                <div className="w-20 h-20 bg-gradient-to-tr from-indigo-600 to-purple-600 text-white rounded-[32px] flex items-center justify-center shadow-[0_15px_45px_rgba(99,102,241,0.3)]">
+                   <span className="material-symbols-outlined text-[40px] drop-shadow-2xl">auto_awesome</span>
                 </div>
-                <div className="absolute -bottom-2 -right-2 w-8 h-8 bg-white rounded-xl shadow-lg flex items-center justify-center">
-                  <span className="material-symbols-outlined text-blue-600 text-[18px] animate-pulse">chat</span>
+                <div className="absolute -bottom-1 -right-1 w-8 h-8 bg-slate-900 border-[3px] border-slate-950 rounded-xl shadow-2xl flex items-center justify-center">
+                  <span className="material-symbols-outlined text-indigo-400 text-[16px] animate-pulse">chat</span>
                 </div>
               </div>
               <div className="space-y-3">
-                <h2 className="text-2xl font-extrabold text-slate-900 tracking-tight">{CHAT_TEXTS.WELCOME.TITLE}</h2>
-                <p className="text-slate-500 text-md leading-relaxed px-4">
+                <h2 className="text-3xl font-black text-white tracking-tight leading-tight">{CHAT_TEXTS.WELCOME.TITLE}</h2>
+                <p className="text-slate-400 text-sm leading-relaxed px-4 font-medium opacity-80">
                   {CHAT_TEXTS.WELCOME.SUBTITLE}
                 </p>
               </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 w-full px-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 w-full px-8">
                 {CHAT_TEXTS.WELCOME.SUGGESTIONS.map((q) => (
                   <button
                     key={q}
                     onClick={() => setInput(q)}
-                    className="p-4 text-sm font-semibold text-slate-700 bg-white border border-slate-200 rounded-2xl hover:border-blue-500 hover:text-blue-600 transition-all text-left shadow-sm hover:shadow-md"
+                    className="py-3 px-4 text-[12px] font-bold text-slate-300 bg-white/5 border border-white/5 rounded-xl hover:border-indigo-500/40 hover:bg-indigo-500/10 hover:text-white transition-all text-left shadow-lg group"
                   >
-                    {q}
+                    <div className="flex items-center gap-2.5">
+                      <span className="material-symbols-outlined text-indigo-400/50 text-[14px] group-hover:text-indigo-400 transition-colors shrink-0">send</span>
+                      <span>{q}</span>
+                    </div>
                   </button>
                 ))}
               </div>
             </div>
           ) : (
-            <div className="max-w-4xl mx-auto w-full space-y-10 pb-10">
+            <div className="max-w-3xl mx-auto w-full space-y-8 pb-4">
               {messages.map((msg) => (
                 <div 
                   key={msg.id} 
-                  className={`flex gap-6 animate-in slide-in-from-bottom-4 duration-500 ${msg.role === "user" ? "flex-row-reverse" : ""}`}
+                  className={`flex gap-4 animate-in slide-in-from-bottom-4 duration-500 ${msg.role === "user" ? "flex-row-reverse" : ""}`}
                 >
-                  <div className={`w-11 h-11 rounded-[16px] shrink-0 flex items-center justify-center shadow-md ${
+                  <div className={`w-10 h-10 rounded-xl shrink-0 flex items-center justify-center shadow-xl border ${
                     msg.role === "user" 
-                    ? "bg-slate-900 text-white shadow-slate-200" 
-                    : "bg-white border border-blue-100 text-blue-600 shadow-blue-50"
+                    ? "bg-slate-800 text-indigo-300 border-indigo-500/20" 
+                    : "bg-indigo-600 text-white border-white/20"
                   }`}>
-                    <span className="material-symbols-outlined text-[22px]">
+                    <span className="material-symbols-outlined text-[20px]">
                       {msg.role === "user" ? "person" : "auto_awesome"}
                     </span>
                   </div>
-                  <div className={`flex-1 space-y-3 pt-1 ${msg.role === "user" ? "text-right flex flex-col items-end" : ""}`}>
-                    <div className={`max-w-[90%] prose prose-slate text-slate-700 leading-relaxed ${
+                  <div className={`flex-1 space-y-3 pt-0.5 ${msg.role === "user" ? "text-right flex flex-col items-end" : ""}`}>
+                    <div className={`max-w-[85%] prose prose-invert prose-slate prose-sm leading-relaxed shadow-xl ${
                       msg.role === "user" 
-                        ? "bg-blue-600 text-white p-5 rounded-3xl rounded-tr-none shadow-lg shadow-blue-100 prose-p:text-white prose-strong:text-white" 
-                        : "bg-white p-7 rounded-3xl rounded-tl-none border border-[#E2E8F0] shadow-sm shadow-slate-100"
+                        ? "bg-indigo-600 text-white p-4 rounded-[24px] rounded-tr-none border border-white/10 prose-p:text-white prose-strong:text-white font-medium" 
+                        : "bg-white/[0.04] backdrop-blur-md p-6 rounded-[24px] rounded-tl-none border border-white/10 font-medium text-slate-200"
                     }`}>
                       <ReactMarkdown>{msg.content}</ReactMarkdown>
                     </div>
-                    
-                    {msg.sources && msg.sources.length > 0 && (
-                      <div className={`mt-4 flex flex-wrap gap-2 ${msg.role === 'user' ? 'justify-end' : ''}`}>
-                        {msg.sources.map((source, idx) => (
-                          <div 
-                            key={idx}
-                            className="group relative px-4 py-2 bg-blue-50/50 hover:bg-blue-100 text-blue-700 text-[11px] font-bold rounded-xl transition-all border border-blue-100/50 cursor-pointer"
-                          >
-                            <span className="flex items-center gap-2">
-                              <span className="material-symbols-outlined text-[16px]">menu_book</span>
-                              {CHAT_TEXTS.MESSAGES.SOURCE_PAGE} {source.page_number}
-                            </span>
-                            <div className="origin-bottom absolute bottom-full left-0 mb-3 w-80 bg-white p-4 rounded-2xl shadow-2xl border border-blue-100 pointer-events-none opacity-0 group-hover:opacity-100 scale-95 group-hover:scale-100 transition-all z-50">
-                               <div className="font-bold text-blue-600 text-[10px] uppercase mb-2 border-b border-blue-50 pb-1">{CHAT_TEXTS.MESSAGES.EXTRACT_FROM} {source.page_number}</div>
-                               <p className="italic text-slate-600 text-[12px] leading-relaxed">"{source.text_excerpt}..."</p>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    )}
                   </div>
                 </div>
               ))}
               {isLoading && (
-                <div className="flex gap-6 py-4">
-                  <div className="w-11 h-11 rounded-[16px] bg-white border border-blue-100 text-blue-600 shadow-blue-50 flex items-center justify-center animate-pulse">
-                    <span className="material-symbols-outlined text-[22px]">auto_awesome</span>
+                <div className="flex gap-4 py-2 animate-in fade-in duration-300">
+                  <div className="w-10 h-10 rounded-xl bg-indigo-600 text-white border border-white/20 shadow-indigo-500/20 flex items-center justify-center animate-pulse">
+                    <span className="material-symbols-outlined text-[20px]">auto_awesome</span>
                   </div>
-                  <div className="flex flex-col gap-2 pt-2">
-                    <div className="flex items-center gap-4">
-                      <p className="text-[11px] font-black text-blue-400 uppercase tracking-[0.2em] animate-pulse">{CHAT_TEXTS.MESSAGES.AI_ANALYZING}</p>
-                    </div>
-                    <div className="flex gap-1.5 items-center bg-slate-100 px-4 py-2 rounded-full w-fit">
-                      <span className="w-2 h-2 bg-blue-400 rounded-full animate-jumping-dot"></span>
-                      <span className="w-2 h-2 bg-blue-500 rounded-full animate-jumping-dot delay-200"></span>
-                      <span className="w-2 h-2 bg-blue-600 rounded-full animate-jumping-dot delay-400"></span>
+                  <div className="flex flex-col gap-2 pt-1">
+                    <p className="text-[10px] font-black text-indigo-400 uppercase tracking-[0.2em] animate-pulse">{CHAT_TEXTS.MESSAGES.AI_ANALYZING}</p>
+                    <div className="flex gap-1.5 items-center bg-white/5 px-3 py-1.5 rounded-full w-fit border border-white/5">
+                      <span className="w-1.5 h-1.5 bg-indigo-400 rounded-full animate-bounce"></span>
+                      <span className="w-1.5 h-1.5 bg-indigo-500 rounded-full animate-bounce [animation-delay:0.2s]"></span>
+                      <span className="w-1.5 h-1.5 bg-indigo-600 rounded-full animate-bounce [animation-delay:0.4s]"></span>
                     </div>
                   </div>
                 </div>
               )}
-              <div ref={messagesEndRef} className="h-4" />
+              <div ref={messagesEndRef} className="h-2" />
             </div>
           )}
         </div>
 
-        {/* Input Area - Fixed at bottom */}
-        <div className="p-4 md:p-6 bg-white border-t border-slate-100 shrink-0">
-          <div className="max-w-4xl mx-auto">
+        <div className="px-6 py-4 pb-4 bg-slate-900/50 backdrop-blur-xl border-t border-white/5 shrink-0 z-20">
+          <div className="max-w-2xl mx-auto relative cursor-text">
             <form 
               onSubmit={handleSendMessage}
               className="relative group flex items-center"
             >
-              <div className="absolute left-6 text-slate-400 group-focus-within:text-blue-500 transition-colors">
-                <span className="material-symbols-outlined">psychology</span>
+              <div className="absolute left-5 text-slate-500 group-focus-within:text-indigo-400 transition-colors pointer-events-none">
+                <span className="material-symbols-outlined text-[20px]">psychology</span>
               </div>
               <input
                 type="text"
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
                 placeholder={CHAT_TEXTS.INPUT.PLACEHOLDER}
-                className="w-full bg-slate-50 text-slate-900 py-4 pl-16 pr-24 rounded-[32px] focus:outline-none focus:bg-white focus:ring-4 focus:ring-blue-500/5 transition-all border border-slate-100 focus:border-blue-300 text-[16px] font-medium shadow-inner"
+                className="w-full bg-white/[0.03] text-white py-3 pl-14 pr-14 rounded-2xl focus:outline-none focus:bg-white/[0.05] focus:ring-4 focus:ring-indigo-500/10 transition-all border border-white/5 focus:border-indigo-500/30 text-xs font-bold shadow-2xl placeholder:text-slate-600"
+                style={{ paddingLeft: '50px' }}
                 disabled={isLoading}
               />
               <button
                 type={isLoading ? "button" : "submit"}
                 onClick={isLoading ? handleCancel : undefined}
                 disabled={!input.trim() && !isLoading}
-                className={`absolute right-3 w-10 h-10 rounded-full flex items-center justify-center transition-all ${
+                className={`absolute right-1.5 w-8 h-8 rounded-xl flex items-center justify-center transition-all ${
                   (input.trim() || isLoading)
-                    ? "bg-blue-600 text-white shadow-xl shadow-blue-200 hover:bg-blue-700 active:scale-95" 
-                    : "bg-slate-200 text-slate-400 cursor-not-allowed"
+                    ? "bg-gradient-to-br from-indigo-500 to-purple-600 text-white shadow-[0_8px_20px_rgba(99,102,241,0.3)] hover:scale-105 active:scale-95" 
+                    : "bg-white/5 text-slate-600 cursor-not-allowed border border-white/5"
                 }`}
               >
                 <span className="material-symbols-outlined text-[20px]">
@@ -500,8 +464,8 @@ export default function ChatPage() {
                 </span>
               </button>
             </form>
-            <div className="flex justify-center items-center px-4 mt-4">
-              <p className="text-[11px] text-slate-300">
+            <div className="flex justify-center items-center px-4 mt-3">
+              <p className="text-[9px] text-slate-400 font-bold uppercase tracking-widest opacity-70">
                 {CHAT_TEXTS.INPUT.DISCLAIMER}
               </p>
             </div>
@@ -509,140 +473,130 @@ export default function ChatPage() {
         </div>
       </main>
 
-      {/* Summary/Quiz Modal */}
+      {/* Modals with Dark Theme */}
       {showModal && (
-        <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-md animate-in fade-in duration-300">
-          <div className="bg-white w-full max-w-3xl max-h-[85vh] rounded-[32px] shadow-2xl flex flex-col overflow-hidden animate-in zoom-in-95 duration-300">
-            <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-white sticky top-0">
-              <h3 className="text-xl font-bold text-slate-800 flex items-center gap-3">
-                <span className={`material-symbols-outlined ${
-                  showModal === 'summary' ? 'text-purple-600' : 
-                  showModal === 'mindmap' ? 'text-blue-600' : 
-                  showModal === 'questions' ? 'text-emerald-600' : 'text-orange-600'
+        <div className="fixed inset-0 z-[200] bg-slate-950/40 backdrop-blur-md animate-in fade-in duration-500">
+          <div className="flex items-center justify-center w-full h-full p-4 sm:p-8">
+            <div className="bg-slate-900 w-full max-w-4xl max-h-[90vh] rounded-[48px] shadow-[0_40px_100px_rgba(0,0,0,0.8)] flex flex-col overflow-hidden border border-white/10 animate-in zoom-in-95 duration-500">
+            <div className="p-8 border-b border-white/5 flex justify-between items-center bg-slate-900/50 backdrop-blur-md sticky top-0 z-10">
+              <h3 className="text-2xl font-black text-white flex items-center gap-4 tracking-tight">
+                <span className={`w-12 h-12 rounded-2xl flex items-center justify-center ${
+                  showModal === 'summary' ? 'bg-purple-500/20 text-purple-400' : 
+                  showModal === 'questions' ? 'bg-emerald-500/20 text-emerald-400' : 'bg-orange-500/20 text-orange-400'
                 }`}>
-                  {showModal === 'summary' ? 'summarize' : 
-                   showModal === 'mindmap' ? 'account_tree' : 
-                   showModal === 'questions' ? 'format_list_numbered' : 'quiz'}
+                  <span className="material-symbols-outlined text-[28px]">
+                    {showModal === 'summary' ? 'summarize' : 
+                     showModal === 'questions' ? 'format_list_numbered' : 'quiz'}
+                  </span>
                 </span>
                 {showModal === 'summary' ? CHAT_TEXTS.MODALS.TITLES.SUMMARY : 
-                 showModal === 'mindmap' ? CHAT_TEXTS.MODALS.TITLES.MINDMAP : 
                  showModal === 'questions' ? CHAT_TEXTS.MODALS.TITLES.QUESTIONS : CHAT_TEXTS.MODALS.TITLES.QUIZ}
               </h3>
               <button 
                 onClick={() => setShowModal(null)}
-                className="w-10 h-10 rounded-full hover:bg-slate-100 flex items-center justify-center transition-colors"
+                className="w-12 h-12 rounded-2xl bg-white/5 hover:bg-white/10 flex items-center justify-center transition-all text-slate-400 border border-white/10 active:scale-95"
               >
                 <span className="material-symbols-outlined">close</span>
               </button>
             </div>
             
-            <div className="flex-1 overflow-y-auto p-8 custom-scrollbar">
+            <div className="flex-1 overflow-y-auto p-10 custom-scrollbar text-slate-200">
               {showModal === 'summary' ? (
                 isSummaryLoading ? (
-                  <div className="flex flex-col items-center justify-center py-20 space-y-4">
-                    <div className="w-12 h-12 border-4 border-purple-200 border-t-purple-600 rounded-full animate-spin"></div>
-                    <p className="text-slate-500 font-medium animate-pulse">{CHAT_TEXTS.MODALS.LOADING.SUMMARY}</p>
+                  <div className="flex flex-col items-center justify-center py-24 space-y-6">
+                    <div className="w-16 h-16 border-4 border-white/5 border-t-purple-500 rounded-full animate-spin"></div>
+                    <p className="text-slate-400 font-bold uppercase tracking-widest text-sm animate-pulse">{CHAT_TEXTS.MODALS.LOADING.SUMMARY}</p>
                   </div>
                 ) : (
-                  <div className="prose prose-slate max-w-none prose-p:leading-relaxed prose-li:my-1">
+                  <div className="prose prose-invert max-w-none prose-p:leading-loose prose-li:my-2 prose-h3:text-white prose-strong:text-indigo-300">
                     <ReactMarkdown>{String(summary || CHAT_TEXTS.MODALS.EMPTY.SUMMARY)}</ReactMarkdown>
-                  </div>
-                )
-              ) : showModal === 'mindmap' ? (
-                isMindmapLoading ? (
-                  <div className="flex flex-col items-center justify-center py-20 space-y-4">
-                    <div className="w-12 h-12 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin"></div>
-                    <p className="text-slate-500 font-medium animate-pulse">{CHAT_TEXTS.MODALS.LOADING.MINDMAP}</p>
-                  </div>
-                ) : (
-                  <div className="flex justify-center bg-white p-4 rounded-xl overflow-x-auto min-h-[400px]">
-                    <div className="mermaid text-center">
-                      {mindmap || CHAT_TEXTS.MODALS.EMPTY.MINDMAP}
-                    </div>
                   </div>
                 )
               ) : showModal === 'questions' ? (
                 isStudyQuestionsLoading ? (
-                  <div className="flex flex-col items-center justify-center py-20 space-y-4">
-                    <div className="w-12 h-12 border-4 border-emerald-200 border-t-emerald-600 rounded-full animate-spin"></div>
-                    <p className="text-slate-500 font-medium animate-pulse">{CHAT_TEXTS.MODALS.LOADING.QUESTIONS}</p>
+                  <div className="flex flex-col items-center justify-center py-24 space-y-6">
+                    <div className="w-16 h-16 border-4 border-white/5 border-t-emerald-500 rounded-full animate-spin"></div>
+                    <p className="text-slate-400 font-bold uppercase tracking-widest text-sm animate-pulse">{CHAT_TEXTS.MODALS.LOADING.QUESTIONS}</p>
                   </div>
                 ) : (
-                  <div className="space-y-4">
-                    <p className="text-slate-600 mb-6 bg-emerald-50 p-4 rounded-xl border border-emerald-100 text-sm">
-                      {CHAT_TEXTS.MODALS.QUESTIONS_HINT}
+                  <div className="space-y-6">
+                    <p className="text-emerald-300 mb-8 bg-emerald-500/10 p-6 rounded-3xl border border-emerald-500/20 text-sm font-bold leading-relaxed">
+                       ✨ {CHAT_TEXTS.MODALS.QUESTIONS_HINT}
                     </p>
                     {studyQuestions ? studyQuestions.map((q, idx) => (
                       <div 
                         key={idx} 
-                        className="group flex gap-4 p-4 rounded-2xl hover:bg-slate-50 transition-all border border-transparent hover:border-slate-100"
+                        className="group flex gap-6 p-6 rounded-3xl hover:bg-white/5 transition-all border border-white/5 hover:border-white/10"
                       >
-                        <div className="w-8 h-8 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center font-bold text-sm shrink-0">
+                        <div className="w-10 h-10 rounded-xl bg-emerald-500/10 text-emerald-400 flex items-center justify-center font-black text-sm shrink-0 border border-emerald-500/20">
                           {idx + 1}
                         </div>
                         <div className="flex-1">
-                          <p className="text-slate-700 font-medium leading-relaxed">{q}</p>
+                          <p className="text-slate-200 font-bold text-lg leading-relaxed">{q}</p>
                           <button 
                             onClick={() => {
                               setShowModal(null);
                               setInput(`Hãy giúp mình trả lời câu hỏi ôn tập: ${q}`);
                             }}
-                            className="mt-2 text-xs text-blue-600 hover:underline flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity"
+                            className="mt-3 text-sm text-indigo-400 hover:text-indigo-300 font-black flex items-center gap-2 opacity-50 group-hover:opacity-100 transition-opacity uppercase tracking-widest"
                           >
-                            <span className="material-symbols-outlined text-sm">chat</span>
+                            <span className="material-symbols-outlined text-[18px]">chat_bubble</span>
                             {CHAT_TEXTS.MODALS.ASK_AI_TOOLTIP}
                           </button>
                         </div>
                       </div>
-                    )) : <p>{CHAT_TEXTS.MODALS.EMPTY.QUESTIONS}</p>}
+                    )) : <p className="text-slate-500 text-center py-10">{CHAT_TEXTS.MODALS.EMPTY.QUESTIONS}</p>}
                   </div>
                 )
               ) : (
                 isQuizLoading ? (
-                  <div className="flex flex-col items-center justify-center py-20 space-y-4">
-                    <div className="w-12 h-12 border-4 border-orange-200 border-t-orange-600 rounded-full animate-spin"></div>
-                    <p className="text-slate-500 font-medium animate-pulse">{CHAT_TEXTS.MODALS.LOADING.QUIZ}</p>
+                  <div className="flex flex-col items-center justify-center py-24 space-y-6">
+                    <div className="w-16 h-16 border-4 border-white/5 border-t-orange-500 rounded-full animate-spin"></div>
+                    <p className="text-slate-400 font-bold uppercase tracking-widest text-sm animate-pulse">{CHAT_TEXTS.MODALS.LOADING.QUIZ}</p>
                   </div>
                 ) : (
-                  <div className="space-y-10">
+                  <div className="space-y-12">
                     {quiz ? quiz.map((item, idx) => (
-                      <div key={idx} className="space-y-4 bg-slate-50 p-6 rounded-2xl border border-slate-100">
-                        <p className="font-bold text-lg text-slate-800 flex items-start gap-2">
-                          <span className="text-orange-600 whitespace-nowrap shrink-0">Câu {idx + 1}:</span>
-                          <span>{item.question}</span>
+                      <div key={idx} className="space-y-6 bg-white/[0.03] p-8 rounded-[40px] border border-white/5 shadow-2xl">
+                        <p className="font-black text-xl text-white flex items-start gap-3">
+                          <span className="text-orange-400 whitespace-nowrap shrink-0">CÂU {idx + 1}:</span>
+                          <span className="tracking-tight leading-tight">{item.question}</span>
                         </p>
-                        <div className="grid grid-cols-1 gap-2">
+                        <div className="grid grid-cols-1 gap-3">
                           {item.options.map((opt: string, optIdx: number) => (
                             <div 
                               key={optIdx}
-                              className={`p-4 rounded-xl border text-sm transition-all ${
+                              className={`p-5 rounded-2xl border text-[15px] font-bold transition-all ${
                                 optIdx === item.correct_index 
-                                  ? "bg-green-50 border-green-200 text-green-700 font-medium" 
-                                  : "bg-white border-slate-200 text-slate-600"
+                                  ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-300" 
+                                  : "bg-white/5 border-white/10 text-slate-400"
                               }`}
                             >
-                              {opt}
+                              <div className="flex items-center gap-3">
+                                <span className={`w-2 h-2 rounded-full shrink-0 ${optIdx === item.correct_index ? "bg-emerald-400" : "bg-slate-700"}`}></span>
+                                {opt}
+                              </div>
                             </div>
                           ))}
                         </div>
-                        <div className="mt-4 p-4 bg-blue-50/50 rounded-xl border border-blue-100">
-                           <p className="text-xs font-bold text-blue-700 uppercase mb-1 flex items-center gap-1">
-                             <span className="material-symbols-outlined text-[16px]">info</span>
-                             Giải thích
+                        <div className="mt-6 p-6 bg-indigo-500/5 rounded-3xl border border-indigo-500/20">
+                           <p className="text-[11px] font-black text-indigo-400 uppercase tracking-[0.2em] mb-3 flex items-center gap-2">
+                             <span className="material-symbols-outlined text-[20px]">lightbulb</span>
+                             Giải thích chuyên sâu
                            </p>
-                           <p className="text-sm text-slate-600 leading-relaxed">{item.explanation}</p>
+                           <p className="text-slate-300 leading-loose font-medium text-[15px]">{item.explanation}</p>
                         </div>
                       </div>
-                    )) : <p>{CHAT_TEXTS.MODALS.EMPTY.QUIZ}</p>}
+                    )) : <p className="text-slate-500 text-center py-10">{CHAT_TEXTS.MODALS.EMPTY.QUIZ}</p>}
                   </div>
                 )
               )}
             </div>
             
-            <div className="p-6 border-t border-slate-100 bg-slate-50 flex justify-end gap-3">
+            <div className="p-8 border-t border-white/5 bg-slate-900 flex justify-end gap-4 z-10 translate-y-0 shadow-[0_-20px_50px_rgba(0,0,0,0.5)]">
               <button 
                 onClick={() => setShowModal(null)}
-                className="px-6 py-2.5 font-medium text-slate-600 hover:bg-slate-200 rounded-xl transition-all"
+                className="px-8 py-3.5 font-bold text-slate-400 hover:text-white hover:bg-white/5 rounded-2xl transition-all border border-white/5"
               >
                 {CHAT_TEXTS.MODALS.BUTTONS.CLOSE}
               </button>
@@ -656,7 +610,7 @@ export default function ChatPage() {
                     a.download = `Tom_tat_${docData?.file_name || 'tai_lieu'}.txt`;
                     a.click();
                   }}
-                  className="px-6 py-2.5 font-bold bg-blue-600 text-white rounded-xl shadow-lg shadow-blue-200 hover:bg-blue-700 transition-all"
+                  className="px-8 py-3.5 font-black bg-indigo-600 text-white rounded-2xl shadow-[0_10px_25px_rgba(99,102,241,0.4)] hover:bg-indigo-500 transition-all uppercase tracking-widest text-sm"
                 >
                   {CHAT_TEXTS.MODALS.BUTTONS.DOWNLOAD_SUMMARY}
                 </button>
@@ -664,7 +618,8 @@ export default function ChatPage() {
             </div>
           </div>
         </div>
-      )}
+      </div>
+    )}
 
       <style jsx global>{`
         .custom-scrollbar::-webkit-scrollbar {
@@ -674,11 +629,11 @@ export default function ChatPage() {
           background: transparent;
         }
         .custom-scrollbar::-webkit-scrollbar-thumb {
-          background: #E2E8F0;
+          background: rgba(255, 255, 255, 0.05);
           border-radius: 10px;
         }
         .custom-scrollbar::-webkit-scrollbar-thumb:hover {
-          background: #CBD5E1;
+          background: rgba(255, 255, 255, 0.1);
         }
       `}</style>
     </div>

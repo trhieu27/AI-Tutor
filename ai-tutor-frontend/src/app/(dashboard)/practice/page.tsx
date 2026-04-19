@@ -1,33 +1,42 @@
 "use client";
 
 import DocumentTable from "@/components/DocumentTable";
-import { SIDEBAR_TEXTS } from "@/constants/texts";
+import { PRACTICE_PAGE_TEXTS } from "@/constants/texts";
 
-export default function PracticePage() {
+export default function PracticeListPage() {
   return (
-    <div className="p-5 md:p-10 max-w-[1200px] mx-auto pb-20">
-      <div className="mb-10 text-center max-w-2xl mx-auto">
-        <h1 className="text-[32px] font-bold text-on-surface mb-3 tracking-tight">
-          Luyện tập Trắc nghiệm
+    <div className="p-8 md:p-12 max-w-[1400px] mx-auto pb-32 space-y-8 relative z-10">
+      {/* Header Section with Boosted Contrast */}
+      <div className="text-center max-w-3xl mx-auto space-y-6 animate-in fade-in slide-in-from-top-4 duration-700">
+        <h1 className="text-4xl md:text-5xl font-black text-white tracking-tight leading-tight">
+          {PRACTICE_PAGE_TEXTS.title}
         </h1>
-        <p className="text-on-surface-variant text-[16px] leading-relaxed">
-          Chọn tài liệu bạn đã học để AI soạn thảo bộ câu hỏi trắc nghiệm kiểm tra kiến thức ngay lập tức!
+        <p className="text-slate-300 text-lg md:text-xl leading-relaxed font-medium opacity-90">
+          {PRACTICE_PAGE_TEXTS.subtitle}
         </p>
       </div>
 
-      <div className="bg-white rounded-[32px] p-1 border border-outline/10 shadow-sm overflow-hidden">
-        <DocumentTable />
+      {/* Document Table Section - Adaptive Height */}
+      <div className="bg-slate-900/40 backdrop-blur-md rounded-[48px] border border-white/10 shadow-2xl h-fit max-h-[600px] overflow-hidden flex flex-col">
+        <DocumentTable defaultAction="quiz" />
       </div>
 
-      <div className="mt-12 p-8 bg-blue-50/50 rounded-[32px] border border-blue-100 flex flex-col md:flex-row items-center gap-8 shadow-sm">
-        <div className="w-20 h-20 bg-blue-100 text-blue-600 rounded-[28px] flex items-center justify-center shrink-0">
-          <span className="material-symbols-outlined text-[40px]">psychology</span>
+      {/* Info Cards with Luxury Dark Theme */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-8 pt-8">
+        <div className="bg-slate-900/60 backdrop-blur-xl p-10 rounded-[48px] border border-white/10 shadow-2xl group transition-all duration-500 hover:-translate-y-2">
+           <div className="w-16 h-16 rounded-[24px] bg-orange-500/10 text-orange-400 flex items-center justify-center mb-8 border border-orange-500/20 group-hover:scale-110 transition-transform">
+             <span className="material-symbols-outlined text-[32px]">lightbulb</span>
+           </div>
+           <h3 className="text-2xl font-black text-white mb-4 tracking-tight">{PRACTICE_PAGE_TEXTS.cards.activeLearning.title}</h3>
+           <p className="text-slate-400 text-sm leading-relaxed font-medium">{PRACTICE_PAGE_TEXTS.cards.activeLearning.desc}</p>
         </div>
-        <div>
-          <h3 className="text-xl font-bold text-blue-900 mb-2">Học tập đa phương thức</h3>
-          <p className="text-blue-700/80 leading-relaxed">
-            AI Tutor không chỉ giúp bạn hỏi đáp mà còn tự động trích xuất các câu hỏi hóc búa nhất từ chính tài liệu của bạn. Hãy thử chọn một tài liệu và bấm vào nút <b>"Luyện tập"</b> trong trang Chat nhé!
-          </p>
+        
+        <div className="bg-slate-900/60 backdrop-blur-xl p-10 rounded-[48px] border border-white/10 shadow-2xl group transition-all duration-500 hover:-translate-y-2">
+           <div className="w-16 h-16 rounded-[24px] bg-emerald-500/10 text-emerald-400 flex items-center justify-center mb-8 border border-emerald-500/20 group-hover:scale-110 transition-transform">
+             <span className="material-symbols-outlined text-[32px]">analytics</span>
+           </div>
+           <h3 className="text-2xl font-black text-white mb-4 tracking-tight">{PRACTICE_PAGE_TEXTS.cards.expertExplanations.title}</h3>
+           <p className="text-slate-400 text-sm leading-relaxed font-medium">{PRACTICE_PAGE_TEXTS.cards.expertExplanations.desc}</p>
         </div>
       </div>
     </div>

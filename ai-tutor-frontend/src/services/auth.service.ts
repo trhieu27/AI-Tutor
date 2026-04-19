@@ -1,10 +1,23 @@
 import { User, Student } from '@/models/User';
+import { API_BASE_URL } from '@/constants/config';
 
 class AuthService {
   private static instance: AuthService;
-  private readonly baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8081/api/v1';
+  private readonly baseUrl = process.env.NEXT_PUBLIC_API_URL || API_BASE_URL;
 
   private constructor() {}
+
+  private setCookie(name: string, value: string, days: number) {
+    if (typeof document === 'undefined') return;
+    const expires = new Date();
+    expires.setTime(expires.getTime() + days * 24 * 60 * 60 * 1000);
+    document.cookie = `${name}=${value};expires=${expires.toUTCString()};path=/;SameSite=Lax`;
+  }
+
+  private deleteCookie(name: string) {
+    if (typeof document === 'undefined') return;
+    document.cookie = `${name}=;expires=Thu, 01 Jan 1970 00:00:00 UTC;path=/;`;
+  }
 
   public static getInstance(): AuthService {
     if (!AuthService.instance) {
@@ -30,11 +43,15 @@ class AuthService {
 
       const data = await response.json();
       
-      // Save tokens to localStorage
+      // Save tokens to localStorage and cookies
       if (typeof window !== 'undefined') {
         localStorage.setItem('access_token', data.access_token);
         localStorage.setItem('refresh_token', data.refresh_token);
         localStorage.setItem('user', JSON.stringify(data.user));
+        
+        // Cookies for middleware (7 days)
+        this.setCookie('access_token', data.access_token, 7);
+        this.setCookie('refresh_token', data.refresh_token, 7);
       }
 
       return {
@@ -77,6 +94,9 @@ class AuthService {
         localStorage.setItem('access_token', data.access_token);
         localStorage.setItem('refresh_token', data.refresh_token);
         localStorage.setItem('user', JSON.stringify(data.user));
+        
+        this.setCookie('access_token', data.access_token, 7);
+        this.setCookie('refresh_token', data.refresh_token, 7);
       }
 
       return {
@@ -110,6 +130,7 @@ class AuthService {
 
       const data = await response.json();
       localStorage.setItem('access_token', data.access_token);
+      this.setCookie('access_token', data.access_token, 7);
       return data.access_token;
     } catch (error) {
       console.error('Refresh token error:', error);
@@ -122,6 +143,8 @@ class AuthService {
       localStorage.removeItem('access_token');
       localStorage.removeItem('refresh_token');
       localStorage.removeItem('user');
+      this.deleteCookie('access_token');
+      this.deleteCookie('refresh_token');
     }
   }
 }
