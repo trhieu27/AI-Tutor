@@ -28,6 +28,13 @@ class Settings(BaseSettings):
     MONGO_URL: str = "mongodb://localhost:27017"
     DATABASE_NAME: str = "ai_tutor"
 
+    # SMTP Settings
+    SMTP_HOST: str = "smtp.gmail.com"
+    SMTP_PORT: int = 587
+    SMTP_USER: str = "" # Placeholder
+    SMTP_PASSWORD: str = "" # Placeholder
+    EMAILS_FROM_NAME: str = "AI Tutor Support"
+
 
 
     # CORS
