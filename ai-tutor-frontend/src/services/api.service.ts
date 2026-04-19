@@ -3,10 +3,10 @@ import { authService } from './auth.service';
 const API_BASE = "/api/v1";
 
 // Helper để lấy token
-const getAuthHeaders = () => {
+const getAuthHeaders = (): HeadersInit => {
   if (typeof window !== 'undefined') {
     const token = localStorage.getItem('access_token');
-    return token ? { 'Authorization': `Bearer ${token}` } : {};
+    if (token) return { 'Authorization': `Bearer ${token}` };
   }
   return {};
 };
@@ -24,7 +24,7 @@ async function authFetch(url: string, options: RequestInit = {}): Promise<Respon
   if (response.status === 401 && typeof window !== 'undefined') {
     console.log("Access token expired, attempting to refresh...");
     const newToken = await authService.refreshToken();
-    
+
     if (newToken) {
       // Retry với token mới
       const newHeaders = {
@@ -108,7 +108,7 @@ const sanitizeFileName = (fileName: string): string => {
 export async function uploadDocument(file: File): Promise<DocumentResponse> {
   const sanitizedName = sanitizeFileName(file.name);
   console.log(`Uploading file: ${file.name} (Sanitized as: ${sanitizedName})`);
-  
+
   const formData = new FormData();
   // Truyền file cùng với tên đã được làm sạch
   formData.append("file", file, sanitizedName);
@@ -191,7 +191,7 @@ export async function askQuestion(
 
   const data = await res.json();
   const msgContent = data.message.content;
-  
+
   if (Array.isArray(msgContent)) {
     data.message.content = msgContent.map(part => part.text || "").join("");
   } else if (typeof msgContent === 'object' && msgContent !== null) {
@@ -241,13 +241,13 @@ export async function fetchDocumentSummary(documentId: string): Promise<string> 
     return "Hệ thống đang bận hoặc gặp lỗi xử lý. Vui lòng thử lại sau.";
   }
   const summaryRaw = data.summary;
-  
+
   if (typeof summaryRaw === 'string') return summaryRaw;
   if (Array.isArray(summaryRaw)) {
     return summaryRaw.map(part => part.text || "").join("");
   }
   if (typeof summaryRaw === 'object' && summaryRaw !== null) {
-      return summaryRaw.text || JSON.stringify(summaryRaw);
+    return summaryRaw.text || JSON.stringify(summaryRaw);
   }
   return data.detail || "Không thể tạo bản tóm tắt";
 }
@@ -273,13 +273,13 @@ export async function fetchDocumentMindmap(documentId: string): Promise<string> 
     return "Không thể tạo sơ đồ tư duy ngay lúc này.";
   }
   const mmRaw = data.mindmap;
-  
+
   if (typeof mmRaw === 'string') return mmRaw;
   if (Array.isArray(mmRaw)) {
     return mmRaw.map(part => part.text || "").join("");
   }
   if (typeof mmRaw === 'object' && mmRaw !== null) {
-      return mmRaw.text || JSON.stringify(mmRaw);
+    return mmRaw.text || JSON.stringify(mmRaw);
   }
   return data.detail || "Không thể tạo sơ đồ tư duy";
 }

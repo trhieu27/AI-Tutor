@@ -5,7 +5,7 @@ class AuthService {
   private static instance: AuthService;
   private readonly baseUrl = process.env.NEXT_PUBLIC_API_URL || API_BASE_URL;
 
-  private constructor() {}
+  private constructor() { }
 
   private setCookie(name: string, value: string, days: number) {
     if (typeof document === 'undefined') return;
@@ -42,13 +42,13 @@ class AuthService {
       }
 
       const data = await response.json();
-      
+
       // Save tokens to localStorage and cookies
       if (typeof window !== 'undefined') {
         localStorage.setItem('access_token', data.access_token);
         localStorage.setItem('refresh_token', data.refresh_token);
         localStorage.setItem('user', JSON.stringify(data.user));
-        
+
         // Cookies for middleware (7 days)
         this.setCookie('access_token', data.access_token, 7);
         this.setCookie('refresh_token', data.refresh_token, 7);
@@ -105,17 +105,17 @@ class AuthService {
   public async register(name: string, email: string, password: string): Promise<{ user: User; accessToken: string; refreshToken: string }> {
     try {
       const student_id = "STU" + Math.floor(100000 + Math.random() * 900000).toString();
-      
+
       const response = await fetch(`${this.baseUrl}/register`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ 
+        body: JSON.stringify({
           student_id: student_id,
           full_name: name,
-          email, 
-          password 
+          email,
+          password
         }),
       });
 
@@ -125,13 +125,13 @@ class AuthService {
       }
 
       const data = await response.json();
-      
+
       // Save tokens
       if (typeof window !== 'undefined') {
         localStorage.setItem('access_token', data.access_token);
         localStorage.setItem('refresh_token', data.refresh_token);
         localStorage.setItem('user', JSON.stringify(data.user));
-        
+
         this.setCookie('access_token', data.access_token, 7);
         this.setCookie('refresh_token', data.refresh_token, 7);
       }
@@ -218,6 +218,43 @@ class AuthService {
     if (!response.ok) {
       const error = await response.json();
       throw new Error(error.detail || 'Không thể đặt lại mật khẩu');
+    }
+  }
+
+  public async getCurrentUser(): Promise<User | null> {
+    try {
+      if (typeof window === 'undefined') return null;
+      const accessToken = localStorage.getItem('access_token');
+      if (!accessToken) return null;
+
+      const response = await fetch(`${this.baseUrl}/me`, {
+        headers: {
+          'Authorization': `Bearer ${accessToken}`,
+        },
+      });
+
+      if (!response.ok) {
+        if (response.status === 401) {
+          const newToken = await this.refreshToken();
+          if (newToken) return this.getCurrentUser();
+        }
+        return null;
+      }
+
+      const userData = await response.json();
+      const user = new Student(
+        userData.id,
+        userData.full_name,
+        userData.email,
+        userData.student_id,
+        userData.avatarUrl
+      );
+
+      localStorage.setItem('user', JSON.stringify(user));
+      return user;
+    } catch (error) {
+      console.error('Get current user error:', error);
+      return null;
     }
   }
 }
