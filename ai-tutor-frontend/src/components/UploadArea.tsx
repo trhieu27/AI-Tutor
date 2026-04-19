@@ -78,11 +78,11 @@ export default function UploadArea({ onUploadSuccess }: UploadAreaProps) {
              </span>
           </div>
 
-          <div className="space-y-2">
-            <h3 className="text-xl font-black text-slate-900 dark:text-white tracking-tight">
+          <div className="space-y-2.5">
+            <h3 className="text-xl font-extrabold text-slate-900 dark:text-white tracking-tight">
               {isAnyUploading ? "ĐANG TẢI LÊN HÀNG ĐỢI..." : UPLOAD_AREA_TEXTS.title}
             </h3>
-            <p className="text-[11px] text-slate-500 dark:text-slate-400 font-bold uppercase tracking-[0.2em] opacity-80">
+            <p className="text-[11px] text-slate-500 dark:text-slate-400 font-bold uppercase tracking-[0.25em] opacity-80 leading-relaxed">
               Kéo thả nhiều file PDF/DOCX hoặc nhấn để chọn
             </p>
           </div>
