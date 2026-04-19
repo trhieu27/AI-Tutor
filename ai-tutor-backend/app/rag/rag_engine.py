@@ -65,6 +65,7 @@ def get_llm():
         _llm = ChatGoogleGenerativeAI(
             model="gemini-1.5-flash",
             google_api_key=settings.GEMINI_API_KEY,
+            transport="rest", # Fixes unawaited coroutine warnings in some environments
             temperature=0.2,
         )
     return _llm
@@ -271,7 +272,7 @@ async def summarize_document_stream(collection_name: str, is_cancelled=None):
                 
     except Exception as e:
         logger.error(f"Summarize Stream Error: {str(e)}")
-        yield f"\n[Lỗi: {str(e)}]"
+        yield "\n\nHệ thống đang bận hoặc gặp lỗi xử lý. Vui lòng thử lại sau."
 
 
 async def generate_quiz_stream(collection_name: str, is_cancelled=None):
@@ -299,7 +300,7 @@ async def generate_quiz_stream(collection_name: str, is_cancelled=None):
                 
     except Exception as e:
         logger.error(f"Quiz Stream Error: {str(e)}")
-        yield "[]"
+        yield "[]"  # Yield empty array so it fails gracefully
 
 async def generate_mindmap_stream(collection_name: str, is_cancelled=None):
     """Stream a Mermaid.js mindmap string."""
@@ -322,7 +323,7 @@ async def generate_mindmap_stream(collection_name: str, is_cancelled=None):
                 
     except Exception as e:
         logger.error(f"Mindmap Stream Error: {str(e)}")
-        yield "mindmap\n  root((Lỗi))"
+        yield "Hệ thống đang bận hoặc gặp lỗi xử lý. Vui lòng thử lại sau giây lát hoặc kiểm tra lượt dùng AI."
 
 async def generate_study_questions_stream(collection_name: str, is_cancelled=None):
     """Stream open-ended study questions."""
@@ -345,7 +346,7 @@ async def generate_study_questions_stream(collection_name: str, is_cancelled=Non
                 
     except Exception as e:
         logger.error(f"Study Questions Stream Error: {str(e)}")
-        yield "\n[Lỗi]"
+        yield "\n\nHệ thống đang bận hoặc gặp lỗi xử lý. Vui lòng thử lại sau."
 
 async def generate_quiz(collection_name: str, is_cancelled=None) -> list[dict]:
     """Generate multiple choice questions from the document."""

@@ -109,13 +109,14 @@ async def chat_with_document(
         # User cancelled, just propagate
         raise
     except Exception as e:
-        import logging
         error_str = str(e)
+        # Catch quota/rate limit errors
         if "429" in error_str or "RESOURCE_EXHAUSTED" in error_str:
-            raise HTTPException(status_code=429, detail="AI đang quá tải lượt dùng. Thử lại sau nhé.")
+            raise HTTPException(status_code=429, detail="Bộ não AI hiện đang quá tải lượt dùng. Vui lòng thử lại sau giây lát nhé.")
         
-        logging.error(f"Chat Error: {error_str}")
-        raise HTTPException(status_code=500, detail=f"Lỗi hệ thống: {error_str}")
+        # General catch-all for other AI errors
+        logger.error(f"Chat Error: {error_str}")
+        raise HTTPException(status_code=500, detail="Hệ thống đang bận hoặc gặp lỗi xử lý. Vui lòng thử lại sau nhé.")
 
 @router.get("/{document_id}/summarize")
 async def get_summary(document_id: str, request: Request, db: AsyncIOMotorDatabase = Depends(get_db)):

@@ -322,3 +322,10 @@ export const PRACTICE_PAGE_TEXTS = {
   }
 };
 
+export const ERROR_MESSAGES = {
+  GENERAL: "Hệ thống đang bận hoặc gặp lỗi xử lý. Vui lòng thử lại sau.",
+  QUOTA_EXCEEDED: "Bạn đã hết lượt sử dụng AI miễn phí trong hôm nay. Vui lòng quay lại sau hoặc nâng cấp tài khoản.",
+  MODEL_NOT_AVAILABLE: "Mô hình AI hiện đang được bảo trì hoặc không khả dụng. Vui lòng thử lại sau ít phút.",
+  NETWORK_ERROR: "Lỗi kết nối máy chủ. Vui lòng kiểm tra lại đường truyền mạng của bạn.",
+  CANCELLED: "Tác vụ đã được hủy theo yêu cầu của người dùng."
+};
