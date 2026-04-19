@@ -8,6 +8,8 @@ import { authService } from '@/services/auth.service';
 import { AUTH_TEXTS } from '@/constants/texts';
 import AuthBranding from '@/components/AuthBranding';
 import GoogleIcon from '@/components/icons/GoogleIcon';
+import { useGoogleLogin } from '@react-oauth/google';
+import { useEffect } from 'react';
 
 export default function RegisterPage() {
   const [name, setName] = useState('');
@@ -15,8 +17,16 @@ export default function RegisterPage() {
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [error, setError] = useState('');
-  const { register, isLoading } = useAuth();
+  const { user, register, googleLogin: loginWithGoogle, isLoading, isInitialLoading } = useAuth();
   const router = useRouter();
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+    if (user && !isInitialLoading) {
+      router.replace('/');
+    }
+  }, [user, isInitialLoading, router]);
 
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -36,8 +46,26 @@ export default function RegisterPage() {
     }
   };
 
+  const googleLogin = useGoogleLogin({
+    onSuccess: async (tokenResponse) => {
+      console.log('Google register success:', tokenResponse);
+      try {
+        await loginWithGoogle(tokenResponse.access_token);
+        router.push('/');
+      } catch (err: any) {
+        setError(err.message || AUTH_TEXTS.GOOGLE.ERROR);
+      }
+    },
+    onError: () => {
+      console.log('Google Register Failed');
+      setError(AUTH_TEXTS.GOOGLE.ERROR);
+    },
+  });
+
   const handleGoogleRegister = () => {
-    console.log('Google register attempt');
+    if (mounted) {
+      googleLogin();
+    }
   };
 
   return (

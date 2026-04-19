@@ -1,13 +1,18 @@
 'use client';
 
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { User, Student, Admin, UserRole } from '@/models/User';
+import { User, Student } from '@/models/User';
 import { authService } from '@/services/auth.service';
+import { useRouter } from 'next/navigation';
 
 interface AuthContextType {
   user: User | null;
   isLoading: boolean;
+  isInitialLoading: boolean;
+  error: string | null;
+  setError: (error: string | null) => void;
   login: (email: string, password: string) => Promise<void>;
+  googleLogin: (token: string) => Promise<void>;
   register: (fullName: string, email: string, password: string) => Promise<void>;
   logout: () => void;
   isAuthenticated: boolean;
@@ -15,56 +20,95 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+// Helper function to get initial user from localStorage
+const getInitialUser = (): User | null => {
+  if (typeof window === 'undefined') return null;
+  try {
+    const storedUser = localStorage.getItem('user');
+    if (!storedUser) return null;
+    const userData = JSON.parse(storedUser);
+
+    if (userData.role === 'student' || userData.student_id) {
+      return new Student(
+        userData.id,
+        userData.full_name,
+        userData.email,
+        userData.student_id,
+        userData.avatarUrl
+      );
+    }
+    return userData;
+  } catch (err) {
+    return null;
+  }
+};
+
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const [isInitialLoading, setIsInitialLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const router = useRouter();
 
-  // Check if user is already logged in (from localStorage)
+  // Sync auth state on mount and keep isInitialLoading accurate
   useEffect(() => {
-    const storedUser = localStorage.getItem('user');
-    if (storedUser) {
-      try {
-        const userData = JSON.parse(storedUser);
-        // Hydrate to proper class instance
-        if (userData.role === UserRole.STUDENT) {
-          setUser(new Student(
-            userData.id, 
-            userData.full_name, 
-            userData.email, 
-            userData.student_id,
-            userData.avatarUrl
-          ));
-        } else if (userData.role === UserRole.ADMIN) {
-          setUser(new Admin(
-            userData.id, 
-            userData.full_name, 
-            userData.email, 
-            userData.avatarUrl
-          ));
-        } else {
-          setUser(userData);
+    const initialUser = getInitialUser();
+    if (initialUser) {
+      setUser(initialUser);
+      
+      // Khôi phục cookie nếu bị mất (quan trọng cho Middleware/proxy.ts)
+      if (typeof window !== 'undefined') {
+        const accessToken = localStorage.getItem('access_token');
+        const refreshToken = localStorage.getItem('refresh_token');
+        
+        if (accessToken && !document.cookie.includes('access_token')) {
+          document.cookie = `access_token=${accessToken}; path=/; max-age=3600`;
         }
-      } catch (error) {
-        console.error('Failed to parse stored user:', error);
-        localStorage.removeItem('user');
+        if (refreshToken && !document.cookie.includes('refresh_token')) {
+          document.cookie = `refresh_token=${refreshToken}; path=/; max-age=${7 * 24 * 60 * 60}`;
+        }
       }
     }
-    setIsLoading(false);
+    setIsInitialLoading(false);
   }, []);
 
   const login = async (email: string, password: string) => {
     setIsLoading(true);
+    setError(null);
     try {
       const { user: userData, accessToken, refreshToken } = await authService.login(email, password);
-
       setUser(userData);
-      
-      // Set cookies for middleware authentication
-      document.cookie = `token=${accessToken}; path=/; max-age=3600`; // 1 hour
-      document.cookie = `refresh_token=${refreshToken}; path=/; max-age=${7 * 24 * 60 * 60}`; // 7 days
-    } catch (error) {
-      console.error('Login error:', error);
-      throw error;
+      localStorage.setItem('user', JSON.stringify(userData));
+      localStorage.setItem('access_token', accessToken);
+      localStorage.setItem('refresh_token', refreshToken);
+      document.cookie = `access_token=${accessToken}; path=/; max-age=3600`;
+      document.cookie = `refresh_token=${refreshToken}; path=/; max-age=${7 * 24 * 60 * 60}`;
+    } catch (err: any) {
+      console.error('Login error:', err);
+      const msg = err.message || 'Đăng nhập thất bại';
+      setError(msg);
+      throw err;
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const googleLogin = async (token: string) => {
+    setIsLoading(true);
+    setError(null);
+    try {
+      const { user: userData, accessToken, refreshToken } = await authService.googleLogin(token);
+      setUser(userData);
+      localStorage.setItem('user', JSON.stringify(userData));
+      localStorage.setItem('access_token', accessToken);
+      localStorage.setItem('refresh_token', refreshToken);
+      document.cookie = `access_token=${accessToken}; path=/; max-age=3600`;
+      document.cookie = `refresh_token=${refreshToken}; path=/; max-age=${7 * 24 * 60 * 60}`;
+    } catch (err: any) {
+      console.error('Google login context error:', err);
+      const msg = err.message || 'Đăng nhập Google thất bại';
+      setError(msg);
+      throw err;
     } finally {
       setIsLoading(false);
     }
@@ -72,14 +116,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const register = async (fullName: string, email: string, password: string) => {
     setIsLoading(true);
+    setError(null);
     try {
       const { user: userData, accessToken, refreshToken } = await authService.register(fullName, email, password);
       setUser(userData);
-      document.cookie = `token=${accessToken}; path=/; max-age=3600`;
+      localStorage.setItem('user', JSON.stringify(userData));
+      localStorage.setItem('access_token', accessToken);
+      localStorage.setItem('refresh_token', refreshToken);
+      document.cookie = `access_token=${accessToken}; path=/; max-age=3600`;
       document.cookie = `refresh_token=${refreshToken}; path=/; max-age=${7 * 24 * 60 * 60}`;
-    } catch (error) {
-      console.error('Registration error:', error);
-      throw error;
+    } catch (err: any) {
+      console.error('Registration error:', err);
+      const msg = err.message || 'Đăng ký thất bại';
+      setError(msg);
+      throw err;
     } finally {
       setIsLoading(false);
     }
@@ -87,10 +137,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const logout = () => {
     setUser(null);
-    // Remove cookies
-    document.cookie = 'token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 UTC;';
-    document.cookie = 'refresh_token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 UTC;';
+    localStorage.removeItem('user');
+    localStorage.removeItem('access_token');
+    localStorage.removeItem('refresh_token');
+    const cookies = ['access_token', 'refresh_token'];
+    cookies.forEach(name => {
+      document.cookie = `${name}=; path=/; expires=Thu, 01 Jan 1970 00:00:00 UTC;`;
+    });
     authService.logout();
+    window.location.replace('/login');
   };
 
   return (
@@ -98,7 +153,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       value={{
         user,
         isLoading,
+        isInitialLoading,
+        error,
+        setError,
         login,
+        googleLogin,
         register,
         logout,
         isAuthenticated: !!user,
