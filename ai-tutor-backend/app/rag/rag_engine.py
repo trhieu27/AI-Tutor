@@ -177,6 +177,7 @@ async def ask_question(
     collection_name: str,
     document_id: str,
     chat_history: list[dict],
+    is_cancelled=None,
 ) -> dict:
     """
     Ask a question using RAG with LCEL.
@@ -210,6 +211,11 @@ async def ask_question(
         # Create chain using LCEL
         chain = prompt | llm | StrOutputParser()
 
+        # Final check before calling AI
+        if is_cancelled and await is_cancelled():
+            logger.info("⏹️ Connection disconnected! Aborting AI call.")
+            raise asyncio.CancelledError()
+
         answer = await chain.ainvoke({
             "context": context_text,
             "chat_history": lc_history,
@@ -238,37 +244,110 @@ async def ask_question(
         raise e
 
 
-async def summarize_document(collection_name: str) -> str:
-    """Generate a comprehensive summary of the document."""
+async def summarize_document_stream(collection_name: str, is_cancelled=None):
+    """Stream a comprehensive summary of the document."""
     try:
         vectorstore = await asyncio.to_thread(get_vectorstore, collection_name)
-        
-        # Check if collection has any data
-        try:
-            count = vectorstore._collection.count()
-            if count == 0:
-                return "Tài liệu chưa được xử lý. Vui lòng tải lên lại."
-        except Exception:
-            return "Không tìm thấy dữ liệu tài liệu."
-
         docs = await vectorstore.asimilarity_search(QUERY_SUMMARIZE, k=10) 
-        
         if not docs:
-            return "Không tìm thấy nội dung để tóm tắt."
+            yield "Không tìm thấy nội dung để tóm tắt."
+            return
+
+        context = "\n\n".join([doc.page_content for doc in docs])
+        llm = get_llm()
+        prompt = PROMPT_SUMMARIZE.replace("{context}", context)
         
+        async for chunk in llm.astream(prompt):
+            if is_cancelled and await is_cancelled():
+                logger.info("⏹️ Summary stream aborted by user.")
+                break
+            # Extract text content from the chunk
+            content = chunk.content
+            if isinstance(content, list):
+                text = "".join([part.get("text", "") if isinstance(part, dict) else str(part) for part in content])
+                yield text
+            else:
+                yield str(content)
+                
+    except Exception as e:
+        logger.error(f"Summarize Stream Error: {str(e)}")
+        yield f"\n[Lỗi: {str(e)}]"
+
+
+async def generate_quiz_stream(collection_name: str, is_cancelled=None):
+    """
+    Stream quiz questions one by one or in chunks.
+    For simplicity, we'll stream the raw text and let frontend parse it.
+    """
+    try:
+        vectorstore = await asyncio.to_thread(get_vectorstore, collection_name)
+        docs = await vectorstore.asimilarity_search(QUERY_QUIZ, k=10)
         context = "\n\n".join([doc.page_content for doc in docs])
         
         llm = get_llm()
-        prompt = PROMPT_SUMMARIZE.replace("{context}", context)
-        response = await llm.ainvoke(prompt)
-        return _extract_text(response.content).strip()
+        prompt = PROMPT_QUIZ.replace("{context}", context)
+        prompt += "\n\nYÊU CẦU quan trọng: Hãy trả về dữ liệu dưới dạng JSON array của các câu hỏi. Bắt đầu bằng [ và kết thúc bằng ]."
+
+        async for chunk in llm.astream(prompt):
+            if is_cancelled and await is_cancelled():
+                break
+            content = chunk.content
+            if isinstance(content, list):
+                yield "".join([part.get("text", "") if isinstance(part, dict) else str(part) for part in content])
+            else:
+                yield str(content)
+                
     except Exception as e:
-        if "429" in str(e):
-            return "AI đang bận, vui lòng thử lại sau vài giây."
-        raise e
+        logger.error(f"Quiz Stream Error: {str(e)}")
+        yield "[]"
 
+async def generate_mindmap_stream(collection_name: str, is_cancelled=None):
+    """Stream a Mermaid.js mindmap string."""
+    try:
+        vectorstore = await asyncio.to_thread(get_vectorstore, collection_name)
+        docs = await vectorstore.asimilarity_search(QUERY_MINDMAP, k=10)
+        context = "\n\n".join([doc.page_content for doc in docs])
+        
+        llm = get_llm()
+        prompt = PROMPT_MINDMAP.replace("{context}", context)
 
-async def generate_quiz(collection_name: str) -> list[dict]:
+        async for chunk in llm.astream(prompt):
+            if is_cancelled and await is_cancelled():
+                break
+            content = chunk.content
+            if isinstance(content, list):
+                yield "".join([part.get("text", "") if isinstance(part, dict) else str(part) for part in content])
+            else:
+                yield str(content)
+                
+    except Exception as e:
+        logger.error(f"Mindmap Stream Error: {str(e)}")
+        yield "mindmap\n  root((Lỗi))"
+
+async def generate_study_questions_stream(collection_name: str, is_cancelled=None):
+    """Stream open-ended study questions."""
+    try:
+        vectorstore = await asyncio.to_thread(get_vectorstore, collection_name)
+        docs = await vectorstore.asimilarity_search(QUERY_STUDY_QUESTIONS, k=15)
+        context = "\n\n".join([doc.page_content for doc in docs])
+        
+        llm = get_llm()
+        prompt = PROMPT_STUDY_QUESTIONS.replace("{context}", context)
+
+        async for chunk in llm.astream(prompt):
+            if is_cancelled and await is_cancelled():
+                break
+            content = chunk.content
+            if isinstance(content, list):
+                yield "".join([part.get("text", "") if isinstance(part, dict) else str(part) for part in content])
+            else:
+                yield str(content)
+                
+    except Exception as e:
+        logger.error(f"Study Questions Stream Error: {str(e)}")
+        yield "\n[Lỗi]"
+
+async def generate_quiz(collection_name: str, is_cancelled=None) -> list[dict]:
     """Generate multiple choice questions from the document."""
     try:
         vectorstore = await asyncio.to_thread(get_vectorstore, collection_name)
@@ -283,6 +362,9 @@ async def generate_quiz(collection_name: str) -> list[dict]:
         prompt = PROMPT_QUIZ.replace("{context}", context)
         # Tell LLM to generate enough questions for the whole content
         prompt += "\n\nYÊU CẦU: Hãy tạo số lượng câu hỏi phù hợp (từ 10-30 câu) để bao quát toàn bộ các nội dung quan trọng có trong văn bản trên."
+
+        if is_cancelled and await is_cancelled():
+            raise asyncio.CancelledError()
 
         response = await llm.ainvoke(prompt)
         content = _extract_text(response.content).strip()
@@ -309,7 +391,7 @@ async def generate_quiz(collection_name: str) -> list[dict]:
         raise e
 
 
-async def generate_mindmap(collection_name: str) -> str:
+async def generate_mindmap(collection_name: str, is_cancelled=None) -> str:
     """Generate a Mermaid.js mindmap string of the document."""
     try:
         vectorstore = await asyncio.to_thread(get_vectorstore, collection_name)
@@ -318,6 +400,9 @@ async def generate_mindmap(collection_name: str) -> str:
         
         llm = get_llm()
         prompt = PROMPT_MINDMAP.replace("{context}", context)
+
+        if is_cancelled and await is_cancelled():
+            raise asyncio.CancelledError()
 
         response = await llm.ainvoke(prompt)
         content = _extract_text(response.content).strip()
@@ -346,7 +431,7 @@ async def generate_mindmap(collection_name: str) -> str:
         raise e
 
 
-async def generate_study_questions(collection_name: str) -> list[str]:
+async def generate_study_questions(collection_name: str, is_cancelled=None) -> list[str]:
     """Generate 10 open-ended study questions for the document."""
     try:
         vectorstore = await asyncio.to_thread(get_vectorstore, collection_name)
@@ -355,6 +440,9 @@ async def generate_study_questions(collection_name: str) -> list[str]:
         
         llm = get_llm()
         prompt = PROMPT_STUDY_QUESTIONS.replace("{context}", context)
+
+        if is_cancelled and await is_cancelled():
+            raise asyncio.CancelledError()
 
         response = await llm.ainvoke(prompt)
         content = _extract_text(response.content).strip()

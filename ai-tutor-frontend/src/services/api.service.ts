@@ -229,66 +229,134 @@ export async function deleteChatSession(sessionId: string): Promise<void> {
   if (!res.ok) throw new Error("Xóa phiên chat thất bại");
 }
 
-export async function fetchDocumentSummary(documentId: string): Promise<string> {
+export async function fetchDocumentSummaryStream(
+  documentId: string, 
+  onChunk: (chunk: string) => void,
+  signal?: AbortSignal
+): Promise<void> {
   const res = await authFetch(`${API_BASE}/chat/${documentId}/summarize`, {
-    headers: { ...getAuthHeaders() }
+    headers: { ...getAuthHeaders() },
+    signal
   });
-  const text = await res.text();
-  let data: any;
-  try {
-    data = JSON.parse(text);
-  } catch (e) {
-    return "Hệ thống đang bận hoặc gặp lỗi xử lý. Vui lòng thử lại sau.";
-  }
-  const summaryRaw = data.summary;
 
-  if (typeof summaryRaw === 'string') return summaryRaw;
-  if (Array.isArray(summaryRaw)) {
-    return summaryRaw.map(part => part.text || "").join("");
+  if (!res.ok) throw new Error("Không thể tạo bản tóm tắt");
+
+  const reader = res.body?.getReader();
+  const decoder = new TextDecoder();
+
+  if (reader) {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      const chunk = decoder.decode(value, { stream: true });
+      onChunk(chunk);
+    }
   }
-  if (typeof summaryRaw === 'object' && summaryRaw !== null) {
-    return summaryRaw.text || JSON.stringify(summaryRaw);
-  }
-  return data.detail || "Không thể tạo bản tóm tắt";
 }
 
-export async function fetchDocumentQuiz(documentId: string): Promise<any[]> {
+export async function fetchDocumentSummary(documentId: string, signal?: AbortSignal): Promise<string> {
+  const res = await authFetch(`${API_BASE}/chat/${documentId}/summarize`, {
+    headers: { ...getAuthHeaders() },
+    signal
+  });
+  if (!res.ok) throw new Error("Không thể tải bản tóm tắt");
+  return res.text();
+}
+
+export async function fetchDocumentQuizStream(
+  documentId: string,
+  onChunk: (chunk: string) => void,
+  signal?: AbortSignal
+): Promise<void> {
   const res = await authFetch(`${API_BASE}/chat/${documentId}/quiz`, {
-    headers: { ...getAuthHeaders() }
+    headers: { ...getAuthHeaders() },
+    signal
   });
   if (!res.ok) throw new Error("Không thể tạo bài kiểm tra");
-  const data = await res.json();
-  return data.quiz;
+  const reader = res.body?.getReader();
+  const decoder = new TextDecoder();
+  if (reader) {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      onChunk(decoder.decode(value, { stream: true }));
+    }
+  }
 }
 
-export async function fetchDocumentMindmap(documentId: string): Promise<string> {
-  const res = await authFetch(`${API_BASE}/chat/${documentId}/mindmap`, {
-    headers: { ...getAuthHeaders() }
+export async function fetchDocumentQuiz(documentId: string, signal?: AbortSignal): Promise<any[]> {
+  const res = await authFetch(`${API_BASE}/chat/${documentId}/quiz`, {
+    headers: { ...getAuthHeaders() },
+    signal
   });
+  if (!res.ok) throw new Error("Không thể tải bài kiểm tra");
   const text = await res.text();
-  let data: any;
   try {
-    data = JSON.parse(text);
+    return JSON.parse(text);
   } catch (e) {
-    return "Không thể tạo sơ đồ tư duy ngay lúc này.";
+    return [];
   }
-  const mmRaw = data.mindmap;
-
-  if (typeof mmRaw === 'string') return mmRaw;
-  if (Array.isArray(mmRaw)) {
-    return mmRaw.map(part => part.text || "").join("");
-  }
-  if (typeof mmRaw === 'object' && mmRaw !== null) {
-    return mmRaw.text || JSON.stringify(mmRaw);
-  }
-  return data.detail || "Không thể tạo sơ đồ tư duy";
 }
 
-export async function fetchDocumentStudyQuestions(documentId: string): Promise<string[]> {
+export async function fetchDocumentMindmapStream(
+  documentId: string,
+  onChunk: (chunk: string) => void,
+  signal?: AbortSignal
+): Promise<void> {
+  const res = await authFetch(`${API_BASE}/chat/${documentId}/mindmap`, {
+    headers: { ...getAuthHeaders() },
+    signal
+  });
+  if (!res.ok) throw new Error("Không thể tạo sơ đồ tư duy");
+  const reader = res.body?.getReader();
+  const decoder = new TextDecoder();
+  if (reader) {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      onChunk(decoder.decode(value, { stream: true }));
+    }
+  }
+}
+
+export async function fetchDocumentMindmap(documentId: string, signal?: AbortSignal): Promise<string> {
+  const res = await authFetch(`${API_BASE}/chat/${documentId}/mindmap`, {
+    headers: { ...getAuthHeaders() },
+    signal
+  });
+  if (!res.ok) throw new Error("Không thể tải sơ đồ tư duy");
+  return res.text();
+}
+
+export async function fetchDocumentStudyQuestionsStream(
+  documentId: string,
+  onChunk: (chunk: string) => void,
+  signal?: AbortSignal
+): Promise<void> {
   const res = await authFetch(`${API_BASE}/chat/${documentId}/study-questions`, {
-    headers: { ...getAuthHeaders() }
+    headers: { ...getAuthHeaders() },
+    signal
   });
   if (!res.ok) throw new Error("Không thể tạo câu hỏi ôn tập");
-  const data = await res.json();
-  return data.questions;
+  const reader = res.body?.getReader();
+  const decoder = new TextDecoder();
+  if (reader) {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      onChunk(decoder.decode(value, { stream: true }));
+    }
+  }
+}
+
+export async function fetchDocumentStudyQuestions(documentId: string, signal?: AbortSignal): Promise<string[]> {
+  const res = await authFetch(`${API_BASE}/chat/${documentId}/study-questions`, {
+    headers: { ...getAuthHeaders() },
+    signal
+  });
+  if (!res.ok) throw new Error("Không thể tải câu hỏi ôn tập");
+  const text = await res.text();
+  return text.split('\n')
+    .map(l => l.replace(/^\d+\.\s*/, "").trim())
+    .filter(l => l.length > 5);
 }
