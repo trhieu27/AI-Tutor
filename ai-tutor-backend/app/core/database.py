@@ -20,16 +20,18 @@ async def init_db():
     """Initialize MongoDB connection on startup."""
     logger.info("Connecting to MongoDB...")
     try:
+        # We don't await the ping here to prevent startup hang
+        # Motor will reconnect automatically when needed
         db_container.client = AsyncIOMotorClient(
             settings.MONGO_URL,
             tlsCAFile=certifi.where(),
-            serverSelectionTimeoutMS=5000
+            serverSelectionTimeoutMS=5000,
+            connectTimeoutMS=5000
         )
         db_container.db = db_container.client[settings.DATABASE_NAME]
-        await db_container.client.admin.command('ping')
-        logger.info(f"Connected to MongoDB: {settings.DATABASE_NAME}")
+        logger.info(f"MongoDB client initialized: {settings.DATABASE_NAME}")
     except Exception as e:
-        logger.error(f"DATABASE CONNECTION ERROR: {str(e)}")
+        logger.error(f"DATABASE INITIALIZATION ERROR: {str(e)}")
 
 async def close_db():
     """Close MongoDB connection on shutdown."""
