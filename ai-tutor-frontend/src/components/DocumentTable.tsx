@@ -33,6 +33,20 @@ export default function DocumentTable({
 
   const [searchTerm, setSearchTerm] = useState("");
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [retryingId, setRetryingId] = useState<string | null>(null);
+
+  // Tự động làm mới nếu có tài liệu đang xử lý
+  useEffect(() => {
+    const hasProcessing = documents.some(doc => doc.status === 'PROCESSING' || doc.status === 'UPLOADING');
+    
+    if (hasProcessing) {
+      const timer = setInterval(() => {
+        refreshDocuments(true); // Tải lại nhưng không hiện loading xoay
+      }, 5000); // 5 giây một lần
+      
+      return () => clearInterval(timer);
+    }
+  }, [documents, refreshDocuments]);
 
   useEffect(() => {
     if (refreshTrigger > 0) {
@@ -53,7 +67,20 @@ export default function DocumentTable({
     }
   };
 
-  const getStatusBadge = (status: DocumentResponse["status"]) => {
+  const handleRetry = async (documentId: string) => {
+    setRetryingId(documentId);
+    try {
+      const { retryDocument } = await import("@/services/api.service");
+      await retryDocument(documentId);
+      await refreshDocuments(true);
+    } catch (err: any) {
+      alert(err.message || "Thử lại thất bại");
+    } finally {
+      setRetryingId(null);
+    }
+  };
+
+  const getStatusBadge = (status: DocumentResponse["status"], docId: string) => {
     switch (status) {
       case "READY":
         return (
@@ -75,10 +102,14 @@ export default function DocumentTable({
         );
       case "FAILED":
         return (
-          <span className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-[11px] font-black uppercase tracking-widest bg-red-50 dark:bg-red-500/10 text-red-600 dark:text-red-400 border border-red-200 dark:border-red-500/20">
-            <span className="w-1.5 h-1.5 rounded-full bg-red-500" />
-            LỖI
-          </span>
+          <button 
+            onClick={(e) => { e.stopPropagation(); handleRetry(docId); }}
+            disabled={retryingId === docId}
+            className="group/retry inline-flex items-center justify-center gap-2 px-4 py-2 rounded-full text-[11px] font-black uppercase tracking-widest bg-red-50 dark:bg-red-500/10 text-red-600 dark:text-red-400 border border-red-200 dark:border-red-500/20 hover:bg-red-500 hover:text-white transition-all whitespace-nowrap"
+          >
+            <span className={`material-symbols-outlined text-xs shrink-0 ${retryingId === docId ? 'animate-spin' : 'group-hover/retry:rotate-180 transition-transform'}`}>refresh</span>
+            <span className="whitespace-nowrap">THỬ LẠI</span>
+          </button>
         );
     }
   };
@@ -155,18 +186,16 @@ export default function DocumentTable({
                   onClick={() => doc.status === "READY" && router.push(getRedirectUrl(doc.id))}
                   className={`transition-all duration-300 relative group ${doc.status === "READY" ? "hover:bg-slate-50 dark:hover:bg-white/[0.04] cursor-pointer" : "opacity-60 cursor-wait"}`}
                 >
-                  <td className="py-6 px-8 relative overflow-hidden min-w-0">
-                    <div className="flex items-center gap-5 w-full min-w-0">
+                  <td className="py-6 px-4">
+                    <div className="flex items-center gap-4">
                       {getFileIcon(doc.file_name)}
-                      <div className="min-w-0 flex-1 relative overflow-hidden group/name">
-                        <div className="flex flex-col min-w-0">
-                          <p className="font-bold text-[14px] sm:text-[15px] text-slate-900 dark:text-white mb-1 leading-snug group-hover/name:text-indigo-600 dark:group-hover/name:text-indigo-300 transition-colors truncate whitespace-nowrap group-hover/name:text-clip group-hover/name:overflow-visible group-hover/name:animate-marquee">
-                            {doc.file_name}
-                          </p>
-                          <p className="text-[10px] text-slate-400 dark:text-slate-400 font-bold uppercase tracking-wider whitespace-nowrap overflow-hidden text-ellipsis">
-                            {doc.file_size_mb} MB • {doc.file_name.split('.').pop()?.toUpperCase()}
-                          </p>
-                        </div>
+                      <div className="min-w-0">
+                        <p className="text-sm font-black text-slate-900 dark:text-white truncate max-w-[200px] lg:max-w-[400px] mb-0.5 group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors">
+                          {doc.file_name}
+                        </p>
+                        <p className="text-[10px] text-slate-400 dark:text-slate-500 font-bold uppercase tracking-wider">
+                          {doc.file_size_mb} MB • {doc.file_name.split('.').pop()?.toUpperCase()}
+                        </p>
                       </div>
                     </div>
                   </td>
@@ -182,7 +211,7 @@ export default function DocumentTable({
                   </td>
                   <td className="py-6 px-4 text-center">
                     <div className="flex justify-center scale-90">
-                      {getStatusBadge(doc.status)}
+                      {getStatusBadge(doc.status, doc.id)}
                     </div>
                   </td>
                   {showActions && (

@@ -29,41 +29,31 @@ async def process_document_background(document_id: str, file_path: str):
     if not doc_data:
         return
 
-    max_retries = 3
-    for attempt in range(1, max_retries + 1):
-        try:
-            await db.documents.update_one(
-                {"id": document_id}, 
-                {"$set": {"status": DocumentStatus.PROCESSING}}
-            )
+    try:
+        await db.documents.update_one(
+            {"id": document_id}, 
+            {"$set": {"status": DocumentStatus.PROCESSING}}
+        )
 
-            collection_name, page_count = await rag_engine.ingest_document(file_path, document_id)
+        collection_name, page_count = await rag_engine.ingest_document(file_path, document_id)
 
-            await db.documents.update_one(
-                {"id": document_id},
-                {"$set": {
-                    "status": DocumentStatus.READY,
-                    "page_count": page_count,
-                    "chroma_collection_id": collection_name,
-                    "updated_at": datetime.utcnow()
-                }}
-            )
-            logger.info(f"✅ Document {document_id} processed successfully on attempt {attempt}")
-            return  # Thành công, thoát khỏi vòng lặp
+        await db.documents.update_one(
+            {"id": document_id},
+            {"$set": {
+                "status": DocumentStatus.READY,
+                "page_count": page_count,
+                "chroma_collection_id": collection_name,
+                "updated_at": datetime.utcnow()
+            }}
+        )
+        logger.info(f"✅ Document {document_id} processed successfully")
 
-        except Exception as e:
-            logger.error(f"❌ Document {document_id} processing failed (attempt {attempt}/{max_retries}): {str(e)}")
-            if attempt < max_retries:
-                import asyncio
-                wait_time = attempt * 5  # 5s, 10s, 15s
-                logger.info(f"⏳ Retrying in {wait_time}s...")
-                await asyncio.sleep(wait_time)
-            else:
-                logger.error(f"🔥 Document {document_id} PERMANENTLY FAILED after {max_retries} attempts")
-                await db.documents.update_one(
-                    {"id": document_id},
-                    {"$set": {"status": DocumentStatus.FAILED}}
-                )
+    except Exception as e:
+        logger.error(f"❌ Document {document_id} processing failed: {str(e)}")
+        await db.documents.update_one(
+            {"id": document_id},
+            {"$set": {"status": DocumentStatus.FAILED}}
+        )
 
 
 @router.post("/upload", response_model=DocumentResponse, status_code=201)
@@ -110,6 +100,42 @@ async def upload_document(
         )
 
     return document
+
+
+@router.post("/{document_id}/retry", response_model=DocumentResponse)
+async def retry_document_processing(
+    document_id: str,
+    background_tasks: BackgroundTasks,
+    db: AsyncIOMotorDatabase = Depends(get_db),
+    current_user_id: str = Depends(get_current_user)
+):
+    """Manually trigger document processing for failed uploads."""
+    doc = await db.documents.find_one({"id": document_id, "owner_id": current_user_id})
+    if not doc:
+        raise HTTPException(status_code=404, detail="Tài liệu không tồn tại.")
+        
+    # Find the file on disk
+    file_path = None
+    for suffix in [".pdf", ".docx", ".doc"]:
+        path = os.path.join(settings.UPLOAD_DIR, f"{document_id}{suffix}")
+        if os.path.exists(path):
+            file_path = path
+            break
+            
+    if not file_path:
+        raise HTTPException(status_code=400, detail="Không tìm thấy file tài liệu trên server.")
+
+    # Reset status and trigger background task
+    await db.documents.update_one(
+        {"id": document_id},
+        {"$set": {"status": DocumentStatus.PROCESSING}}
+    )
+    
+    background_tasks.add_task(process_document_background, document_id, file_path)
+    
+    # Return updated doc
+    doc["status"] = DocumentStatus.PROCESSING
+    return doc
 
 
 @router.get("", response_model=list[DocumentResponse])

@@ -158,6 +158,15 @@ export async function deleteDocument(documentId: string): Promise<void> {
   if (!res.ok) throw new Error("Xóa tài liệu thất bại");
 }
 
+export async function retryDocument(documentId: string): Promise<DocumentResponse> {
+  const res = await authFetch(`${API_BASE}/documents/${documentId}/retry`, {
+    method: "POST",
+    headers: { ...getAuthHeaders() }
+  });
+  if (!res.ok) throw new Error("Yêu cầu xử lý lại thất bại");
+  return res.json();
+}
+
 // ─── Chat API ─────────────────────────────────────────────────────────────────
 
 export async function askQuestion(
