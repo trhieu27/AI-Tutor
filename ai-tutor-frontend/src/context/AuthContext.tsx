@@ -68,87 +68,55 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const storedUser = getStoredUser();
     const hasToken = !!localStorage.getItem('access_token');
 
-    console.log(`[AuthContext] [DEBUG] Sync start. User in LS: ${storedUser?.email || 'NONE'}, Token in LS: ${hasToken}`);
-
     if (storedUser) {
       setUser(storedUser);
       setIsInitialLoading(false);
-      console.log(`[AuthContext] [DEBUG] User restored from LS. Loading set to FALSE.`);
     } else if (!hasToken) {
       setUser(null);
       setIsInitialLoading(false);
-      console.log(`[AuthContext] [DEBUG] No user, no token. Loading set to FALSE.`);
     }
   }, []);
 
+  // 2. Kiểm tra với Backend (ĐÃ TẮT THEO YÊU CẦU)
   const revalidateAuth = useCallback(async () => {
-    if (typeof window === 'undefined') return;
-    const hasToken = !!localStorage.getItem('access_token');
-
-    if (!hasToken) {
-      console.log(`[AuthContext] [DEBUG] Revalidate skipped: No token.`);
-      setIsInitialLoading(false);
-      return;
-    }
-
-    try {
-      console.log("[AuthContext] [DEBUG] Calling backend /me...");
-      const freshUser = await authService.getCurrentUser();
-
-      if (freshUser) {
-        console.log("[AuthContext] [DEBUG] Backend match! User:", freshUser.email);
-        setUser(freshUser);
-      } else {
-        console.warn("[AuthContext] [DEBUG] Backend did NOT return user.");
-        if (!getStoredUser()) {
-          setUser(null);
-          authService.logout();
-        }
-      }
-    } catch (err) {
-      console.error("[AuthContext] [DEBUG] Revalidation error:", err);
-    } finally {
-      setIsInitialLoading(false);
-      console.log("[AuthContext] [DEBUG] Sync cycle complete. Loading: FALSE");
-    }
+    // Chúng ta chỉ dựa vào LocalStorage để tối ưu tốc độ và tránh lỗi 404
+    setIsInitialLoading(false);
   }, []);
 
-  // Sync ngay lập tức
-  useLayoutEffect(() => {
-    syncFromStorage();
-  }, [syncFromStorage]);
-
-  // Revalidate ngầm
+  // Effect tổng quản lý việc đồng bộ khi Mount, Chuyển trang (pathname) và Browser Events
   useEffect(() => {
-    revalidateAuth();
-  }, [pathname, revalidateAuth]);
-
-  useEffect(() => {
-    const handleEvents = () => {
+    const handleSync = () => {
       syncFromStorage();
       revalidateAuth();
     };
 
-    window.addEventListener('pageshow', handleEvents);
-    window.addEventListener('popstate', handleEvents);
+    // Chạy khi mount hoặc pathname thay đổi
+    handleSync();
+
+    // Lắng nghe các sự kiện trình duyệt
+    window.addEventListener('pageshow', handleSync);
+    window.addEventListener('popstate', handleSync);
     window.addEventListener('storage', (e) => {
-      if (e.key === 'user' || e.key === 'access_token') handleEvents();
+      if (e.key === 'user' || e.key === 'access_token') handleSync();
     });
+    window.addEventListener('focus', handleSync);
 
     return () => {
-      window.removeEventListener('pageshow', handleEvents);
-      window.removeEventListener('popstate', handleEvents);
+      window.removeEventListener('pageshow', handleSync);
+      window.removeEventListener('popstate', handleSync);
     };
-  }, [syncFromStorage, revalidateAuth]);
+  }, [pathname, syncFromStorage, revalidateAuth]);
 
   const login = async (email: string, password: string) => {
     setIsLoading(true);
     setError(null);
     try {
       const { user: userData } = await authService.login(email, password);
+      console.log("[AuthContext] Login success raw data:", userData);
       const userInstance = createUserInstance(userData);
+      console.log("[AuthContext] User instance created:", userInstance);
       setUser(userInstance);
-      setIsInitialLoading(false); // Quan trọng: Tắt loading ngay sau khi login
+      setIsInitialLoading(false);
     } catch (err: any) {
       setError(err.message || 'Đăng nhập thất bại');
       throw err;
@@ -162,7 +130,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setError(null);
     try {
       const { user: userData } = await authService.register(fullName, email, password);
+      console.log("[AuthContext] Register success raw data:", userData);
       const userInstance = createUserInstance(userData);
+      console.log("[AuthContext] User instance created:", userInstance);
       setUser(userInstance);
       setIsInitialLoading(false);
     } catch (err: any) {
@@ -184,7 +154,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setError(null);
     try {
       const { user: userData } = await authService.googleLogin(token);
-      setUser(createUserInstance(userData));
+      console.log("[AuthContext] Google Login success raw data:", userData);
+      const userInstance = createUserInstance(userData);
+      console.log("[AuthContext] User instance created:", userInstance);
+      setUser(userInstance);
       setIsInitialLoading(false);
     } catch (err: any) {
       setError(err.message || 'Google login failed');
