@@ -65,6 +65,43 @@ class AuthService {
     }
   }
 
+  public async googleLogin(token: string): Promise<{ user: User; accessToken: string; refreshToken: string }> {
+    try {
+      const response = await fetch(`${this.baseUrl}/google-login`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ token }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.detail || 'Google login failed');
+      }
+
+      const data = await response.json();
+
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('access_token', data.access_token);
+        localStorage.setItem('refresh_token', data.refresh_token);
+        localStorage.setItem('user', JSON.stringify(data.user));
+
+        this.setCookie('access_token', data.access_token, 7);
+        this.setCookie('refresh_token', data.refresh_token, 7);
+      }
+
+      return {
+        user: new Student(data.user.id, data.user.full_name, data.user.email, data.user.student_id),
+        accessToken: data.access_token,
+        refreshToken: data.refresh_token,
+      };
+    } catch (error) {
+      console.error('Backend Google login error:', error);
+      throw error;
+    }
+  }
+
   public async register(name: string, email: string, password: string): Promise<{ user: User; accessToken: string; refreshToken: string }> {
     try {
       const student_id = "STU" + Math.floor(100000 + Math.random() * 900000).toString();
@@ -145,6 +182,42 @@ class AuthService {
       localStorage.removeItem('user');
       this.deleteCookie('access_token');
       this.deleteCookie('refresh_token');
+    }
+  }
+
+  public async forgotPassword(email: string): Promise<void> {
+    const response = await fetch(`${this.baseUrl}/forgot-password`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email }),
+    });
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.detail || 'Không thể gửi yêu cầu khôi phục');
+    }
+  }
+
+  public async verifyOtp(email: string, otp: string): Promise<void> {
+    const response = await fetch(`${this.baseUrl}/verify-otp`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, otp }),
+    });
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.detail || 'Mã xác nhận không hợp lệ');
+    }
+  }
+
+  public async resetPassword(email: string, otp: string, password: string): Promise<void> {
+    const response = await fetch(`${this.baseUrl}/reset-password`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, otp, new_password: password }),
+    });
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.detail || 'Không thể đặt lại mật khẩu');
     }
   }
 }

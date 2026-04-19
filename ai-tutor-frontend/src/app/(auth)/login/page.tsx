@@ -13,14 +13,49 @@ export default function LoginPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
-  const { login, isLoading } = useAuth();
-  const router = useRouter();
+  const { user, login, googleLogin: loginWithGoogle, isLoading, isInitialLoading } = useAuth();
+   const router = useRouter();
   const [mounted, setMounted] = useState(false);
+  const [failedAttempts, setFailedAttempts] = useState(0);
+  const [lockoutTimer, setLockoutTimer] = useState(0);
 
-  // Đảm bảo chỉ render nội dung liên quan đến Google ở phía Client
+  // Khôi phục trạng thái khóa từ LocalStorage khi mount
   useEffect(() => {
     setMounted(true);
-  }, []);
+    
+    const storedLockoutUntil = localStorage.getItem('login_lockout_until');
+    if (storedLockoutUntil) {
+      const remaining = Math.ceil((parseInt(storedLockoutUntil) - Date.now()) / 1000);
+      if (remaining > 0) {
+        setLockoutTimer(remaining);
+        setFailedAttempts(5);
+      } else {
+        localStorage.removeItem('login_lockout_until');
+      }
+    }
+
+    if (user && !isInitialLoading) {
+      router.replace('/');
+    }
+  }, [user, isInitialLoading, router]);
+
+  // Bộ đếm ngược và đồng bộ với LocalStorage
+  useEffect(() => {
+    if (lockoutTimer > 0) {
+      const interval = setInterval(() => {
+        setLockoutTimer((prev) => {
+          const nextValue = prev - 1;
+          if (nextValue <= 0) {
+            localStorage.removeItem('login_lockout_until');
+            setFailedAttempts(0);
+            return 0;
+          }
+          return nextValue;
+        });
+      }, 1000);
+      return () => clearInterval(interval);
+    }
+  }, [lockoutTimer]);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -30,10 +65,20 @@ export default function LoginPage() {
       await login(email, password);
       router.push('/');
     } catch (err: any) {
-      const errorMessage = err.message || AUTH_TEXTS.LOGIN.LOGIN_ERROR;
-      setError(errorMessage === 'Failed to fetch' 
-        ? 'Lỗi kết nối: Không thể kết nối tới máy chủ (Backend).' 
-        : errorMessage);
+       const newAttempts = failedAttempts + 1;
+      setFailedAttempts(newAttempts);
+
+      if (newAttempts >= 5) {
+        const lockoutUntil = Date.now() + 60000;
+        localStorage.setItem('login_lockout_until', lockoutUntil.toString());
+        setLockoutTimer(60); 
+        setError(AUTH_TEXTS.LOGIN.RATE_LIMIT_COUNTDOWN?.(60) || `Thử quá nhiều lần. Vui lòng thử lại sau 60 giây.`);
+      } else {
+        const errorMessage = err.message || AUTH_TEXTS.LOGIN.LOGIN_ERROR;
+        setError(errorMessage === 'Failed to fetch'
+          ? 'Lỗi kết nối: Không thể kết nối tới máy chủ (Backend).'
+          : errorMessage);
+      }
       console.error('Login error:', err);
     }
   };
@@ -41,8 +86,12 @@ export default function LoginPage() {
   const googleLogin = useGoogleLogin({
     onSuccess: async (tokenResponse) => {
       console.log('Google login success:', tokenResponse);
-      alert(AUTH_TEXTS.GOOGLE.SUCCESS);
-      router.push('/');
+      try {
+        await loginWithGoogle(tokenResponse.access_token);
+        router.push('/');
+      } catch (err: any) {
+        setError(err.message || AUTH_TEXTS.GOOGLE.ERROR);
+      }
     },
     onError: () => {
       console.log('Login Failed');
@@ -82,7 +131,13 @@ export default function LoginPage() {
             <div className="flex-1 h-px bg-gray-200"></div>
           </div>
 
-          {error && (
+          {lockoutTimer > 0 ? (
+            <div className="bg-red-50 border border-red-200 rounded-xl p-4 mb-6">
+              <p className="text-red-600 text-[15px] font-medium text-center">
+                {AUTH_TEXTS.LOGIN.RATE_LIMIT_COUNTDOWN?.(lockoutTimer) || `Thử quá nhiều lần. Vui lòng thử lại sau ${lockoutTimer} giây.`}
+              </p>
+            </div>
+          ) : error && (
             <div className="bg-red-50 border border-red-200 rounded-lg p-3 mb-5">
               <p className="text-red-700 text-sm">{error}</p>
             </div>
@@ -99,7 +154,7 @@ export default function LoginPage() {
                   placeholder={AUTH_TEXTS.LOGIN.EMAIL_PLACEHOLDER}
                   className="w-full bg-[#f4f6fa] rounded-xl py-3.5 pl-4 pr-12 outline-none border-2 border-transparent focus:border-[#0052ff] focus:bg-white text-[15px] transition-all text-[#111827] placeholder-gray-400"
                   required
-                  disabled={isLoading}
+                  disabled={isLoading || lockoutTimer > 0}
                 />
                 <span className="material-symbols-outlined absolute right-4 text-gray-400">mail</span>
               </div>
@@ -120,7 +175,7 @@ export default function LoginPage() {
                   placeholder={AUTH_TEXTS.LOGIN.PASSWORD_PLACEHOLDER}
                   className="w-full bg-[#f4f6fa] rounded-xl py-3.5 pl-4 pr-12 outline-none border-2 border-transparent focus:border-[#0052ff] focus:bg-white text-[15px] transition-all text-[#111827] placeholder-gray-400"
                   required
-                  disabled={isLoading}
+                  disabled={isLoading || lockoutTimer > 0}
                 />
                 <span className="material-symbols-outlined absolute right-4 text-gray-400">lock</span>
               </div>
@@ -128,7 +183,7 @@ export default function LoginPage() {
 
             <button
               type="submit"
-              disabled={isLoading}
+              disabled={isLoading || lockoutTimer > 0}
               className="w-full bg-[#0052ff] text-white font-bold rounded-xl py-3.5 mt-4 hover:bg-[#0042cc] transition-colors shadow-[0_4px_12px_rgba(0,82,255,0.25)] disabled:bg-gray-400 disabled:cursor-not-allowed"
             >
               {isLoading ? AUTH_TEXTS.LOGIN.LOGIN_LOADING : AUTH_TEXTS.LOGIN.LOGIN_BUTTON}

@@ -76,7 +76,7 @@ export const DOCUMENT_TABLE_TEXTS = {
 
 export const AUTH_TEXTS = {
   LOGIN: {
-    HERO_TITLE: "AI TUTOR SYSTEM",
+    HERO_TITLE: "AI TUTOR",
     HERO_QUOTE: "Nền tảng học tập thông minh dựa trên trí tuệ nhân tạo thế hệ mới.",
     WELCOME_TITLE: "Chào mừng trở lại!",
     WELCOME_SUBTITLE: "Vui lòng nhập thông tin để truy cập vào hệ thống",
@@ -92,6 +92,30 @@ export const AUTH_TEXTS = {
     LOGIN_ERROR: "Email hoặc mật khẩu không chính xác.",
     NO_ACCOUNT: "Bạn chưa có tài khoản?",
     REGISTER_NOW: "Đăng ký ngay"
+  },
+  FORGOT_PASSWORD: {
+    TITLE: "Quên mật khẩu",
+    SUBTITLE: "Đừng lo, hãy nhập email để AI Tutor giúp bạn lấy lại quyền truy cập",
+    EMAIL_LABEL: "Email khôi phục",
+    EMAIL_PLACEHOLDER: "example@email.com",
+    BUTTON: "Gửi mã xác nhận",
+    LOADING: "Đang gửi...",
+    SUCCESS_MSG: "Yêu cầu đã được gửi! Vui lòng kiểm tra email của bạn.",
+    ERROR: "Email không hợp lệ hoặc không tồn tại.",
+    OTP_TITLE: "Kiểm tra Email",
+    OTP_SUBTITLE: (email: string) => `Chúng tôi đã gửi mã xác nhận đến ${email}`,
+    OTP_LABEL: "Mã xác nhận (6 chữ số)",
+    VERIFY_OTP: "Xác thực mã",
+    VERIFYING: "Đang xác thực...",
+    RESET_TITLE: "Mật khẩu mới",
+    RESET_SUBTITLE: "Hãy chọn một mật khẩu mạnh để bảo vệ tài khoản của bạn",
+    NEW_PASSWORD: "Mật khẩu mới",
+    CONFIRM_NEW_PASSWORD: "Xác nhận mật khẩu mới",
+    RESET_BUTTON: "Cập nhật mật khẩu",
+    RESET_LOADING: "Đang cập nhật...",
+    SUCCESS_TITLE: "Xong rồi!",
+    RESET_SUCCESS: "Đổi mật khẩu thành công! Vui lòng đăng nhập lại.",
+    BACK_TO_LOGIN: "Quay lại Đăng nhập"
   },
   REGISTER: {
     PASSWORD_MISMATCH: "Mật khẩu xác nhận không khớp.",
