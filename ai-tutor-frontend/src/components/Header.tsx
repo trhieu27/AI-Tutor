@@ -141,12 +141,12 @@ export default function Header({ onMenuClick }: HeaderProps) {
 
         <div className="flex items-center gap-3">
           <div className="flex flex-col items-end">
-            <p className="text-[13px] font-black text-slate-900 dark:text-white tracking-tight leading-none mb-1">
+            <p className="text-[13px] font-extrabold text-slate-900 dark:text-white tracking-tight leading-none mb-1.5">
               {user?.full_name || HEADER_TEXTS.user.defaultName}
             </p>
-            <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-amber-50 dark:bg-amber-500/10 border border-amber-200 dark:border-amber-500/20 shadow-sm dark:shadow-[0_0_10px_rgba(245,158,11,0.1)]">
+            <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-amber-50 dark:bg-amber-500/10 border border-amber-200 dark:border-amber-500/20 shadow-sm">
               <span className="w-1 h-1 rounded-full bg-amber-500 animate-pulse"></span>
-              <p className="text-[9px] font-black text-amber-600 dark:text-amber-500 uppercase tracking-widest">{HEADER_TEXTS.proBadge}</p>
+              <p className="text-[9px] font-extrabold text-amber-600 dark:text-amber-500 uppercase tracking-[0.15em]">{HEADER_TEXTS.proBadge}</p>
             </div>
           </div>
           <div className="relative group">

@@ -77,17 +77,17 @@ export default function Dashboard() {
         <div className="relative z-10 max-w-2xl space-y-8">
           <div className="inline-flex items-center gap-2 px-4 py-1.5 bg-white/10 dark:bg-indigo-500/10 border border-white/20 dark:border-indigo-500/30 rounded-full">
              <span className="w-1.5 h-1.5 rounded-full bg-white dark:bg-indigo-400 animate-ping"></span>
-             <span className="text-[10px] font-black text-white/90 dark:text-indigo-300 uppercase tracking-widest leading-none">AI Trợ lý học tập mới nhất</span>
+             <span className="text-[10px] font-extrabold text-white/90 dark:text-indigo-300 uppercase tracking-[0.2em] leading-none">AI Trợ lý học tập mới nhất</span>
           </div>
-          <h1 className="text-5xl md:text-6xl font-black tracking-tight leading-[1.1] text-white">
+          <h1 className="text-5xl md:text-6xl font-extrabold tracking-tight leading-[1.1] text-white">
             {DASHBOARD_TEXTS.welcome.title.split('AI Tutor')[0]}
-            <span className="text-transparent bg-clip-text bg-gradient-to-r from-amber-200 via-white to-indigo-200 dark:from-indigo-300 dark:via-purple-300 dark:to-pink-300">AI Tutor</span>
+            <span className="text-transparent bg-clip-text bg-gradient-to-r from-amber-200 via-white to-indigo-200 dark:from-indigo-300 dark:via-purple-300 dark:to-pink-300 whitespace-nowrap">AI Tutor</span>
           </h1>
-          <p className="text-white/80 dark:text-slate-200 text-lg md:text-xl leading-relaxed max-w-xl font-medium tracking-tight">
+          <p className="text-white/80 dark:text-slate-200 text-lg md:text-xl leading-relaxed max-w-xl font-semibold tracking-tight">
             {DASHBOARD_TEXTS.welcome.subtitle}
           </p>
           <div className="pt-4">
-             <button onClick={scrollToUpload} className="px-8 py-4 bg-white text-indigo-700 dark:text-slate-950 font-black rounded-2xl hover:bg-indigo-100 dark:hover:bg-indigo-400 dark:hover:text-white transition-all shadow-xl active:scale-95 text-sm uppercase tracking-widest">
+             <button onClick={scrollToUpload} className="px-8 py-4 bg-white text-indigo-700 dark:text-slate-950 font-extrabold rounded-2xl hover:bg-slate-50 dark:hover:bg-indigo-400 dark:hover:text-white transition-all shadow-xl active:scale-95 text-sm uppercase tracking-[0.15em]">
                 Bắt đầu học ngay
              </button>
           </div>
@@ -102,8 +102,8 @@ export default function Dashboard() {
             <div className={`w-16 h-16 bg-gradient-to-br ${feat.color} rounded-[24px] flex items-center justify-center mb-6 group-hover:scale-110 group-hover:rotate-6 transition-transform duration-500 shadow-lg`}>
               <span className="material-symbols-outlined text-[32px]">{feat.icon}</span>
             </div>
-            <h3 className="text-xl font-bold text-slate-900 dark:text-white mb-3 tracking-tight">{feat.title}</h3>
-            <p className="text-slate-500 dark:text-slate-300 text-sm leading-relaxed font-medium">{feat.desc}</p>
+            <h3 className="text-xl font-extrabold text-slate-900 dark:text-white mb-3 tracking-tight">{feat.title}</h3>
+            <p className="text-slate-500 dark:text-slate-300 text-[13px] leading-[1.7] font-medium tracking-tight opacity-90">{feat.desc}</p>
           </Link>
         ))}
       </div>

@@ -62,23 +62,23 @@ export default function LoginPage() {
 
       <div className="w-full lg:w-1/2 flex flex-col justify-center items-center py-12 px-6 sm:px-12 relative overflow-y-auto h-full">
         <div className="w-full max-w-[420px]">
-          <div className="mb-10 text-center lg:text-left">
-            <h2 className="text-3xl font-bold text-[#111827] mb-3">{AUTH_TEXTS.LOGIN.WELCOME_TITLE}</h2>
-            <p className="text-[#6b7280] text-[15px]">{AUTH_TEXTS.LOGIN.WELCOME_SUBTITLE}</p>
+          <div className="mb-12 text-center lg:text-left">
+            <h2 className="text-3xl font-extrabold text-[#111827] mb-4 tracking-tight">{AUTH_TEXTS.LOGIN.WELCOME_TITLE}</h2>
+            <p className="text-[#6b7280] text-[15px] leading-relaxed">{AUTH_TEXTS.LOGIN.WELCOME_SUBTITLE}</p>
           </div>
 
           <button
             type="button"
             onClick={handleGoogleLogin}
-            className="w-full flex items-center justify-center gap-3 bg-[#f3f4f6] text-[#111827] rounded-xl py-3.5 px-4 font-semibold hover:bg-[#e5e7eb] transition-colors mb-8"
+            className="w-full flex items-center justify-center gap-3 bg-[#f3f4f6] text-[#111827] rounded-xl py-4 px-4 font-bold hover:bg-[#e5e7eb] transition-colors mb-10 tracking-tight"
           >
             <GoogleIcon size={20} />
             {AUTH_TEXTS.LOGIN.CONTINUE_WITH_GOOGLE}
           </button>
 
-          <div className="flex items-center gap-4 mb-8">
+          <div className="flex items-center gap-4 mb-10">
             <div className="flex-1 h-px bg-gray-200"></div>
-            <p className="text-[11px] text-gray-400 font-bold tracking-wider uppercase">{AUTH_TEXTS.LOGIN.OR_LOGIN_WITH_EMAIL}</p>
+            <p className="text-[10px] text-gray-400 font-extrabold tracking-[0.2em] uppercase">{AUTH_TEXTS.LOGIN.OR_LOGIN_WITH_EMAIL}</p>
             <div className="flex-1 h-px bg-gray-200"></div>
           </div>
 

@@ -142,10 +142,10 @@ export default function DocumentTable({
       {/* Header with Search */}
       <div className="px-8 py-5 flex flex-col lg:flex-row lg:items-center justify-between gap-6 bg-slate-50 dark:bg-slate-900/40 border-b border-slate-200 dark:border-white/10 transition-colors duration-500">
         <div>
-          <h2 className="text-2xl font-black text-slate-900 dark:text-white tracking-tight leading-none mb-2">{DOCUMENT_TABLE_TEXTS.title}</h2>
+          <h2 className="text-2xl font-bold text-slate-900 dark:text-white tracking-tight leading-none mb-2">{DOCUMENT_TABLE_TEXTS.title}</h2>
           <div className="flex items-center gap-2">
             <span className="w-1.5 h-1.5 rounded-full bg-indigo-500 shadow-[0_0_8px_rgba(99,102,241,1)]"></span>
-            <p className="text-[11px] text-slate-500 dark:text-slate-400 font-bold uppercase tracking-widest">{documents.length} TÀI LIỆU TRONG THƯ VIỆN</p>
+            <p className="text-[13px] text-slate-500 dark:text-slate-400 font-medium">{documents.length} tài liệu trong thư viện</p>
           </div>
         </div>
 
@@ -171,11 +171,11 @@ export default function DocumentTable({
         <table className="w-full text-left border-collapse table-fixed min-w-full">
           <thead className="sticky top-0 z-20 bg-slate-50 dark:bg-slate-900 shadow-sm">
             <tr className="border-b border-slate-200 dark:border-white/10">
-              <th className="py-5 px-8 text-[10px] font-black tracking-[0.2em] uppercase text-slate-500 dark:text-slate-200" style={{ width: '38%' }}>{DOCUMENT_TABLE_TEXTS.colName}</th>
-              <th className="py-5 px-4 text-[10px] font-black tracking-[0.2em] uppercase text-slate-500 dark:text-slate-200 text-center" style={{ width: '15%' }}>{DOCUMENT_TABLE_TEXTS.colDate}</th>
-              <th className="py-5 px-4 text-[10px] font-black tracking-[0.2em] uppercase text-slate-500 dark:text-slate-200 text-center" style={{ width: '12%' }}>QUY MÔ</th>
-              <th className="py-5 px-4 text-[10px] font-black tracking-[0.2em] uppercase text-slate-500 dark:text-slate-200 text-center" style={{ width: '15%' }}>{DOCUMENT_TABLE_TEXTS.colStatus}</th>
-              {showActions && <th className="py-5 px-8 text-[10px] font-black tracking-[0.2em] uppercase text-slate-500 dark:text-slate-200 text-center" style={{ width: '20%' }}>THAO TÁC</th>}
+              <th className="py-5 px-8 text-[11px] font-bold tracking-wider uppercase text-slate-500 dark:text-slate-200" style={{ width: '38%' }}>{DOCUMENT_TABLE_TEXTS.colName}</th>
+              <th className="py-5 px-4 text-[11px] font-bold tracking-wider uppercase text-slate-500 dark:text-slate-200 text-center" style={{ width: '15%' }}>{DOCUMENT_TABLE_TEXTS.colDate}</th>
+              <th className="py-5 px-4 text-[11px] font-bold tracking-wider uppercase text-slate-500 dark:text-slate-200 text-center" style={{ width: '12%' }}>Quy mô</th>
+              <th className="py-5 px-4 text-[11px] font-bold tracking-wider uppercase text-slate-500 dark:text-slate-200 text-center" style={{ width: '15%' }}>{DOCUMENT_TABLE_TEXTS.colStatus}</th>
+              {showActions && <th className="py-5 px-8 text-[11px] font-bold tracking-wider uppercase text-slate-500 dark:text-slate-200 text-center" style={{ width: '20%' }}>Thao tác</th>}
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100 dark:divide-white/[0.05]">
@@ -190,10 +190,10 @@ export default function DocumentTable({
                     <div className="flex items-center gap-4">
                       {getFileIcon(doc.file_name)}
                       <div className="min-w-0">
-                        <p className="text-sm font-black text-slate-900 dark:text-white truncate max-w-[200px] lg:max-w-[400px] mb-0.5 group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors">
+                        <p className="text-[14px] font-semibold text-slate-900 dark:text-white truncate max-w-[200px] lg:max-w-[400px] mb-1 group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors">
                           {doc.file_name}
                         </p>
-                        <p className="text-[10px] text-slate-400 dark:text-slate-500 font-bold uppercase tracking-wider">
+                        <p className="text-[12px] text-slate-500 dark:text-slate-400">
                           {doc.file_size_mb} MB • {doc.file_name.split('.').pop()?.toUpperCase()}
                         </p>
                       </div>
