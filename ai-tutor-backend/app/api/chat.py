@@ -1,6 +1,8 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi.responses import StreamingResponse
 import json
 import logging
+import asyncio
 from uuid import uuid4
 
 logger = logging.getLogger(__name__)
@@ -10,7 +12,16 @@ from motor.motor_asyncio import AsyncIOMotorDatabase
 from app.core.database import get_db
 from app.models.db_models import ChatSession, ChatMessage
 from app.models.schemas import AskRequest, AskResponse, MessageResponse, ChatSessionResponse, ChatSessionDetail
-from app.rag.rag_engine import ask_question, summarize_document, generate_quiz, generate_mindmap, generate_study_questions
+from app.rag.rag_engine import (
+    ask_question, 
+    summarize_document_stream, 
+    generate_quiz_stream, 
+    generate_mindmap_stream, 
+    generate_study_questions_stream,
+    generate_quiz, 
+    generate_mindmap, 
+    generate_study_questions
+)
 from app.api.auth import get_current_user
 
 router = APIRouter(prefix="/chat", tags=["Chat"])
@@ -21,6 +32,7 @@ router = APIRouter(prefix="/chat", tags=["Chat"])
 async def chat_with_document(
     document_id: str,
     request: AskRequest,
+    fastapi_request: Request,
     db: AsyncIOMotorDatabase = Depends(get_db),
     current_user_id: str = Depends(get_current_user)
 ):
@@ -57,7 +69,8 @@ async def chat_with_document(
             question=request.question,
             collection_name=doc["chroma_collection_id"],
             document_id=document_id,
-            chat_history=chat_history
+            chat_history=chat_history,
+            is_cancelled=fastapi_request.is_disconnected
         )
         answer = rag_response.get("answer", "Xin lỗi, tôi không tìm được câu trả lời.")
         sources = rag_response.get("sources", [])
@@ -92,48 +105,61 @@ async def chat_with_document(
             "session_id": session_id,
             "message": ai_msg
         }
+    except asyncio.CancelledError:
+        # User cancelled, just propagate
+        raise
     except Exception as e:
         import logging
-        logging.error(f"Chat Error: {str(e)}")
-        if "429" in str(e) or "RESOURCE_EXHAUSTED" in str(e):
+        error_str = str(e)
+        if "429" in error_str or "RESOURCE_EXHAUSTED" in error_str:
             raise HTTPException(status_code=429, detail="AI đang quá tải lượt dùng. Thử lại sau nhé.")
-        raise HTTPException(status_code=500, detail=f"Lỗi hệ thống: {str(e)}")
+        
+        logging.error(f"Chat Error: {error_str}")
+        raise HTTPException(status_code=500, detail=f"Lỗi hệ thống: {error_str}")
 
 @router.get("/{document_id}/summarize")
-async def get_summary(document_id: str, db: AsyncIOMotorDatabase = Depends(get_db)):
+async def get_summary(document_id: str, request: Request, db: AsyncIOMotorDatabase = Depends(get_db)):
     doc = await db.documents.find_one({"id": document_id})
     if not doc or not doc.get("chroma_collection_id"):
         raise HTTPException(status_code=404, detail="Tài liệu chưa sẵn sàng")
     
-    try:
-        summary = await summarize_document(doc["chroma_collection_id"])
-        return {"summary": summary}
-    except Exception:
-        return {"summary": "Không thể tạo bản tóm tắt tại thời điểm này. Vui lòng tải lại tài liệu và thử lại."}
+    return StreamingResponse(
+        summarize_document_stream(doc["chroma_collection_id"], is_cancelled=request.is_disconnected),
+        media_type="text/plain"
+    )
 
 @router.get("/{document_id}/quiz")
-async def get_document_quiz(document_id: str, db: AsyncIOMotorDatabase = Depends(get_db)):
+async def get_document_quiz(document_id: str, request: Request, db: AsyncIOMotorDatabase = Depends(get_db)):
     doc = await db.documents.find_one({"id": document_id})
     if not doc or not doc.get("chroma_collection_id"):
         raise HTTPException(status_code=404, detail="Tài liệu chưa sẵn sàng")
     
-    try:
-        quiz = await generate_quiz(doc["chroma_collection_id"])
-        return {"quiz": quiz}
-    except Exception:
-        return {"quiz": []}  # Trả về mảng rỗng để không lỗi giao diện
+    return StreamingResponse(
+        generate_quiz_stream(doc["chroma_collection_id"], is_cancelled=request.is_disconnected),
+        media_type="text/plain"
+    )
 
 @router.get("/{document_id}/mindmap")
-async def get_document_mindmap(document_id: str, db: AsyncIOMotorDatabase = Depends(get_db)):
+async def get_document_mindmap(document_id: str, request: Request, db: AsyncIOMotorDatabase = Depends(get_db)):
     doc = await db.documents.find_one({"id": document_id})
     if not doc or not doc.get("chroma_collection_id"):
         raise HTTPException(status_code=404, detail="Tài liệu chưa sẵn sàng")
     
-    try:
-        mindmap = await generate_mindmap(doc["chroma_collection_id"])
-        return {"mindmap": mindmap}
-    except Exception:
-        return {"mindmap": "mindmap\n  root((Lỗi))\n    Không thể tạo sơ đồ tư duy"}
+    return StreamingResponse(
+        generate_mindmap_stream(doc["chroma_collection_id"], is_cancelled=request.is_disconnected),
+        media_type="text/plain"
+    )
+
+@router.get("/{document_id}/study-questions")
+async def get_study_questions(document_id: str, request: Request, db: AsyncIOMotorDatabase = Depends(get_db)):
+    doc = await db.documents.find_one({"id": document_id})
+    if not doc or not doc.get("chroma_collection_id"):
+        raise HTTPException(status_code=404, detail="Tài liệu chưa sẵn sàng")
+    
+    return StreamingResponse(
+        generate_study_questions_stream(doc["chroma_collection_id"], is_cancelled=request.is_disconnected),
+        media_type="text/plain"
+    )
 
 @router.get("/{document_id}/sessions", response_model=list[ChatSessionResponse])
 async def list_sessions(

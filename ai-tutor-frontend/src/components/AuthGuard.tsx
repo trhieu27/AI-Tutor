@@ -29,9 +29,9 @@ export function AuthGuard({ children }: { children: React.ReactNode }) {
   // Trong khi mount hoặc đang loading khởi tạo
   if (!mounted) {
     return (
-      <div className="fixed inset-0 bg-slate-950 flex flex-col items-center justify-center z-[9999]">
-        <div className="w-16 h-16 border-4 border-indigo-500/20 border-t-indigo-500 rounded-full animate-spin mb-4"></div>
-        <p className="text-indigo-300 font-bold animate-pulse uppercase tracking-[0.2em] text-[10px]">Cấu hình bảo mật...</p>
+      <div className="fixed inset-0 bg-white dark:bg-slate-950 flex flex-col items-center justify-center z-[9999] transition-colors duration-500">
+        <div className="w-16 h-16 border-4 border-indigo-500/10 dark:border-indigo-500/20 border-t-indigo-600 dark:border-t-indigo-500 rounded-full animate-spin mb-6 shadow-xl shadow-indigo-500/10 dark:shadow-none"></div>
+        <p className="text-indigo-600 dark:text-indigo-300 font-black animate-pulse uppercase tracking-[0.3em] text-[11px]">Cấu hình bảo mật...</p>
       </div>
     );
   }
@@ -41,9 +41,9 @@ export function AuthGuard({ children }: { children: React.ReactNode }) {
   const hasTokenInLS = typeof window !== 'undefined' && !!localStorage.getItem('access_token');
   if (isInitialLoading && hasTokenInLS) {
     return (
-      <div className="fixed inset-0 bg-slate-950 flex flex-col items-center justify-center z-[9999]">
-        <div className="w-16 h-16 border-4 border-indigo-500/20 border-t-indigo-500 rounded-full animate-spin mb-4"></div>
-        <p className="text-indigo-300 font-bold animate-pulse uppercase tracking-[0.2em] text-[10px]">Đang lấy lại phiên làm việc...</p>
+      <div className="fixed inset-0 bg-white dark:bg-slate-950 flex flex-col items-center justify-center z-[9999] transition-colors duration-500">
+        <div className="w-16 h-16 border-4 border-indigo-500/10 dark:border-indigo-500/20 border-t-indigo-600 dark:border-t-indigo-500 rounded-full animate-spin mb-6 shadow-xl shadow-indigo-500/10 dark:shadow-none"></div>
+        <p className="text-indigo-600 dark:text-indigo-300 font-black animate-pulse uppercase tracking-[0.3em] text-[11px]">Đang lấy lại phiên làm việc...</p>
       </div>
     );
   }

@@ -13,19 +13,20 @@ const MermaidChart: React.FC<MermaidChartProps> = ({ chart }) => {
   const containerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
+    const isDark = document.documentElement.classList.contains('dark');
     mermaid.initialize({
       startOnLoad: false,
-      theme: 'base',
+      theme: isDark ? 'dark' : 'default',
       themeVariables: {
-        primaryColor: '#3b82f6',
+        primaryColor: isDark ? '#6366f1' : '#4f46e5',
         primaryTextColor: '#fff',
-        primaryBorderColor: '#2563eb',
-        lineColor: '#94a3b8',
+        primaryBorderColor: isDark ? '#4338ca' : '#3730a3',
+        lineColor: isDark ? '#94a3b8' : '#475569',
         secondaryColor: '#f59e0b',
         tertiaryColor: '#10b981',
         nodeBorder: '1px',
         fontSize: '14px',
-        fontFamily: 'Inter, sans-serif'
+        fontFamily: 'Outfit, Inter, sans-serif'
       },
       securityLevel: 'loose',
       mindmap: {
@@ -33,7 +34,28 @@ const MermaidChart: React.FC<MermaidChartProps> = ({ chart }) => {
         padding: 40
       }
     });
-  }, []);
+
+    // Re-render when theme changes (optional but good for consistency)
+    const observer = new MutationObserver((mutations) => {
+      mutations.forEach((mutation) => {
+        if (mutation.attributeName === 'class') {
+          const updatedIsDark = document.documentElement.classList.contains('dark');
+          mermaid.initialize({
+            theme: updatedIsDark ? 'dark' : 'default',
+            themeVariables: {
+              primaryColor: updatedIsDark ? '#6366f1' : '#4f46e5',
+              primaryTextColor: '#fff',
+              primaryBorderColor: updatedIsDark ? '#4338ca' : '#3730a3',
+              lineColor: updatedIsDark ? '#94a3b8' : '#475569',
+            }
+          });
+          // This won't automatically re-render the SVG, but the next render will use new theme
+        }
+      });
+    });
+    observer.observe(document.documentElement, { attributes: true });
+    return () => observer.disconnect();
+  }, [chart]);
 
   useEffect(() => {
     const renderChart = async () => {

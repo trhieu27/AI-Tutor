@@ -160,7 +160,7 @@ export default function DocumentTable({
               className="w-full pl-12 pr-6 py-3 bg-white dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-2xl focus:outline-none focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500/30 transition-all text-sm text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-white/40 font-bold"
             />
           </div>
-          <button onClick={() => refreshDocuments()} className="w-12 h-12 flex items-center justify-center bg-white dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-2xl text-slate-500 dark:text-white/60 hover:text-indigo-600 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-white/10 transition-all active:scale-90">
+          <button onClick={() => refreshDocuments()} className="w-12 h-12 aspect-square shrink-0 flex items-center justify-center bg-white dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-full text-slate-500 dark:text-white/60 hover:text-indigo-600 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-white/10 transition-all active:scale-95 shadow-sm">
             <span className="material-symbols-outlined text-[22px]">refresh</span>
           </button>
         </div>
@@ -171,11 +171,11 @@ export default function DocumentTable({
         <table className="w-full text-left border-collapse table-fixed min-w-full">
           <thead className="sticky top-0 z-20 bg-slate-50 dark:bg-slate-900 shadow-sm">
             <tr className="border-b border-slate-200 dark:border-white/10">
-              <th className="py-5 px-8 text-[11px] font-bold tracking-wider uppercase text-slate-500 dark:text-slate-200" style={{ width: '38%' }}>{DOCUMENT_TABLE_TEXTS.colName}</th>
+              <th className="py-5 px-8 text-[11px] font-bold tracking-wider uppercase text-slate-500 dark:text-slate-200" style={{ width: '32%' }}>{DOCUMENT_TABLE_TEXTS.colName}</th>
               <th className="py-5 px-4 text-[11px] font-bold tracking-wider uppercase text-slate-500 dark:text-slate-200 text-center" style={{ width: '15%' }}>{DOCUMENT_TABLE_TEXTS.colDate}</th>
-              <th className="py-5 px-4 text-[11px] font-bold tracking-wider uppercase text-slate-500 dark:text-slate-200 text-center" style={{ width: '12%' }}>Quy mô</th>
+              <th className="py-5 px-4 text-[11px] font-bold tracking-wider uppercase text-slate-500 dark:text-slate-200 text-center" style={{ width: '13%' }}>Quy mô</th>
               <th className="py-5 px-4 text-[11px] font-bold tracking-wider uppercase text-slate-500 dark:text-slate-200 text-center" style={{ width: '15%' }}>{DOCUMENT_TABLE_TEXTS.colStatus}</th>
-              {showActions && <th className="py-5 px-8 text-[11px] font-bold tracking-wider uppercase text-slate-500 dark:text-slate-200 text-center" style={{ width: '20%' }}>Thao tác</th>}
+              {showActions && <th className="py-5 px-3 text-[11px] font-bold tracking-wider uppercase text-slate-500 dark:text-slate-200 text-center" style={{ width: '25%' }}>Thao tác</th>}
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100 dark:divide-white/[0.05]">
@@ -190,7 +190,7 @@ export default function DocumentTable({
                     <div className="flex items-center gap-4">
                       {getFileIcon(doc.file_name)}
                       <div className="min-w-0">
-                        <p className="text-[14px] font-semibold text-slate-900 dark:text-white truncate max-w-[200px] lg:max-w-[400px] mb-1 group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors">
+                        <p className="text-[14px] font-semibold text-slate-900 dark:text-white truncate max-w-[150px] lg:max-w-[250px] mb-1 group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors">
                           {doc.file_name}
                         </p>
                         <p className="text-[12px] text-slate-500 dark:text-slate-400">
@@ -215,25 +215,25 @@ export default function DocumentTable({
                     </div>
                   </td>
                   {showActions && (
-                    <td className="py-6 px-8 text-center" onClick={(e) => e.stopPropagation()}>
-                      <div className="flex items-center justify-center gap-3">
+                    <td className="py-6 px-3 text-center" onClick={(e) => e.stopPropagation()}>
+                      <div className="flex items-center justify-center gap-2">
                         {doc.status === "READY" && (
                           <>
-                            <Link href={getRedirectUrl(doc.id)} className="w-9 h-9 rounded-xl bg-indigo-50 dark:bg-white/5 border border-indigo-200 dark:border-white/10 text-indigo-500 dark:text-indigo-400 hover:bg-indigo-500 hover:text-white flex items-center justify-center transition-all shadow-sm dark:shadow-lg active:scale-95" title="Hỏi AI">
-                              <span className="material-symbols-outlined text-base">chat_bubble</span>
+                            <Link href={getRedirectUrl(doc.id)} className="w-8 h-8 aspect-square shrink-0 rounded-full bg-indigo-50 dark:bg-white/5 border border-indigo-200 dark:border-white/10 text-indigo-500 dark:text-indigo-400 hover:bg-indigo-500 hover:text-white flex items-center justify-center transition-all shadow-sm active:scale-95" title="Hỏi AI">
+                              <span className="material-symbols-outlined text-[16px]">chat_bubble</span>
                             </Link>
-                            <Link href={`/chat/${doc.id}?action=quiz`} className="w-9 h-9 rounded-xl bg-orange-50 dark:bg-white/5 border border-orange-200 dark:border-white/10 text-orange-500 dark:text-orange-400 hover:bg-orange-500 hover:text-white flex items-center justify-center transition-all shadow-sm dark:shadow-lg active:scale-95" title="Luyện tập">
-                              <span className="material-symbols-outlined text-base">quiz</span>
+                            <Link href={`/chat/${doc.id}?action=quiz`} className="w-8 h-8 aspect-square shrink-0 rounded-full bg-orange-50 dark:bg-white/5 border border-orange-200 dark:border-white/10 text-orange-500 dark:text-orange-400 hover:bg-orange-500 hover:text-white flex items-center justify-center transition-all shadow-sm active:scale-95" title="Luyện tập">
+                              <span className="material-symbols-outlined text-[16px]">quiz</span>
                             </Link>
-                            <Link href={`/mindmap/${doc.id}`} className="w-9 h-9 rounded-xl bg-cyan-50 dark:bg-white/5 border border-cyan-200 dark:border-white/10 text-cyan-500 dark:text-cyan-400 hover:bg-cyan-500 hover:text-white flex items-center justify-center transition-all shadow-sm dark:shadow-lg active:scale-95" title="Sơ đồ tư duy">
-                              <span className="material-symbols-outlined text-base">hub</span>
+                            <Link href={`/mindmap/${doc.id}`} className="w-8 h-8 aspect-square shrink-0 rounded-full bg-cyan-50 dark:bg-white/5 border border-cyan-200 dark:border-white/10 text-cyan-500 dark:text-cyan-400 hover:bg-cyan-500 hover:text-white flex items-center justify-center transition-all shadow-sm active:scale-95" title="Sơ đồ tư duy">
+                              <span className="material-symbols-outlined text-[16px]">hub</span>
                             </Link>
                           </>
                         )}
                         <button
                           onClick={() => handleDelete(doc.id, doc.file_name)}
                           disabled={deletingId === doc.id}
-                          className="w-9 h-9 rounded-xl bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 text-slate-400 hover:bg-red-500 hover:text-white hover:border-red-500 flex items-center justify-center transition-all disabled:opacity-50"
+                          className="w-8 h-8 aspect-square shrink-0 rounded-full bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 text-slate-400 hover:bg-red-500 hover:text-white hover:border-red-500 flex items-center justify-center transition-all disabled:opacity-50 shadow-sm"
                           title="Xóa"
                         >
                           {deletingId === doc.id ? (
