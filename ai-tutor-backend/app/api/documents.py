@@ -21,34 +21,49 @@ ALLOWED_EXTENSIONS = {".pdf", ".doc", ".docx"}
 
 async def process_document_background(document_id: str, file_path: str):
     """Background task: extract text and build ChromaDB index using MongoDB."""
+    import logging
+    logger = logging.getLogger(__name__)
+    
     db = db_container.db
     doc_data = await db.documents.find_one({"id": document_id})
     if not doc_data:
         return
 
-    try:
-        await db.documents.update_one(
-            {"id": document_id}, 
-            {"$set": {"status": DocumentStatus.PROCESSING}}
-        )
+    max_retries = 3
+    for attempt in range(1, max_retries + 1):
+        try:
+            await db.documents.update_one(
+                {"id": document_id}, 
+                {"$set": {"status": DocumentStatus.PROCESSING}}
+            )
 
-        collection_name, page_count = await rag_engine.ingest_document(file_path, document_id)
+            collection_name, page_count = await rag_engine.ingest_document(file_path, document_id)
 
-        await db.documents.update_one(
-            {"id": document_id},
-            {"$set": {
-                "status": DocumentStatus.READY,
-                "page_count": page_count,
-                "chroma_collection_id": collection_name,
-                "updated_at": datetime.utcnow()
-            }}
-        )
+            await db.documents.update_one(
+                {"id": document_id},
+                {"$set": {
+                    "status": DocumentStatus.READY,
+                    "page_count": page_count,
+                    "chroma_collection_id": collection_name,
+                    "updated_at": datetime.utcnow()
+                }}
+            )
+            logger.info(f"✅ Document {document_id} processed successfully on attempt {attempt}")
+            return  # Thành công, thoát khỏi vòng lặp
 
-    except Exception as e:
-        await db.documents.update_one(
-            {"id": document_id},
-            {"$set": {"status": DocumentStatus.FAILED}}
-        )
+        except Exception as e:
+            logger.error(f"❌ Document {document_id} processing failed (attempt {attempt}/{max_retries}): {str(e)}")
+            if attempt < max_retries:
+                import asyncio
+                wait_time = attempt * 5  # 5s, 10s, 15s
+                logger.info(f"⏳ Retrying in {wait_time}s...")
+                await asyncio.sleep(wait_time)
+            else:
+                logger.error(f"🔥 Document {document_id} PERMANENTLY FAILED after {max_retries} attempts")
+                await db.documents.update_one(
+                    {"id": document_id},
+                    {"$set": {"status": DocumentStatus.FAILED}}
+                )
 
 
 @router.post("/upload", response_model=DocumentResponse, status_code=201)

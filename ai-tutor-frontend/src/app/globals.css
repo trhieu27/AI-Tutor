@@ -11,28 +11,36 @@
   --background: #f8fafc;
   --foreground: #0f172a;
   --sidebar-bg: #ffffff;
-  --header-bg: rgba(255, 255, 255, 0.8);
+  --header-bg: rgba(255, 255, 255, 0.85);
   --border-color: #e2e8f0;
+  --card-bg: #ffffff;
+  --card-bg-hover: #f1f5f9;
+  --muted: #64748b;
+  --muted-light: #94a3b8;
+  --surface: #f1f5f9;
+  --surface-raised: #ffffff;
+  --accent-glow: rgba(99, 102, 241, 0.08);
 }
 
 .dark {
   --background: #020617;
   --foreground: #f8fafc;
-  --sidebar-bg: #0f172a; /* Reverting to slightly lighter indigo for depth */
+  --sidebar-bg: #0f172a;
   --header-bg: rgba(15, 23, 42, 0.8);
-  --border-color: rgba(255, 255, 255, 0.1); /* Visible but subtle line */
+  --border-color: rgba(255, 255, 255, 0.1);
+  --card-bg: rgba(15, 23, 42, 0.6);
+  --card-bg-hover: rgba(30, 41, 59, 0.8);
+  --muted: #94a3b8;
+  --muted-light: #64748b;
+  --surface: rgba(15, 23, 42, 0.4);
+  --surface-raised: rgba(15, 23, 42, 0.8);
+  --accent-glow: rgba(99, 102, 241, 0.15);
 }
 
 body {
   background-color: var(--background);
   color: var(--foreground);
   @apply transition-colors duration-500;
-}
-
-@layer utilities {
-  .material-symbols-outlined {
-    font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
-  }
 }
 
 @layer utilities {

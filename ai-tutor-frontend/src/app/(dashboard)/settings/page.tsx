@@ -3,11 +3,18 @@
 import React from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { useTheme } from 'next-themes';
-import { HEADER_TEXTS, SIDEBAR_TEXTS } from '@/constants/texts';
 
 export default function SettingsPage() {
   const { user } = useAuth();
   const { theme, setTheme } = useTheme();
+  const [mounted, setMounted] = React.useState(false);
+
+  React.useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  // Use a safe theme value that won't cause hydration mismatch
+  const currentTheme = mounted ? theme : 'dark';
 
   const sections = [
     {
@@ -17,12 +24,12 @@ export default function SettingsPage() {
       description: 'Quản lý thông tin tài khoản và cách bạn hiển thị trên hệ thống.',
       content: (
         <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
-          <div className="flex items-center gap-6 p-6 bg-slate-50 dark:bg-slate-900/50 rounded-3xl border border-slate-200 dark:border-white/5 shadow-sm">
+          <div className="flex items-center gap-6 p-6 bg-slate-50 dark:bg-slate-900/50 rounded-3xl border border-slate-200 dark:border-white/5 shadow-sm transition-colors duration-500">
             <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white text-3xl font-black shadow-xl">
-              {(user?.full_name?.[0] || user?.username?.[0] || "U").toUpperCase()}
+              {(user?.full_name?.[0] || "U").toUpperCase()}
             </div>
             <div>
-              <h3 className="text-xl font-black text-slate-900 dark:text-white mb-1">{user?.full_name || user?.username || "Người dùng"}</h3>
+              <h3 className="text-xl font-black text-slate-900 dark:text-white mb-1">{user?.full_name || "Người dùng"}</h3>
               <p className="text-sm text-slate-500 dark:text-slate-400 font-bold mb-3">{user?.email}</p>
               <button className="px-4 py-2 bg-indigo-500 hover:bg-indigo-600 text-white text-xs font-black uppercase tracking-widest rounded-xl transition-all active:scale-95 shadow-lg shadow-indigo-500/20">
                 Thay đổi ảnh đại diện
@@ -37,14 +44,14 @@ export default function SettingsPage() {
                 type="text" 
                 defaultValue={user?.full_name || ""} 
                 placeholder="Nhập họ tên của bạn..."
-                className="w-full px-5 py-3 rounded-2xl bg-white dark:bg-slate-900/50 border border-slate-200 dark:border-white/10 focus:outline-none focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500/30 transition-all text-sm font-bold placeholder-slate-400 dark:placeholder-white/20"
+                className="w-full px-5 py-3 rounded-2xl bg-white dark:bg-slate-900/50 border border-slate-200 dark:border-white/10 focus:outline-none focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500/30 transition-all text-sm font-bold text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-white/20"
               />
             </div>
             <div className="space-y-2">
-              <label className="text-[10px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest ml-1">Tên đăng nhập</label>
+              <label className="text-[10px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest ml-1">Mã sinh viên</label>
               <input 
                 type="text" 
-                defaultValue={user?.username || ""} 
+                defaultValue={user?.student_id || ""} 
                 readOnly
                 className="w-full px-5 py-3 rounded-2xl bg-slate-100 dark:bg-slate-800/30 border border-slate-200 dark:border-white/5 text-slate-500 dark:text-slate-500 text-sm font-bold cursor-not-allowed"
               />
@@ -63,35 +70,35 @@ export default function SettingsPage() {
            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <button 
                 onClick={() => setTheme('light')}
-                className={`p-5 rounded-3xl border-2 transition-all flex flex-col items-center gap-4 group ${theme === 'light' ? 'border-indigo-500 bg-indigo-500/5' : 'border-slate-200 dark:border-white/5 hover:border-slate-300 dark:hover:border-white/10'}`}
+                className={`p-5 rounded-3xl border-2 transition-all flex flex-col items-center gap-4 group ${currentTheme === 'light' ? 'border-indigo-500 bg-indigo-50 dark:bg-indigo-500/5' : 'border-slate-200 dark:border-white/5 hover:border-slate-300 dark:hover:border-white/10'}`}
               >
-                <div className={`w-12 h-12 rounded-2xl flex items-center justify-center transition-transform duration-500 group-hover:scale-110 ${theme === 'light' ? 'bg-amber-500 text-white shadow-xl shadow-amber-500/20' : 'bg-slate-100 dark:bg-slate-800 text-slate-500'}`}>
+                <div className={`w-12 h-12 rounded-2xl flex items-center justify-center transition-transform duration-500 group-hover:scale-110 ${currentTheme === 'light' ? 'bg-amber-500 text-white shadow-xl shadow-amber-500/20' : 'bg-slate-100 dark:bg-slate-800 text-slate-500'}`}>
                   <span className="material-symbols-outlined text-2xl">light_mode</span>
                 </div>
                 <div className="text-center">
-                  <p className="text-sm font-black dark:text-white">Chế độ sáng</p>
+                  <p className="text-sm font-black text-slate-900 dark:text-white">Chế độ sáng</p>
                   <p className="text-[10px] text-slate-500 font-bold uppercase mt-1">Light Minimalist</p>
                 </div>
               </button>
 
               <button 
                 onClick={() => setTheme('dark')}
-                className={`p-5 rounded-3xl border-2 transition-all flex flex-col items-center gap-4 group ${theme === 'dark' ? 'border-indigo-500 bg-indigo-500/5' : 'border-slate-200 dark:border-white/5 hover:border-slate-300 dark:hover:border-white/10'}`}
+                className={`p-5 rounded-3xl border-2 transition-all flex flex-col items-center gap-4 group ${currentTheme === 'dark' ? 'border-indigo-500 bg-indigo-50 dark:bg-indigo-500/5' : 'border-slate-200 dark:border-white/5 hover:border-slate-300 dark:hover:border-white/10'}`}
               >
-                <div className={`w-12 h-12 rounded-2xl flex items-center justify-center transition-transform duration-500 group-hover:scale-110 ${theme === 'dark' ? 'bg-indigo-600 text-white shadow-xl shadow-indigo-600/20' : 'bg-slate-100 dark:bg-slate-800 text-slate-500'}`}>
+                <div className={`w-12 h-12 rounded-2xl flex items-center justify-center transition-transform duration-500 group-hover:scale-110 ${currentTheme === 'dark' ? 'bg-indigo-600 text-white shadow-xl shadow-indigo-600/20' : 'bg-slate-100 dark:bg-slate-800 text-slate-500'}`}>
                   <span className="material-symbols-outlined text-2xl">dark_mode</span>
                 </div>
                 <div className="text-center">
-                  <p className="text-sm font-black dark:text-white">Chế độ tối</p>
+                  <p className="text-sm font-black text-slate-900 dark:text-white">Chế độ tối</p>
                   <p className="text-[10px] text-slate-500 font-bold uppercase mt-1">Luxury Indigo</p>
                 </div>
               </button>
            </div>
 
-           <div className="p-4 bg-amber-500/10 border border-amber-500/20 rounded-2xl flex items-start gap-4">
+           <div className="p-4 bg-amber-50 dark:bg-amber-500/10 border border-amber-200 dark:border-amber-500/20 rounded-2xl flex items-start gap-4 transition-colors duration-500">
               <span className="material-symbols-outlined text-amber-500">info</span>
               <div>
-                <p className="text-[11px] font-black text-amber-600 dark:text-amber-500 uppercase tracking-widest mb-1">Mẹo nhỏ</p>
+                <p className="text-[11px] font-black text-amber-700 dark:text-amber-500 uppercase tracking-widest mb-1">Mẹo nhỏ</p>
                 <p className="text-xs text-amber-800 dark:text-amber-200/70 font-medium leading-relaxed">
                   Chuyển sang Chế độ tối khi sử dụng vào ban đêm để bảo vệ mắt và tiết kiệm pin cho thiết bị của bạn.
                 </p>
@@ -118,7 +125,7 @@ export default function SettingsPage() {
           <div key={section.id} className="grid grid-cols-1 lg:grid-cols-3 gap-10">
             <div>
               <div className="flex items-center gap-3 mb-3">
-                <div className="w-8 h-8 rounded-lg bg-indigo-500/10 flex items-center justify-center text-indigo-500">
+                <div className="w-8 h-8 rounded-lg bg-indigo-50 dark:bg-indigo-500/10 flex items-center justify-center text-indigo-500">
                   <span className="material-symbols-outlined text-xl">{section.icon}</span>
                 </div>
                 <h3 className="text-xl font-black text-slate-900 dark:text-white tracking-tight">{section.title}</h3>
