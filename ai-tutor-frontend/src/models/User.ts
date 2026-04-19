@@ -6,9 +6,10 @@ export enum UserRole {
 export abstract class User {
   constructor(
     public id: string,
-    public name: string,
+    public full_name: string,
     public email: string,
     public role: UserRole,
+    public student_id?: string,
     public avatarUrl?: string,
     public createdAt: Date = new Date()
   ) { }
@@ -16,7 +17,7 @@ export abstract class User {
   getProfile() {
     return {
       id: this.id,
-      name: this.name,
+      name: this.full_name,
       email: this.email,
       role: this.role,
       avatarUrl: this.avatarUrl,
@@ -29,14 +30,15 @@ export abstract class User {
 export class Student extends User {
   constructor(
     id: string,
-    name: string,
+    full_name: string,
     email: string,
+    student_id?: string,
     avatarUrl?: string,
     public totalDocumentsUploaded: number = 0,
     public totalQuizzesTaken: number = 0,
     public lastActive: Date = new Date()
   ) {
-    super(id, name, email, UserRole.STUDENT, avatarUrl);
+    super(id, full_name, email, UserRole.STUDENT, student_id, avatarUrl);
   }
 
   getDashboardUrl(): string {
@@ -54,12 +56,12 @@ export class Student extends User {
 export class Admin extends User {
   constructor(
     id: string,
-    name: string,
+    full_name: string,
     email: string,
     avatarUrl?: string,
     public permissions: string[] = ['ALL']
   ) {
-    super(id, name, email, UserRole.ADMIN, avatarUrl);
+    super(id, full_name, email, UserRole.ADMIN, undefined, avatarUrl);
   }
 
   getDashboardUrl(): string {

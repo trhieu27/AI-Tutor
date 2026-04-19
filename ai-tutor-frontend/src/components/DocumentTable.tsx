@@ -45,7 +45,7 @@ export default function DocumentTable({
     setDeletingId(documentId);
     try {
       await deleteDocument(documentId);
-      setDocuments((prev) => prev.filter((d) => d.id !== documentId));
+      await refreshDocuments(true); // Tải lại danh sách (chế độ không hiện loading xoay)
     } catch {
       alert("Xóa tài liệu thất bại.");
     } finally {
