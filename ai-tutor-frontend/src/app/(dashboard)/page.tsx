@@ -20,9 +20,14 @@ export default function Dashboard() {
     uploadSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
   };
 
+  const hasTriggeredUpload = useRef(false);
+
   useEffect(() => {
+    if (hasTriggeredUpload.current) return;
+
     const searchParams = new URLSearchParams(window.location.search);
     if (searchParams.get('action') === 'upload') {
+      hasTriggeredUpload.current = true;
       setTimeout(() => {
         scrollToUpload();
         // Trigger file input after a short delay for smooth scroll

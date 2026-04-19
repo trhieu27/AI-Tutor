@@ -89,19 +89,19 @@ export default function Header({ onMenuClick }: HeaderProps) {
           {showNotifications && (
             <div className="absolute top-full right-0 mt-3 w-80 bg-slate-900 border border-white/10 rounded-2xl shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-200 z-[60]">
                 <div className="px-4 py-3 bg-white/5 flex items-center justify-between border-b border-white/10">
-                  <h3 className="text-sm font-black text-white">Thông báo</h3>
+                  <h3 className="text-sm font-black text-white">{HEADER_TEXTS.notifications.title}</h3>
                   <div className="flex gap-3">
                     <button 
                       onClick={markAllAsRead}
                       className="text-[9px] text-indigo-400 hover:text-indigo-300 font-bold uppercase tracking-tight"
                     >
-                      Đã đọc
+                      {HEADER_TEXTS.notifications.markAsRead}
                     </button>
                     <button 
                       onClick={clearAllNotifications}
                       className="text-[9px] text-red-400 hover:text-red-300 font-bold uppercase tracking-tight"
                     >
-                      Xóa hết
+                      {HEADER_TEXTS.notifications.clearAll}
                     </button>
                   </div>
                 </div>
@@ -125,13 +125,13 @@ export default function Header({ onMenuClick }: HeaderProps) {
                   {notifications.length === 0 && (
                     <div className="py-12 text-center flex flex-col items-center gap-3">
                       <span className="material-symbols-outlined text-slate-700 text-4xl">notifications_off</span>
-                      <p className="text-slate-500 text-[11px] font-bold uppercase tracking-widest">Không có thông báo mới</p>
+                      <p className="text-slate-500 text-[11px] font-bold uppercase tracking-widest">{HEADER_TEXTS.notifications.empty}</p>
                     </div>
                   )}
                 </div>
                 {notifications.length > 0 && (
                   <div className="p-3 text-center bg-white/5 hover:bg-white/10 transition-colors cursor-pointer border-t border-white/10">
-                    <span className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">Xem toàn bộ</span>
+                    <span className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">{HEADER_TEXTS.notifications.viewAll}</span>
                   </div>
                 )}
               </div>
@@ -143,7 +143,7 @@ export default function Header({ onMenuClick }: HeaderProps) {
         <div className="flex items-center gap-3">
           <div className="flex flex-col items-end">
             <p className="text-[13px] font-black text-white tracking-tight leading-none mb-1">
-              {user?.full_name || user?.username || "Người dùng"}
+              {user?.full_name || HEADER_TEXTS.user.defaultName}
             </p>
             <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-amber-500/10 border border-amber-500/20 shadow-[0_0_10px_rgba(245,158,11,0.1)]">
               <span className="w-1 h-1 rounded-full bg-amber-500 animate-pulse"></span>
@@ -152,13 +152,13 @@ export default function Header({ onMenuClick }: HeaderProps) {
           </div>
           <div className="relative group">
             <button className="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white font-black shadow-lg shadow-indigo-500/20 group-hover:scale-105 transition-transform duration-300 border border-white/10">
-              {(user?.full_name?.[0] || user?.username?.[0] || "U").toUpperCase()}
+              {(user?.full_name?.[0] || "U").toUpperCase()}
             </button>
             
             <div className="absolute top-full right-0 mt-3 w-52 bg-slate-900 border border-white/10 rounded-2xl shadow-2xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-300 transform origin-top-right group-hover:translate-y-0 translate-y-2 p-2 z-50">
                <div className="px-4 py-3 border-b border-white/5 mb-2">
-                  <p className="text-xs font-bold text-white truncate">{user?.email || "Chưa đăng nhập"}</p>
-                  <p className="text-[10px] text-slate-500 font-bold uppercase mt-1">ID: {user?.id?.slice(0, 8) || "00000000"}</p>
+                  <p className="text-xs font-bold text-white truncate">{user?.email || HEADER_TEXTS.user.notLoggedIn}</p>
+                  <p className="text-[10px] text-slate-500 font-bold uppercase mt-1">{HEADER_TEXTS.user.idPrefix}{user?.id?.slice(0, 8) || "00000000"}</p>
                </div>
                <button 
                 onClick={handleLogout}

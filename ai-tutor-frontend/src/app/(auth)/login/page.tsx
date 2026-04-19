@@ -29,8 +29,11 @@ export default function LoginPage() {
     try {
       await login(email, password);
       router.push('/');
-    } catch (err) {
-      setError(AUTH_TEXTS.LOGIN.LOGIN_ERROR);
+    } catch (err: any) {
+      const errorMessage = err.message || AUTH_TEXTS.LOGIN.LOGIN_ERROR;
+      setError(errorMessage === 'Failed to fetch' 
+        ? 'Lỗi kết nối: Không thể kết nối tới máy chủ (Backend).' 
+        : errorMessage);
       console.error('Login error:', err);
     }
   };

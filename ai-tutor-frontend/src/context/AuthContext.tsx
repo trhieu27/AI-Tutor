@@ -1,14 +1,14 @@
 'use client';
 
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { User } from '@/models/User';
+import { User, Student, Admin, UserRole } from '@/models/User';
 import { authService } from '@/services/auth.service';
 
 interface AuthContextType {
   user: User | null;
   isLoading: boolean;
   login: (email: string, password: string) => Promise<void>;
-  register: (name: string, email: string, password: string) => Promise<void>;
+  register: (fullName: string, email: string, password: string) => Promise<void>;
   logout: () => void;
   isAuthenticated: boolean;
 }
@@ -24,7 +24,26 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const storedUser = localStorage.getItem('user');
     if (storedUser) {
       try {
-        setUser(JSON.parse(storedUser));
+        const userData = JSON.parse(storedUser);
+        // Hydrate to proper class instance
+        if (userData.role === UserRole.STUDENT) {
+          setUser(new Student(
+            userData.id, 
+            userData.full_name, 
+            userData.email, 
+            userData.student_id,
+            userData.avatarUrl
+          ));
+        } else if (userData.role === UserRole.ADMIN) {
+          setUser(new Admin(
+            userData.id, 
+            userData.full_name, 
+            userData.email, 
+            userData.avatarUrl
+          ));
+        } else {
+          setUser(userData);
+        }
       } catch (error) {
         console.error('Failed to parse stored user:', error);
         localStorage.removeItem('user');
@@ -51,10 +70,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  const register = async (name: string, email: string, password: string) => {
+  const register = async (fullName: string, email: string, password: string) => {
     setIsLoading(true);
     try {
-      const { user: userData, accessToken, refreshToken } = await authService.register(name, email, password);
+      const { user: userData, accessToken, refreshToken } = await authService.register(fullName, email, password);
       setUser(userData);
       document.cookie = `token=${accessToken}; path=/; max-age=3600`;
       document.cookie = `refresh_token=${refreshToken}; path=/; max-age=${7 * 24 * 60 * 60}`;

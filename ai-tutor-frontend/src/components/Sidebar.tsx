@@ -48,13 +48,13 @@ export default function Sidebar({ onClose }: { onClose?: () => void }) {
               <Link
                 key={item.href}
                 href={item.href}
-                className={`group flex items-center gap-3 px-3 py-3 rounded-[18px] font-bold text-sm transition-all duration-300 relative ${isActive
+                className={`group flex items-center gap-3 px-3 py-3 rounded-[18px] font-bold text-sm transition-all duration-300 relative outline-none ${isActive
                   ? "bg-gradient-to-r from-indigo-500/30 to-transparent text-indigo-600 dark:text-white shadow-lg border border-indigo-500/20 dark:border-white/10"
-                  : "text-slate-600 dark:text-slate-200 hover:text-indigo-600 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-white/10"
+                  : "text-slate-600 dark:text-slate-200 hover:text-indigo-600 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-white/10 border border-transparent"
                   }`}
               >
                 {isActive && (
-                  <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1.2 h-5 bg-indigo-400 rounded-full shadow-[0_0_15px_rgba(129,140,248,1)]"></div>
+                  <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-5 bg-indigo-400 rounded-full shadow-[0_0_15px_rgba(129,140,248,1)]"></div>
                 )}
                 <span className={`material-symbols-outlined transition-transform duration-300 ${isActive ? 'scale-110 text-indigo-300' : 'group-hover:scale-110 text-slate-400'}`}>
                   {item.icon}

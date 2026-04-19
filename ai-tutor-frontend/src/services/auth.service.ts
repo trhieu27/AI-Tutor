@@ -55,7 +55,7 @@ class AuthService {
       }
 
       return {
-        user: new Student(data.user.id, data.user.full_name, data.user.email),
+        user: new Student(data.user.id, data.user.full_name, data.user.email, data.user.student_id),
         accessToken: data.access_token,
         refreshToken: data.refresh_token,
       };
@@ -100,7 +100,7 @@ class AuthService {
       }
 
       return {
-        user: new Student(data.user.id, data.user.full_name, data.user.email),
+        user: new Student(data.user.id, data.user.full_name, data.user.email, data.user.student_id),
         accessToken: data.access_token,
         refreshToken: data.refresh_token,
       };

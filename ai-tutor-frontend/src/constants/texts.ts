@@ -26,7 +26,19 @@ export const HEADER_TEXTS = {
   searchPlaceholder: "Tìm kiếm tài liệu, bài giảng...",
   userName: "Trần Hiếu",
   proBadge: "Phiên bản PRO",
-  logout: "Đăng xuất"
+  logout: "Đăng xuất",
+  notifications: {
+    title: "Thông báo",
+    markAsRead: "Đã đọc",
+    clearAll: "Xóa hết",
+    empty: "Không có thông báo mới",
+    viewAll: "Xem toàn bộ"
+  },
+  user: {
+    defaultName: "Người dùng",
+    notLoggedIn: "Chưa đăng nhập",
+    idPrefix: "ID: "
+  }
 };
 
 export const UPLOAD_AREA_TEXTS = {
