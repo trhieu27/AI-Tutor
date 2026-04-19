@@ -83,18 +83,32 @@ const MermaidChart: React.FC<MermaidChartProps> = ({ chart }) => {
   }, [chart]);
 
   if (isError) {
+    // Nếu không phải là định dạng mindmap mà bị lỗi parse, có thể đây là một thông báo lỗi từ hệ thống
+    if (!chart.toLowerCase().includes('mindmap') && chart.length > 0) {
+      return (
+        <div className="flex flex-col items-center justify-center p-20 text-center animate-in fade-in duration-500">
+           <div className="w-16 h-16 bg-slate-100 dark:bg-white/5 rounded-2xl flex items-center justify-center mb-6 text-slate-400 dark:text-white/20">
+             <span className="material-symbols-outlined text-3xl">info</span>
+           </div>
+           <p className="text-slate-500 dark:text-slate-400 font-medium max-w-sm leading-relaxed">
+             {chart}
+           </p>
+        </div>
+      );
+    }
+
     return (
-      <div className="flex flex-col items-center justify-center p-12 bg-red-50/50 rounded-[32px] border border-red-100 max-w-md mx-auto text-center animate-in fade-in zoom-in duration-300">
-        <div className="w-16 h-16 bg-red-100 text-red-600 rounded-2xl flex items-center justify-center mb-6">
+      <div className="flex flex-col items-center justify-center p-12 bg-red-50/50 dark:bg-red-500/5 rounded-[32px] border border-red-100 dark:border-red-500/10 max-w-md mx-auto text-center animate-in fade-in zoom-in duration-300">
+        <div className="w-16 h-16 bg-red-100 dark:bg-red-500/20 text-red-600 dark:text-red-400 rounded-2xl flex items-center justify-center mb-6">
           <span className="material-symbols-outlined text-3xl">warning_amber</span>
         </div>
-        <h3 className="text-lg font-bold text-red-900 mb-2">Không thể hiển thị sơ đồ</h3>
-        <p className="text-sm text-red-700/80 leading-relaxed mb-6">
+        <h3 className="text-lg font-bold text-red-900 dark:text-red-300 mb-2">Không thể hiển thị sơ đồ</h3>
+        <p className="text-sm text-red-700/80 dark:text-red-400/60 leading-relaxed mb-6">
           Định dạng dữ liệu từ AI hoặc từ việc chỉnh sửa thủ công đang gặp vấn đề về cú pháp.
         </p>
         <div className="flex flex-col gap-2 w-full">
-           <p className="text-[11px] text-red-400 font-medium uppercase tracking-widest">Gợi ý khắc phục</p>
-           <ul className="text-[11px] text-red-600 space-y-1">
+           <p className="text-[11px] text-red-400 dark:text-red-500/60 font-medium uppercase tracking-widest">Gợi ý khắc phục</p>
+           <ul className="text-[11px] text-red-600 dark:text-red-400/80 space-y-1">
              <li>• Kiểm tra lại các dấu ngoặc lồng nhau</li>
              <li>• Đảm bảo các ý con được thụt lề bằng dấu cách</li>
              <li>• Nhấn "Làm mới từ AI" để thử lại</li>
