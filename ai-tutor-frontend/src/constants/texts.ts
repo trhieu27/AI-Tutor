@@ -90,6 +90,7 @@ export const AUTH_TEXTS = {
     LOGIN_BUTTON: "Đăng nhập",
     LOGIN_LOADING: "Đang xử lý...",
     LOGIN_ERROR: "Email hoặc mật khẩu không chính xác.",
+    RATE_LIMIT_COUNTDOWN: (seconds: number) => `Thử quá nhiều lần. Vui lòng thử lại sau ${seconds} giây.`,
     NO_ACCOUNT: "Bạn chưa có tài khoản?",
     REGISTER_NOW: "Đăng ký ngay"
   },

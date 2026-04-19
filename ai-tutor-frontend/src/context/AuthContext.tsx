@@ -1,9 +1,9 @@
 'use client';
 
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useLayoutEffect, useCallback, useMemo } from 'react';
 import { User, Student } from '@/models/User';
 import { authService } from '@/services/auth.service';
-import { useRouter } from 'next/navigation';
+import { useRouter, usePathname } from 'next/navigation';
 
 interface AuthContextType {
   user: User | null;
@@ -20,15 +20,15 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-// Helper function to get initial user from localStorage
-const getInitialUser = (): User | null => {
-  if (typeof window === 'undefined') return null;
+const createUserInstance = (userData: any): User | null => {
+  if (!userData) return null;
   try {
-    const storedUser = localStorage.getItem('user');
-    if (!storedUser) return null;
-    const userData = JSON.parse(storedUser);
+    // Chấp nhận cả lowercase và uppercase cho role
+    const isStudent = userData.student_id ||
+      userData.role === 'student' ||
+      userData.role === 'STUDENT';
 
-    if (userData.role === 'student' || userData.student_id) {
+    if (isStudent) {
       return new Student(
         userData.id,
         userData.full_name,
@@ -39,6 +39,17 @@ const getInitialUser = (): User | null => {
     }
     return userData;
   } catch (err) {
+    console.error("[AuthContext] Error creating user instance:", err);
+    return userData;
+  }
+};
+
+const getStoredUser = (): User | null => {
+  if (typeof window === 'undefined') return null;
+  try {
+    const raw = localStorage.getItem('user');
+    return raw ? createUserInstance(JSON.parse(raw)) : null;
+  } catch (e) {
     return null;
   }
 };
@@ -48,66 +59,98 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [isInitialLoading, setIsInitialLoading] = useState(true);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const router = useRouter();
 
-  // Sync auth state on mount and keep isInitialLoading accurate
-  useEffect(() => {
-    const initialUser = getInitialUser();
-    if (initialUser) {
-      setUser(initialUser);
-      
-      // Khôi phục cookie nếu bị mất (quan trọng cho Middleware/proxy.ts)
-      if (typeof window !== 'undefined') {
-        const accessToken = localStorage.getItem('access_token');
-        const refreshToken = localStorage.getItem('refresh_token');
-        
-        if (accessToken && !document.cookie.includes('access_token')) {
-          document.cookie = `access_token=${accessToken}; path=/; max-age=3600`;
-        }
-        if (refreshToken && !document.cookie.includes('refresh_token')) {
-          document.cookie = `refresh_token=${refreshToken}; path=/; max-age=${7 * 24 * 60 * 60}`;
+  const pathname = usePathname();
+
+  const syncFromStorage = useCallback(() => {
+    if (typeof window === 'undefined') return;
+    const isClient = typeof window !== 'undefined';
+    const storedUser = getStoredUser();
+    const hasToken = !!localStorage.getItem('access_token');
+
+    console.log(`[AuthContext] [DEBUG] Sync start. User in LS: ${storedUser?.email || 'NONE'}, Token in LS: ${hasToken}`);
+
+    if (storedUser) {
+      setUser(storedUser);
+      setIsInitialLoading(false);
+      console.log(`[AuthContext] [DEBUG] User restored from LS. Loading set to FALSE.`);
+    } else if (!hasToken) {
+      setUser(null);
+      setIsInitialLoading(false);
+      console.log(`[AuthContext] [DEBUG] No user, no token. Loading set to FALSE.`);
+    }
+  }, []);
+
+  const revalidateAuth = useCallback(async () => {
+    if (typeof window === 'undefined') return;
+    const hasToken = !!localStorage.getItem('access_token');
+
+    if (!hasToken) {
+      console.log(`[AuthContext] [DEBUG] Revalidate skipped: No token.`);
+      setIsInitialLoading(false);
+      return;
+    }
+
+    try {
+      console.log("[AuthContext] [DEBUG] Calling backend /me...");
+      const freshUser = await authService.getCurrentUser();
+
+      if (freshUser) {
+        console.log("[AuthContext] [DEBUG] Backend match! User:", freshUser.email);
+        setUser(freshUser);
+      } else {
+        console.warn("[AuthContext] [DEBUG] Backend did NOT return user.");
+        if (!getStoredUser()) {
+          setUser(null);
+          authService.logout();
         }
       }
+    } catch (err) {
+      console.error("[AuthContext] [DEBUG] Revalidation error:", err);
+    } finally {
+      setIsInitialLoading(false);
+      console.log("[AuthContext] [DEBUG] Sync cycle complete. Loading: FALSE");
     }
-    setIsInitialLoading(false);
   }, []);
+
+  // Sync ngay lập tức
+  useLayoutEffect(() => {
+    syncFromStorage();
+  }, [syncFromStorage]);
+
+  // Revalidate ngầm
+  useEffect(() => {
+    revalidateAuth();
+  }, [pathname, revalidateAuth]);
+
+  useEffect(() => {
+    const handleEvents = () => {
+      syncFromStorage();
+      revalidateAuth();
+    };
+
+    window.addEventListener('pageshow', handleEvents);
+    window.addEventListener('popstate', handleEvents);
+    window.addEventListener('storage', (e) => {
+      if (e.key === 'user' || e.key === 'access_token') handleEvents();
+    });
+
+    return () => {
+      window.removeEventListener('pageshow', handleEvents);
+      window.removeEventListener('popstate', handleEvents);
+    };
+  }, [syncFromStorage, revalidateAuth]);
 
   const login = async (email: string, password: string) => {
     setIsLoading(true);
     setError(null);
     try {
-      const { user: userData, accessToken, refreshToken } = await authService.login(email, password);
-      setUser(userData);
-      localStorage.setItem('user', JSON.stringify(userData));
-      localStorage.setItem('access_token', accessToken);
-      localStorage.setItem('refresh_token', refreshToken);
-      document.cookie = `access_token=${accessToken}; path=/; max-age=3600`;
-      document.cookie = `refresh_token=${refreshToken}; path=/; max-age=${7 * 24 * 60 * 60}`;
+      const { user: userData } = await authService.login(email, password);
+      const userInstance = createUserInstance(userData);
+      setUser(userInstance);
+      setIsInitialLoading(false); // Quan trọng: Tắt loading ngay sau khi login
     } catch (err: any) {
-      console.error('Login error:', err);
-      const msg = err.message || 'Đăng nhập thất bại';
-      setError(msg);
-      throw err;
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const googleLogin = async (token: string) => {
-    setIsLoading(true);
-    setError(null);
-    try {
-      const { user: userData, accessToken, refreshToken } = await authService.googleLogin(token);
-      setUser(userData);
-      localStorage.setItem('user', JSON.stringify(userData));
-      localStorage.setItem('access_token', accessToken);
-      localStorage.setItem('refresh_token', refreshToken);
-      document.cookie = `access_token=${accessToken}; path=/; max-age=3600`;
-      document.cookie = `refresh_token=${refreshToken}; path=/; max-age=${7 * 24 * 60 * 60}`;
-    } catch (err: any) {
-      console.error('Google login context error:', err);
-      const msg = err.message || 'Đăng nhập Google thất bại';
-      setError(msg);
+      setError(err.message || 'Đăng nhập thất bại');
       throw err;
     } finally {
       setIsLoading(false);
@@ -118,51 +161,54 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setIsLoading(true);
     setError(null);
     try {
-      const { user: userData, accessToken, refreshToken } = await authService.register(fullName, email, password);
-      setUser(userData);
-      localStorage.setItem('user', JSON.stringify(userData));
-      localStorage.setItem('access_token', accessToken);
-      localStorage.setItem('refresh_token', refreshToken);
-      document.cookie = `access_token=${accessToken}; path=/; max-age=3600`;
-      document.cookie = `refresh_token=${refreshToken}; path=/; max-age=${7 * 24 * 60 * 60}`;
+      const { user: userData } = await authService.register(fullName, email, password);
+      const userInstance = createUserInstance(userData);
+      setUser(userInstance);
+      setIsInitialLoading(false);
     } catch (err: any) {
-      console.error('Registration error:', err);
-      const msg = err.message || 'Đăng ký thất bại';
-      setError(msg);
+      setError(err.message || 'Đăng ký thất bại');
       throw err;
     } finally {
       setIsLoading(false);
     }
   };
 
-  const logout = () => {
+  const logout = useCallback(() => {
     setUser(null);
-    localStorage.removeItem('user');
-    localStorage.removeItem('access_token');
-    localStorage.removeItem('refresh_token');
-    const cookies = ['access_token', 'refresh_token'];
-    cookies.forEach(name => {
-      document.cookie = `${name}=; path=/; expires=Thu, 01 Jan 1970 00:00:00 UTC;`;
-    });
     authService.logout();
     window.location.replace('/login');
+  }, []);
+
+  const googleLogin = async (token: string) => {
+    setIsLoading(true);
+    setError(null);
+    try {
+      const { user: userData } = await authService.googleLogin(token);
+      setUser(createUserInstance(userData));
+      setIsInitialLoading(false);
+    } catch (err: any) {
+      setError(err.message || 'Google login failed');
+      throw err;
+    } finally {
+      setIsLoading(false);
+    }
   };
 
+  const contextValue = useMemo(() => ({
+    user,
+    isLoading,
+    isInitialLoading,
+    error,
+    setError,
+    login,
+    googleLogin,
+    register,
+    logout,
+    isAuthenticated: !!user,
+  }), [user, isLoading, isInitialLoading, error, logout]);
+
   return (
-    <AuthContext.Provider
-      value={{
-        user,
-        isLoading,
-        isInitialLoading,
-        error,
-        setError,
-        login,
-        googleLogin,
-        register,
-        logout,
-        isAuthenticated: !!user,
-      }}
-    >
+    <AuthContext.Provider value={contextValue}>
       {children}
     </AuthContext.Provider>
   );

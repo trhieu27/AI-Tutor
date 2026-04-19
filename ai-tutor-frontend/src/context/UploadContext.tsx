@@ -40,7 +40,7 @@ export const UploadProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
     try {
       await uploadDocument(file);
-      
+
       setQueue(prev => {
         const itemExists = prev.find(item => item.id === id);
         if (!itemExists) return prev;
@@ -48,7 +48,7 @@ export const UploadProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       });
 
       setLastUploadTime(Date.now());
-      
+
       // Auto-remove success items after 5 seconds instead of 3 to give more time to see success
       setTimeout(() => {
         setQueue(prev => prev.filter(item => item.id !== id));
@@ -68,7 +68,7 @@ export const UploadProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     const newItems: UploadQueueItem[] = [];
 
     const fileArray = Array.from(files);
-    
+
     for (const file of fileArray) {
       if (allowedTypes.includes(file.type)) {
         newItems.push({
@@ -83,24 +83,24 @@ export const UploadProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     if (newItems.length === 0) return;
 
     setQueue(prev => [...prev, ...newItems]);
-    
+
     // We don't await the whole loop here because we want them to start in background
     // and let the context stay responsive
     const startUploads = async () => {
-        for (const item of newItems) {
-            await uploadFile(item.id, item.file);
-        }
+      for (const item of newItems) {
+        await uploadFile(item.id, item.file);
+      }
     };
-    
+
     startUploads();
   }, [uploadFile]);
 
   return (
-    <UploadContext.Provider value={{ 
-      queue, 
-      addToQueue, 
-      removeFromQueue, 
-      isAnyUploading, 
+    <UploadContext.Provider value={{
+      queue,
+      addToQueue,
+      removeFromQueue,
+      isAnyUploading,
       clearQueue,
       lastUploadTime
     }}>

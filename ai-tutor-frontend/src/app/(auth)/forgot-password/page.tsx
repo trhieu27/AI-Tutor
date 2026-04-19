@@ -13,25 +13,28 @@ type ForgotStep = 'email' | 'otp' | 'reset' | 'success';
 export default function ForgotPasswordPage() {
   const [step, setStep] = useState<ForgotStep>('email');
   const [email, setEmail] = useState('');
-  const [lastEmailSent, setLastEmailSent] = useState(''); 
+  const [lastEmailSent, setLastEmailSent] = useState('');
   const [otpValues, setOtpValues] = useState(['', '', '', '', '', '']);
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
-  
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [resendTimer, setResendTimer] = useState(0);
-  
+
   // OTP Lockout states
   const [failedOtpAttempts, setFailedOtpAttempts] = useState(0);
   const [otpLockoutTimer, setOtpLockoutTimer] = useState(0);
-  
+
   const { user, isInitialLoading } = useAuth();
   const router = useRouter();
   const inputRefs = useRef<(HTMLInputElement | null)[]>([]);
 
   useEffect(() => {
     if (user && !isInitialLoading) {
+      router.refresh();
       router.replace('/');
     }
   }, [user, isInitialLoading, router]);
@@ -43,7 +46,7 @@ export default function ForgotPasswordPage() {
       setOtpLockoutTimer(0);
       return;
     }
-    
+
     const storedLockout = localStorage.getItem(`otp_lockout_${checkEmail}`);
     if (storedLockout) {
       const remaining = Math.ceil((parseInt(storedLockout) - Date.now()) / 1000);
@@ -95,7 +98,7 @@ export default function ForgotPasswordPage() {
 
   const handleSendOtp = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
-    
+
     if (resendTimer > 0 && email === lastEmailSent) {
       setError(`Vui lòng đợi ${resendTimer} giây trước khi yêu cầu mã mới.`);
       return;
@@ -108,7 +111,7 @@ export default function ForgotPasswordPage() {
       setLastEmailSent(email);
       setOtpValues(['', '', '', '', '', '']); // Xóa sạch mã cũ
       setStep('otp');
-      setResendTimer(60); 
+      setResendTimer(60);
     } catch (err: any) {
       setError(err.message || "Email không tồn tại trong hệ thống.");
     } finally {
@@ -135,7 +138,7 @@ export default function ForgotPasswordPage() {
     } catch (err: any) {
       const newAttempts = failedOtpAttempts + 1;
       setFailedOtpAttempts(newAttempts);
-      
+
       if (newAttempts >= 3) {
         const lockoutUntil = Date.now() + 60000;
         localStorage.setItem(`otp_lockout_${lastEmailSent}`, lockoutUntil.toString());
@@ -174,12 +177,12 @@ export default function ForgotPasswordPage() {
         return (
           <form onSubmit={handleSendOtp} className="flex flex-col gap-8 w-full">
             <div className="relative group">
-              <input 
-                type="email" 
+              <input
+                type="email"
                 value={email}
                 onChange={(e) => {
-                    setEmail(e.target.value);
-                    setError(''); // Xóa lỗi khi gõ email mới
+                  setEmail(e.target.value);
+                  setError(''); // Xóa lỗi khi gõ email mới
                 }}
                 placeholder="Nhập địa chỉ email của bạn..."
                 className="w-full bg-[#f8fafc] rounded-2xl py-4.5 pl-6 pr-14 outline-none border-2 border-slate-100 focus:border-[#0052ff] focus:bg-white text-[15px] font-medium transition-all text-slate-700 group-hover:border-slate-200 shadow-sm"
@@ -188,8 +191,8 @@ export default function ForgotPasswordPage() {
               />
               <span className="material-symbols-outlined absolute right-5 top-1/2 -translate-y-1/2 text-slate-300 group-focus-within:text-[#0052ff] transition-colors">mail</span>
             </div>
-            <button 
-              type="submit" 
+            <button
+              type="submit"
               disabled={isLoading || (resendTimer > 0 && email === lastEmailSent)}
               className="w-full bg-[#0052ff] text-white font-semibold rounded-2xl py-4.5 hover:bg-[#0042cc] transition-all shadow-[0_4px_14px_0_rgba(0,82,255,0.25)] active:scale-[0.99] disabled:bg-slate-50 disabled:text-slate-400 disabled:shadow-none text-[16px] border border-transparent disabled:border-slate-100"
             >
@@ -205,7 +208,7 @@ export default function ForgotPasswordPage() {
               {otpValues.map((digit, idx) => (
                 <input
                   key={idx}
-                  ref={(el) => (inputRefs.current[idx] = el)}
+                  ref={(el) => { inputRefs.current[idx] = el; }}
                   type="text"
                   maxLength={1}
                   value={digit}
@@ -218,20 +221,20 @@ export default function ForgotPasswordPage() {
               ))}
             </div>
             <div className="space-y-6">
-                <button 
-                    type="submit" 
-                    disabled={isLoading || otpLockoutTimer > 0}
-                    className="w-full bg-[#0052ff] text-white font-semibold rounded-2xl py-4.5 hover:bg-[#0042cc] transition-all shadow-[0_4px_14px_0_rgba(0,82,255,0.25)] active:scale-[0.99] disabled:bg-slate-50 disabled:text-slate-400 disabled:shadow-none border border-transparent disabled:border-slate-100"
-                >
-                    {isLoading ? "Đang kiểm tra..." : otpLockoutTimer > 0 ? "Đang bị khóa" : "Xác thực mã OTP"}
-                </button>
-                <p className="text-center text-[15px] font-medium text-slate-400">
-                    Bạn không nhận được mã? {resendTimer > 0 ? (
-                      <span className="text-slate-400 italic">Thử lại sau {resendTimer}s</span>
-                    ) : (
-                      <button type="button" onClick={() => handleSendOtp()} className="text-[#0052ff] font-bold hover:underline" disabled={otpLockoutTimer > 0}>Gửi lại ngay</button>
-                    )}
-                </p>
+              <button
+                type="submit"
+                disabled={isLoading || otpLockoutTimer > 0}
+                className="w-full bg-[#0052ff] text-white font-semibold rounded-2xl py-4.5 hover:bg-[#0042cc] transition-all shadow-[0_4px_14px_0_rgba(0,82,255,0.25)] active:scale-[0.99] disabled:bg-slate-50 disabled:text-slate-400 disabled:shadow-none border border-transparent disabled:border-slate-100"
+              >
+                {isLoading ? "Đang kiểm tra..." : otpLockoutTimer > 0 ? "Đang bị khóa" : "Xác thực mã OTP"}
+              </button>
+              <p className="text-center text-[15px] font-medium text-slate-400">
+                Bạn không nhận được mã? {resendTimer > 0 ? (
+                  <span className="text-slate-400 italic">Thử lại sau {resendTimer}s</span>
+                ) : (
+                  <button type="button" onClick={() => handleSendOtp()} className="text-[#0052ff] font-bold hover:underline" disabled={otpLockoutTimer > 0}>Gửi lại ngay</button>
+                )}
+              </p>
             </div>
           </form>
         );
@@ -240,25 +243,46 @@ export default function ForgotPasswordPage() {
         return (
           <form onSubmit={handleResetPassword} className="flex flex-col gap-6 w-full animate-in fade-in zoom-in-95 duration-500">
             <div className="space-y-6">
-              <input 
-                type="password" 
-                value={newPassword}
-                onChange={(e) => setNewPassword(e.target.value)}
-                placeholder="Mật khẩu mới (tối thiểu 8 ký tự)"
-                className="w-full bg-[#f8fafc] rounded-2xl py-4.5 px-7 outline-none border-2 border-slate-100 focus:border-[#0052ff] focus:bg-white text-[15px] font-medium transition-all text-slate-700 shadow-sm"
-                required
-              />
-              <input 
-                type="password" 
-                value={confirmPassword}
-                onChange={(e) => setConfirmPassword(e.target.value)}
-                placeholder="Xác nhận lại mật khẩu mới"
-                className="w-full bg-[#f8fafc] rounded-2xl py-4.5 px-7 outline-none border-2 border-slate-100 focus:border-[#0052ff] focus:bg-white text-[15px] font-medium transition-all text-slate-700 shadow-sm"
-                required
-              />
+              <div className="relative group">
+                <input
+                  type={showPassword ? "text" : "password"}
+                  value={newPassword}
+                  onChange={(e) => setNewPassword(e.target.value)}
+                  placeholder="Mật khẩu mới (tối thiểu 8 ký tự)"
+                  className="w-full bg-[#f8fafc] rounded-2xl py-4.5 pl-6 pr-14 outline-none border-2 border-slate-100 focus:border-[#0052ff] focus:bg-white text-[15px] font-medium transition-all text-slate-700 shadow-sm"
+                  required
+                />
+                <button
+                  type="button"
+                  tabIndex={-1}
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-[#0052ff] transition-colors focus:outline-none"
+                >
+                  <span className="material-symbols-outlined">{showPassword ? "visibility_off" : "visibility"}</span>
+                </button>
+              </div>
+              
+              <div className="relative group">
+                <input
+                  type={showConfirmPassword ? "text" : "password"}
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  placeholder="Xác nhận lại mật khẩu mới"
+                  className="w-full bg-[#f8fafc] rounded-2xl py-4.5 pl-6 pr-14 outline-none border-2 border-slate-100 focus:border-[#0052ff] focus:bg-white text-[15px] font-medium transition-all text-slate-700 shadow-sm"
+                  required
+                />
+                <button
+                  type="button"
+                  tabIndex={-1}
+                  onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                  className="absolute right-5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-[#0052ff] transition-colors focus:outline-none"
+                >
+                  <span className="material-symbols-outlined">{showConfirmPassword ? "visibility_off" : "visibility"}</span>
+                </button>
+              </div>
             </div>
-            <button 
-              type="submit" 
+            <button
+              type="submit"
               disabled={isLoading}
               className="w-full bg-[#0052ff] text-white font-semibold rounded-2xl py-4.5 hover:bg-[#0042cc] transition-all shadow-[0_4px_14px_0_rgba(0,82,255,0.25)]"
             >
@@ -287,12 +311,12 @@ export default function ForgotPasswordPage() {
   };
 
   const getHeaderInfo = () => {
-    switch(step) {
-        case 'email': return { title: "Quên mật khẩu?", subtitle: "Hãy nhập email của bạn, chúng tôi sẽ giúp bạn khôi phục quyền truy cập nhanh nhất." };
-        case 'otp': return { title: "Xác thực mã", subtitle: `Một mã bảo mật đã được gửi tới ${lastEmailSent}` };
-        case 'reset': return { title: "Mật khẩu mới", subtitle: "Hãy giữ bí mật mật khẩu này để bảo vệ tài khoản của bạn." };
-        case 'success': return { title: "", subtitle: "" };
-        default: return { title: "", subtitle: "" };
+    switch (step) {
+      case 'email': return { title: "Quên mật khẩu?", subtitle: "Hãy nhập email của bạn, chúng tôi sẽ giúp bạn khôi phục quyền truy cập nhanh nhất." };
+      case 'otp': return { title: "Xác thực mã", subtitle: `Một mã bảo mật đã được gửi tới ${lastEmailSent}` };
+      case 'reset': return { title: "Mật khẩu mới", subtitle: "Hãy giữ bí mật mật khẩu này để bảo vệ tài khoản của bạn." };
+      case 'success': return { title: "", subtitle: "" };
+      default: return { title: "", subtitle: "" };
     }
   }
 
@@ -304,9 +328,9 @@ export default function ForgotPasswordPage() {
 
       <div className="w-full lg:w-1/2 flex flex-col justify-center items-center py-12 px-6 sm:px-12 relative overflow-y-auto h-full">
         {step !== 'success' && (
-          <button 
+          <button
             type="button"
-            onClick={() => step === 'email' ? router.push('/login') : setStep('email')} 
+            onClick={() => step === 'email' ? router.replace('/login') : setStep('email')}
             className="absolute top-10 left-8 sm:left-12 flex items-center gap-2 text-slate-400 hover:text-[#0052ff] transition-all font-semibold text-sm group"
           >
             <span className="material-symbols-outlined text-[20px] group-hover:-translate-x-1 transition-transform">arrow_back</span>
@@ -316,10 +340,10 @@ export default function ForgotPasswordPage() {
 
         <div className="w-full max-w-[420px]">
           {step !== 'success' && (
-             <div className="mb-14 text-center lg:text-left">
-                <h2 className="text-3xl font-bold text-slate-800 mb-4 tracking-tight leading-tight">{header.title}</h2>
-                <p className="text-slate-400 text-[16px] leading-relaxed font-medium">{header.subtitle}</p>
-             </div>
+            <div className="mb-14 text-center lg:text-left">
+              <h2 className="text-3xl font-bold text-slate-800 mb-4 tracking-tight leading-tight">{header.title}</h2>
+              <p className="text-slate-400 text-[16px] leading-relaxed font-medium">{header.subtitle}</p>
+            </div>
           )}
 
           {(error || (step === 'otp' && otpLockoutTimer > 0)) && (
