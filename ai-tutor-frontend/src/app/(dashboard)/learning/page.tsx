@@ -1,48 +1,57 @@
 "use client";
 
-import Link from "next/link";
 import DocumentTable from "@/components/DocumentTable";
-import { SIDEBAR_TEXTS } from "@/constants/texts";
+import { LEARNING_PAGE_TEXTS } from "@/constants/texts";
 
 export default function LearningPage() {
   return (
-    <div className="p-5 md:p-10 max-w-[1200px] mx-auto pb-20">
-      <div className="mb-10 text-center max-w-2xl mx-auto">
-        <h1 className="text-[32px] font-bold text-on-surface mb-3 tracking-tight">
-          {SIDEBAR_TEXTS.learning}
+    <div className="p-6 md:p-10 w-full pb-12 space-y-10 relative z-10">
+      {/* Header Section - Compact */}
+      <div className="text-center mb-10 space-y-4">
+        <h1 className="text-4xl md:text-5xl font-black text-white tracking-tight">
+          {LEARNING_PAGE_TEXTS.header.title}
         </h1>
-        <p className="text-on-surface-variant text-[16px] leading-relaxed">
-          Chọn một tài liệu từ thư viện của bạn để bắt đầu phân tích, tóm tắt và đặt câu hỏi chuyên sâu cùng AI Tutor.
+        <p className="text-slate-300 text-lg max-w-2xl mx-auto leading-relaxed font-medium opacity-90">
+          {LEARNING_PAGE_TEXTS.header.subtitle}
         </p>
       </div>
 
-      <div>
-        <DocumentTable />
-      </div>
-
-      <div className="mt-12 grid grid-cols-1 md:grid-cols-3 gap-6">
-        <div className="bg-white p-6 rounded-2xl border border-outline/20 shadow-sm">
-          <div className="w-12 h-12 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center mb-4">
-            <span className="material-symbols-outlined text-[28px]">search_insights</span>
-          </div>
-          <h3 className="font-bold text-on-surface mb-2">Truy vấn Kiến thức</h3>
-          <p className="text-sm text-on-surface-variant">Hỏi và đáp dựa trên nội dung chính xác từ tài liệu của bạn.</p>
-        </div>
-        
-        <div className="bg-white p-6 rounded-2xl border border-outline/20 shadow-sm">
-          <div className="w-12 h-12 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center mb-4">
-            <span className="material-symbols-outlined text-[28px]">format_list_bulleted</span>
-          </div>
-          <h3 className="font-bold text-on-surface mb-2">Tóm tắt Thông minh</h3>
-          <p className="text-sm text-on-surface-variant">Tự động trích xuất các ý chính và sơ đồ hóa kiến thức phức tạp.</p>
+      <div className="space-y-8">
+        {/* Document Table Area - Adaptive height with internal scrollbar */}
+        <div className="bg-slate-900/40 backdrop-blur-md rounded-[48px] border border-white/10 shadow-2xl h-fit max-h-[600px] overflow-hidden flex flex-col">
+           <DocumentTable showActions={true} />
         </div>
 
-        <div className="bg-white p-6 rounded-2xl border border-outline/20 shadow-sm">
-          <div className="w-12 h-12 rounded-xl bg-orange-50 text-orange-600 flex items-center justify-center mb-4">
-            <span className="material-symbols-outlined text-[28px]">edit_note</span>
-          </div>
-          <h3 className="font-bold text-on-surface mb-2">Luyện tập & Đánh giá</h3>
-          <p className="text-sm text-on-surface-variant">Tạo đề thi trắc nghiệm từ tài liệu để kiểm tra mức độ hiểu bài.</p>
+        {/* Feature Highlights - Tightened spacing */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+          {[
+            { 
+              icon: "manage_search", 
+              title: LEARNING_PAGE_TEXTS.cards.query.title, 
+              desc: LEARNING_PAGE_TEXTS.cards.query.desc,
+              color: "text-blue-400 bg-blue-500/10"
+            },
+            { 
+              icon: "lightbulb", 
+              title: LEARNING_PAGE_TEXTS.cards.summary.title, 
+              desc: LEARNING_PAGE_TEXTS.cards.summary.desc,
+              color: "text-purple-400 bg-purple-500/10"
+            },
+            { 
+              icon: "assignment", 
+              title: LEARNING_PAGE_TEXTS.cards.quiz.title, 
+              desc: LEARNING_PAGE_TEXTS.cards.quiz.desc,
+              color: "text-orange-400 bg-orange-500/10"
+            }
+          ].map((feature, idx) => (
+            <div key={idx} className="bg-slate-900/60 backdrop-blur-xl p-10 rounded-[48px] border border-white/10 shadow-2xl hover:-translate-y-2 transition-all duration-500 group">
+              <div className={`w-16 h-16 rounded-[24px] flex items-center justify-center mb-8 transition-transform group-hover:scale-110 group-hover:rotate-6 ${feature.color} border border-white/5`}>
+                <span className="material-symbols-outlined text-[32px]">{feature.icon}</span>
+              </div>
+              <h3 className="text-2xl font-black text-white mb-4 tracking-tight">{feature.title}</h3>
+              <p className="text-slate-400 text-sm leading-relaxed font-medium">{feature.desc}</p>
+            </div>
+          ))}
         </div>
       </div>
     </div>

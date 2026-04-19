@@ -2,6 +2,7 @@
 
 import { AuthProvider } from '@/context/AuthContext';
 import { GoogleOAuthProvider } from '@react-oauth/google';
+import { ThemeProvider } from '@/components/ThemeProvider';
 
 export function Providers({ children }: { children: React.ReactNode }) {
   // Thay thế bằng Client ID thực tế của bạn từ Google Cloud Console
@@ -10,7 +11,9 @@ export function Providers({ children }: { children: React.ReactNode }) {
   return (
     <GoogleOAuthProvider clientId={googleClientId}>
       <AuthProvider>
-        {children}
+        <ThemeProvider attribute="class" defaultTheme="dark" enableSystem>
+          {children}
+        </ThemeProvider>
       </AuthProvider>
     </GoogleOAuthProvider>
   );

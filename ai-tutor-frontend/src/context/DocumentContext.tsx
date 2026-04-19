@@ -1,0 +1,70 @@
+"use client";
+
+import React, { createContext, useContext, useState, useCallback, useEffect } from 'react';
+import { fetchDocuments, DocumentResponse } from '@/services/api.service';
+import { useUpload } from './UploadContext';
+
+interface DocumentContextType {
+  documents: DocumentResponse[];
+  loading: boolean;
+  error: string;
+  refreshDocuments: (isSilent?: boolean) => Promise<void>;
+  lastRefreshTime: number;
+}
+
+const DocumentContext = createContext<DocumentContextType | undefined>(undefined);
+
+export const DocumentProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const [documents, setDocuments] = useState<DocumentResponse[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const [lastRefreshTime, setLastRefreshTime] = useState(0);
+  const { lastUploadTime } = useUpload();
+
+  const refreshDocuments = useCallback(async (isSilent = false) => {
+    if (!isSilent) setLoading(true);
+    setError("");
+    try {
+      const docs = await fetchDocuments();
+      setDocuments(docs);
+      setLastRefreshTime(Date.now());
+    } catch (err) {
+      console.error("Failed to fetch documents:", err);
+      setError("Không thể tải danh sách tài liệu.");
+    } finally {
+      if (!isSilent) setLoading(false);
+    }
+  }, []);
+
+  // Initial load
+  useEffect(() => {
+    refreshDocuments();
+  }, [refreshDocuments]);
+
+  // Auto refresh when a global upload finishes
+  useEffect(() => {
+    if (lastUploadTime > 0) {
+      refreshDocuments(true); // Silent refresh
+    }
+  }, [lastUploadTime, refreshDocuments]);
+
+  return (
+    <DocumentContext.Provider value={{ 
+      documents, 
+      loading, 
+      error, 
+      refreshDocuments,
+      lastRefreshTime
+    }}>
+      {children}
+    </DocumentContext.Provider>
+  );
+};
+
+export const useDocuments = () => {
+  const context = useContext(DocumentContext);
+  if (context === undefined) {
+    throw new Error('useDocuments must be used within a DocumentProvider');
+  }
+  return context;
+};

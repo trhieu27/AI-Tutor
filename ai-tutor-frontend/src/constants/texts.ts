@@ -14,12 +14,19 @@ export const SIDEBAR_TEXTS = {
   mindmap: "Sơ đồ tư duy",
   uploadBtn: "Thêm tài liệu",
   settings: "Cài đặt",
-  support: "Trợ giúp"
+  support: "Trợ giúp",
+  upgrade: {
+    header: "Nâng cấp phiên bản Pro",
+    title: "Nâng cấp PRO",
+    desc: "Mở khóa mọi tính năng AI."
+  }
 };
 
 export const HEADER_TEXTS = {
   searchPlaceholder: "Tìm kiếm tài liệu, bài giảng...",
-  userName: "Trần Hiếu"
+  userName: "Trần Hiếu",
+  proBadge: "Phiên bản PRO",
+  logout: "Đăng xuất"
 };
 
 export const UPLOAD_AREA_TEXTS = {
@@ -27,7 +34,13 @@ export const UPLOAD_AREA_TEXTS = {
   descriptionPrefix: "Kéo và thả file tại đây hoặc",
   selectFileLink: "duyệt file từ máy tính",
   maxSizeDesc: "Tối đa 50MB",
-  acceptedTypes: "PDF, DOC, DOCX"
+  acceptedTypes: "PDF, DOC, DOCX",
+  status: {
+    uploading: "Đang tải lên & xử lý...",
+    success: "Tải lên thành công!",
+    processingBg: "Đang xử lý RAG trong nền...",
+    error: "Tải lên thất bại"
+  }
 };
 
 export const DOCUMENT_TABLE_TEXTS = {
@@ -38,7 +51,14 @@ export const DOCUMENT_TABLE_TEXTS = {
   colActions: "Thao tác",
   status: {
     processed: "Đã xử lý",
-    extracting: "Đang trích xuất"
+    extracting: "AI đang phân tích...",
+    uploading: "Đang tải lên...",
+    failed: "Thất bại"
+  },
+  empty: {
+    title: "Thư viện đang trống",
+    subtitle: "Bắt đầu hành trình học tập bằng cách tải lên tài liệu đầu tiên của bạn ở phía bên trái.",
+    hint: "Hỗ trợ định dạng PDF, DOC, DOCX tối đa 50MB"
   }
 };
 
@@ -88,8 +108,67 @@ export const AUTH_TEXTS = {
     VERIFY_BUTTON: "Xác thực tài khoản",
     VERIFY_LOADING: "Đang xác thực...",
     RESEND_CODE: "Gửi lại mã xác nhận"
+  },
+  GOOGLE: {
+    SUCCESS: "Đăng nhập Google thành công!",
+    ERROR: "Đăng nhập bằng Google thất bại"
   }
 };
+
+export const DASHBOARD_TEXTS = {
+  welcome: {
+    title: "Nâng tầm tri thức cùng AI Tutor",
+    subtitle: "Tải lên tài liệu của bạn và để trí tuệ nhân tạo giúp bạn học tập, tra cứu và luyện tập hiệu quả gấp 10 lần."
+  },
+  features: {
+    chat: {
+      title: "Hỏi đáp với AI",
+      desc: "Tra cứu kiến thức và giải đáp thắc mắc chuyên sâu."
+    },
+    practice: {
+      title: "Luyện tập câu hỏi",
+      desc: "Tự tạo đề thi trắc nghiệm để đánh giá năng lực."
+    },
+    summary: {
+      title: "Tóm tắt thông minh",
+      desc: "Nắm bắt các ý chính chỉ trong vài giây."
+    },
+    mindmap: {
+      title: "Sơ đồ tư duy",
+      desc: "Trực quan hóa cấu trúc kiến thức của tài liệu."
+    },
+    questions: {
+      title: "Câu hỏi ôn tập",
+      desc: "Tổng hợp các câu hỏi mở để ôn tập kiến thức sâu."
+    }
+  },
+  upload: {
+    title: "Tải tài liệu mới",
+    tip: "Hỗ trợ file PDF lên đến 50MB. AI sẽ tự động phân tích và sẵn sàng hỗ trợ bạn sau vài giây."
+  }
+};
+
+export const LEARNING_PAGE_TEXTS = {
+  header: {
+    title: "Thư viện học tập",
+    subtitle: "Chọn một tài liệu để bắt đầu phân tích, tóm tắt và đặt câu hỏi chuyên sâu cùng AI Tutor."
+  },
+  cards: {
+    query: {
+      title: "Truy vấn Kiến thức",
+      desc: "Hỏi và đáp dựa trên nội dung chính xác từ tài liệu của bạn."
+    },
+    summary: {
+      title: "Tóm tắt Thông minh",
+      desc: "Tự động trích xuất các ý chính và sơ đồ hóa kiến thức phức tạp."
+    },
+    quiz: {
+      title: "Luyện tập & Đánh giá",
+      desc: "Tạo đề thi trắc nghiệm từ tài liệu để kiểm tra mức độ hiểu bài."
+    }
+  }
+};
+
 
 export const CHAT_TEXTS = {
   SIDEBAR: {
@@ -157,3 +236,52 @@ export const CHAT_TEXTS = {
     ASK_AI_TOOLTIP: "Hỏi AI về câu này"
   }
 };
+
+export const MINDMAP_PAGE_TEXTS = {
+  title: "Sơ đồ tư duy",
+  subtitle: "Chọn một tài liệu để tạo sơ đồ tư duy (Mindmap). AI sẽ giúp bạn trực quan hóa các mối liên hệ giữa các khái niệm chính trong bài học.",
+  heroTitle: "Vì sao nên dùng Sơ đồ tư duy?",
+  heroDesc: "Sơ đồ tư duy giúp bạn ghi nhớ lâu hơn thông qua việc liên kết các hình ảnh và từ khóa. AI của chúng tôi sẽ tự động phân loại các cấp độ kiến thức từ chủ đề lớn đến các ý con, giúp bạn có cái nhìn tổng quát về toàn bộ tài liệu chỉ trong vài giây.",
+  EDITOR: {
+    TITLE: "Công cụ Mindmap",
+    LABEL: "Trình chỉnh sửa",
+    EDIT_BTN: "Chỉnh sửa nội dung",
+    PLACEHOLDER: "Nhập mã Mermaid mindmap tại đây...",
+    APPLY: "Cập nhật",
+    CANCEL: "Hủy",
+    TIPS_TITLE: "Mẹo sử dụng",
+    TIPS_DESC: "Bạn có thể tự thêm các nhánh mới bằng cách xuống dòng và thêm thụt đầu dòng (tabs) trong trình chỉnh sửa. Ví dụ:",
+    EXAMPLE_NODE: "Nhánh mới",
+    EXAMPLE_CHILD: "Ý con 1",
+    PRINT: "Lưu sơ đồ/In"
+  },
+  CONTROLS: {
+    OPEN_EDITOR: "Mở trình sửa",
+    CLOSE_EDITOR: "Đóng trình sửa",
+    ZOOM_IN: "Phóng to",
+    ZOOM_OUT: "Thu nhỏ",
+    RESET_ZOOM: "Reset Zoom",
+    REFRESH: "Làm mới sơ đồ từ AI"
+  },
+  STATUS: {
+    LOADING: "AI đang thiết kế sơ đồ...",
+    DOC_LABEL: "Tài liệu:",
+    FOOTER_TIP: "Mẹo: Sử dụng con lăn chuột hoặc các phím (+) (-) để thu phóng sơ đồ."
+  }
+};
+
+export const PRACTICE_PAGE_TEXTS = {
+  title: "Luyện tập trắc nghiệm",
+  subtitle: "Thử thách bản thân với các bài kiểm tra trắc nghiệm được tạo tự động từ nội dung tài liệu.",
+  cards: {
+    activeLearning: {
+      title: "Học tập chủ động",
+      desc: "Thay vì chỉ đọc, hãy trả lời câu hỏi để kích hoạt bộ nhớ và hiểu sâu bản chất vấn đề."
+    },
+    expertExplanations: {
+      title: "Giải thích chi tiết",
+      desc: "Mỗi câu hỏi đều đi kèm lời giải thích tại sao đúng/sai, giúp bạn học ngay từ những lỗi sai."
+    }
+  }
+};
+

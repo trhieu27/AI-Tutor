@@ -1,194 +1,166 @@
 "use client";
 
 import { useState, useRef } from "react";
+import { useUpload } from "@/context/UploadContext";
 import { UPLOAD_AREA_TEXTS } from "@/constants/texts";
-import { uploadDocument, DocumentResponse } from "@/services/api.service";
 
 interface UploadAreaProps {
-  onUploadSuccess?: (doc: DocumentResponse) => void;
+  onUploadSuccess?: () => void;
 }
 
-type UploadState = "idle" | "uploading" | "success" | "error";
-
 export default function UploadArea({ onUploadSuccess }: UploadAreaProps) {
+  const { queue, addToQueue, removeFromQueue, isAnyUploading } = useUpload();
   const [isDragging, setIsDragging] = useState(false);
-  const [uploadState, setUploadState] = useState<UploadState>("idle");
-  const [uploadProgress, setUploadProgress] = useState(0);
-  const [errorMessage, setErrorMessage] = useState("");
-  const [uploadedFileName, setUploadedFileName] = useState("");
+  const [error, setError] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const handleUploadDocument = async (files: FileList | null) => {
+  const processFiles = async (files: FileList | null) => {
     if (!files || files.length === 0) return;
-    const file = files[0];
-
-    // Validate type
-    const validTypes = ["application/pdf", "application/msword", "application/vnd.openxmlformats-officedocument.wordprocessingml.document"];
-    const validExts = [".pdf", ".doc", ".docx"];
-    const ext = file.name.toLowerCase().slice(file.name.lastIndexOf("."));
-    if (!validExts.includes(ext)) {
-      setUploadState("error");
-      setErrorMessage("Chỉ chấp nhận file PDF, DOC, DOCX.");
-      return;
+    
+    // Preliminary check for UI error messaging
+    const allowedTypes = ["application/pdf", "application/vnd.openxmlformats-officedocument.wordprocessingml.document"];
+    let hasInvalid = false;
+    for (let i = 0; i < files.length; i++) {
+        if (!allowedTypes.includes(files[i].type)) {
+            hasInvalid = true;
+            break;
+        }
     }
 
-    // Validate size (50MB)
-    if (file.size > 50 * 1024 * 1024) {
-      setUploadState("error");
-      setErrorMessage("File quá lớn. Tối đa 50MB.");
-      return;
+    if (hasInvalid) {
+        setError("Chỉ chấp nhận định dạng PDF hoặc DOCX.");
     }
 
-    setUploadedFileName(file.name);
-    setUploadState("uploading");
-    setUploadProgress(0);
-    setErrorMessage("");
-
-    // Simulate progress while uploading
-    const interval = setInterval(() => {
-      setUploadProgress((p) => Math.min(p + 10, 85));
-    }, 200);
-
-    try {
-      const doc = await uploadDocument(file);
-      clearInterval(interval);
-      setUploadProgress(100);
-      setUploadState("success");
-      onUploadSuccess?.(doc);
-
-      // Reset after 3 seconds
-      setTimeout(() => {
-        setUploadState("idle");
-        setUploadProgress(0);
-        setUploadedFileName("");
-      }, 3000);
-    } catch (err) {
-      clearInterval(interval);
-      setUploadState("error");
-      setErrorMessage(err instanceof Error ? err.message : "Upload thất bại. Vui lòng thử lại.");
-    }
+    await addToQueue(files);
+    if (onUploadSuccess) onUploadSuccess();
   };
 
-  const onDragOver = (e: React.DragEvent) => {
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    processFiles(e.target.files);
+    if (fileInputRef.current) fileInputRef.current.value = "";
+  };
+
+  const handleDragOver = (e: React.DragEvent) => {
     e.preventDefault();
     setIsDragging(true);
   };
 
-  const onDragLeave = (e: React.DragEvent) => {
+  const handleDragLeave = () => setIsDragging(false);
+
+  const handleDrop = (e: React.DragEvent) => {
     e.preventDefault();
     setIsDragging(false);
-  };
-
-  const onDrop = (e: React.DragEvent) => {
-    e.preventDefault();
-    setIsDragging(false);
-    handleUploadDocument(e.dataTransfer.files);
-  };
-
-  const onFileInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    handleUploadDocument(e.target.files);
-    e.target.value = "";
-  };
-
-  const getBorderColor = () => {
-    if (uploadState === "error") return "border-red-400 bg-red-50";
-    if (uploadState === "success") return "border-green-400 bg-green-50";
-    if (isDragging) return "border-primary bg-primary-container/20";
-    return "border-[#d0d0fc] bg-white hover:border-primary/50";
+    processFiles(e.dataTransfer.files);
   };
 
   return (
-    <div
-      className={`border-2 border-dashed rounded-[32px] p-6 sm:p-12 flex flex-col items-center justify-center transition-all cursor-pointer ${getBorderColor()}`}
-      onDragOver={onDragOver}
-      onDragLeave={onDragLeave}
-      onDrop={onDrop}
-      onClick={() => uploadState === "idle" && fileInputRef.current?.click()}
-    >
-      <input
-        ref={fileInputRef}
-        type="file"
-        accept=".pdf,.doc,.docx"
-        className="hidden"
-        onChange={onFileInputChange}
-      />
-
-      {/* Icon */}
-      <div className={`w-[72px] h-[72px] rounded-full flex items-center justify-center mb-6 shadow-sm transition-colors ${
-        uploadState === "success" ? "bg-green-100 text-green-600" :
-        uploadState === "error" ? "bg-red-100 text-red-500" :
-        "bg-primary-container text-primary"
-      }`}>
-        {uploadState === "uploading" ? (
-          <svg className="w-10 h-10 animate-spin text-primary" fill="none" viewBox="0 0 24 24">
-            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-          </svg>
-        ) : (
-          <span className="material-symbols-outlined text-[40px]">
-            {uploadState === "success" ? "check_circle" : uploadState === "error" ? "error" : "cloud_upload"}
-          </span>
-        )}
-      </div>
-
-      {/* Text */}
-      {uploadState === "idle" && (
-        <>
-          <h3 className="text-[22px] font-bold text-on-surface mb-3 text-center">{UPLOAD_AREA_TEXTS.title}</h3>
-          <p className="text-on-surface-variant text-[15px] mb-8 max-w-md text-center leading-relaxed">
-            {UPLOAD_AREA_TEXTS.descriptionPrefix}{" "}
-            <span className="text-primary font-bold hover:underline">{UPLOAD_AREA_TEXTS.selectFileLink}</span>
-          </p>
-          <div className="flex flex-wrap items-center justify-center gap-3">
-            <span className="px-4 py-2 rounded-lg bg-surface text-on-surface-variant text-xs font-bold tracking-widest uppercase">{UPLOAD_AREA_TEXTS.maxSizeDesc}</span>
-            <span className="px-4 py-2 rounded-lg bg-surface text-on-surface-variant text-xs font-bold tracking-widest uppercase">{UPLOAD_AREA_TEXTS.acceptedTypes}</span>
-          </div>
-        </>
-      )}
-
-      {uploadState === "uploading" && (
-        <div className="w-full max-w-xs flex flex-col items-center text-center">
-          <p className="font-bold text-on-surface mb-1 truncate w-full max-w-[240px]" title={uploadedFileName}>
-            {uploadedFileName}
-          </p>
-          <p className="text-sm text-on-surface-variant mb-4">Đang tải lên & xử lý...</p>
-          <div className="w-full bg-gray-100 rounded-full h-2.5 overflow-hidden">
-            <div
-              className="bg-primary h-full rounded-full transition-all duration-300 shadow-[0_0_8px_rgba(59,40,204,0.3)]"
-              style={{ width: `${uploadProgress}%` }}
-            />
-          </div>
-          <p className="text-xs text-primary mt-3 font-black tabular-nums tracking-wider">{uploadProgress}%</p>
+    <div className="space-y-4 flex-1 flex flex-col">
+      <div
+        onDragOver={handleDragOver}
+        onDragLeave={handleDragLeave}
+        onDrop={handleDrop}
+        onClick={() => !isAnyUploading && fileInputRef.current?.click()}
+        className={`relative group cursor-pointer border-2 border-dashed rounded-[40px] p-10 transition-all duration-500 flex-1 flex flex-col items-center justify-center text-center overflow-hidden min-h-[220px] ${
+          isDragging 
+          ? "border-indigo-400 bg-indigo-500/10 scale-[0.98]" 
+          : "border-white/10 bg-white/[0.02] hover:bg-white/[0.05] hover:border-indigo-500/30"
+        } ${isAnyUploading ? "cursor-wait opacity-80" : ""}`}
+      >
+        <div className={`absolute inset-0 opacity-20 pointer-events-none transition-opacity duration-700 ${isDragging ? 'opacity-40' : 'opacity-0'}`}>
+           <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[300px] h-[300px] bg-indigo-500 blur-[80px] rounded-full"></div>
         </div>
-      )}
 
-      {uploadState === "success" && (
-        <div className="text-center flex flex-col items-center w-full max-w-xs px-4">
-          <p className="font-bold text-green-700 text-lg mb-2">Tải lên thành công!</p>
-          <div className="w-full flex justify-center">
-            <p className="text-sm text-green-600 font-medium truncate w-full max-w-[240px]" title={uploadedFileName}>
-              {uploadedFileName}
+        <div className="relative z-10 space-y-4">
+          <div className={`w-16 h-16 rounded-[22px] mx-auto flex items-center justify-center transition-all duration-500 shadow-2xl ${
+            isAnyUploading ? 'bg-indigo-500 animate-pulse' : 'bg-indigo-400 text-slate-950 group-hover:scale-110 group-hover:rotate-6 shadow-indigo-500/20'
+          }`}>
+            <span className="material-symbols-outlined text-[32px] font-bold">
+              {isAnyUploading ? 'sync' : 'cloud_upload'}
+             </span>
+          </div>
+
+          <div className="space-y-2">
+            <h3 className="text-xl font-black text-white tracking-tight">
+              {isAnyUploading ? "ĐANG TẢI LÊN HÀNG ĐỢI..." : UPLOAD_AREA_TEXTS.title}
+            </h3>
+            <p className="text-[11px] text-slate-400 font-bold uppercase tracking-[0.2em] opacity-80">
+              Kéo thả nhiều file PDF/DOCX hoặc nhấn để chọn
             </p>
           </div>
-          <div className="flex items-center gap-2 mt-3 bg-white/50 px-3 py-1.5 rounded-full border border-green-100">
-            <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse shadow-[0_0_8px_rgba(34,197,94,0.5)]"></span>
-            <p className="text-[11px] font-bold text-green-800/70 uppercase tracking-wider">Đang xử lý RAG trong nền...</p>
-          </div>
+        </div>
+
+        <input
+          type="file"
+          ref={fileInputRef}
+          onChange={handleFileChange}
+          className="hidden"
+          accept=".pdf,.docx"
+          multiple
+        />
+      </div>
+
+      {/* Upload Queue List */}
+      {queue.length > 0 && (
+        <div className="space-y-3 mt-4 max-h-[280px] overflow-y-auto pr-2 custom-scrollbar shrink-0">
+          {queue.map((item) => (
+            <div key={item.id} className="group/item bg-slate-900/60 backdrop-blur-md p-4 rounded-2xl border border-white/5 flex items-center gap-4 animate-in slide-in-from-right-4 duration-300 relative">
+              <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${
+                item.status === 'success' ? 'bg-emerald-500/10 text-emerald-400' :
+                item.status === 'error' ? 'bg-red-500/10 text-red-400' :
+                'bg-indigo-500/10 text-indigo-400'
+              }`}>
+                <span className="material-symbols-outlined">
+                  {item.status === 'success' ? 'check_circle' : 
+                   item.status === 'error' ? 'error' : 
+                   item.status === 'uploading' ? 'sync' : 'hourglass_empty'}
+                </span>
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="flex justify-between items-start mb-1">
+                  <p className="text-sm font-bold text-white truncate pr-4">{item.file.name}</p>
+                  <p className="text-[10px] font-black text-slate-500 uppercase shrink-0 pt-0.5">
+                    {(item.file.size / (1024 * 1024)).toFixed(2)} MB
+                  </p>
+                </div>
+                <div className="w-full h-1 bg-white/5 rounded-full overflow-hidden">
+                   <div className={`h-full transition-all duration-500 ${
+                     item.status === 'success' ? 'bg-emerald-500' :
+                     item.status === 'error' ? 'bg-red-500' :
+                     'bg-indigo-500 animate-pulse'
+                   }`} style={{ width: item.status === 'success' ? '100%' : item.status === 'uploading' ? '70%' : '5%' }}></div>
+                </div>
+              </div>
+
+              <button 
+                onClick={() => removeFromQueue(item.id)}
+                className="w-8 h-8 flex items-center justify-center rounded-xl bg-white/5 text-white/20 hover:bg-red-500/20 hover:text-red-400 transition-all opacity-0 group-hover/item:opacity-100 shrink-0"
+              >
+                <span className="material-symbols-outlined text-[18px]">close</span>
+              </button>
+            </div>
+          ))}
         </div>
       )}
 
-      {uploadState === "error" && (
-        <div className="text-center">
-          <p className="font-bold text-red-600 text-lg mb-1">Tải lên thất bại</p>
-          <p className="text-sm text-red-500 max-w-xs">{errorMessage}</p>
-          <button
-            className="mt-4 px-5 py-2 bg-red-100 text-red-600 rounded-xl text-sm font-semibold hover:bg-red-200 transition-colors"
-            onClick={(e) => { e.stopPropagation(); setUploadState("idle"); }}
-          >
-            Thử lại
+      {error && (
+        <div className="flex items-center gap-3 p-4 bg-red-500/10 border border-red-500/20 rounded-2xl animate-in fade-in slide-in-from-top-2 shrink-0">
+          <span className="material-symbols-outlined text-red-400">error</span>
+          <p className="text-xs text-red-300 font-bold">{error}</p>
+          <button onClick={() => setError("")} className="ml-auto text-slate-500 hover:text-white transition-colors">
+            <span className="material-symbols-outlined text-lg">close</span>
           </button>
         </div>
       )}
+
+      <style jsx global>{`
+        .custom-scrollbar::-webkit-scrollbar {
+          width: 4px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+          background: rgba(255, 255, 255, 0.1);
+          border-radius: 10px;
+        }
+      `}</style>
     </div>
   );
 }

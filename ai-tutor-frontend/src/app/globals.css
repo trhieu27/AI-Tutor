@@ -1,25 +1,38 @@
 @import "tailwindcss";
 
+@custom-variant dark (&:where(.dark, .dark *));
+
 @theme {
-  --color-background: var(--color-surface);
-  --color-foreground: var(--color-on-surface);
-  --color-primary: #3b28cc;
-  --color-primary-container: #ebe8ff;
-  --color-on-primary-container: #3b28cc;
-  --color-surface: #f8f9fc;
-  --color-surface-container: #ffffff;
-  --color-on-surface: #1a1a24;
-  --color-on-surface-variant: #5f6368;
-  --color-outline: #e2e2ec;
-  --color-success: #0b8c4c;
-  --color-success-bg: #e6f6eb;
-  --color-warning: #b77c11;
-  --color-warning-bg: #fdf5e6;
+  --color-primary: #6366f1;
+  --color-primary-hover: #4f46e5;
+}
+
+:root {
+  --background: #f8fafc;
+  --foreground: #0f172a;
+  --sidebar-bg: #ffffff;
+  --header-bg: rgba(255, 255, 255, 0.8);
+  --border-color: #e2e8f0;
+}
+
+.dark {
+  --background: #020617;
+  --foreground: #f8fafc;
+  --sidebar-bg: #0f172a; /* Reverting to slightly lighter indigo for depth */
+  --header-bg: rgba(15, 23, 42, 0.8);
+  --border-color: rgba(255, 255, 255, 0.1); /* Visible but subtle line */
 }
 
 body {
-  background-color: var(--color-surface);
-  color: var(--color-on-surface);
+  background-color: var(--background);
+  color: var(--foreground);
+  @apply transition-colors duration-500;
+}
+
+@layer utilities {
+  .material-symbols-outlined {
+    font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+  }
 }
 
 @layer utilities {

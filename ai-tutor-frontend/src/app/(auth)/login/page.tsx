@@ -38,12 +38,12 @@ export default function LoginPage() {
   const googleLogin = useGoogleLogin({
     onSuccess: async (tokenResponse) => {
       console.log('Google login success:', tokenResponse);
-      alert('Đăng nhập Google thành công! Thông tin token đã được in ra console.');
+      alert(AUTH_TEXTS.GOOGLE.SUCCESS);
       router.push('/');
     },
     onError: () => {
       console.log('Login Failed');
-      setError('Đăng nhập bằng Google thất bại');
+      setError(AUTH_TEXTS.GOOGLE.ERROR);
     },
   });
 
