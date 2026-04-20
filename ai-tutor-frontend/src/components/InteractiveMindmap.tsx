@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useCallback, useRef, useEffect, useMemo } from 'react';
+import React, { useState, useCallback, useRef, useEffect, useMemo, forwardRef, useImperativeHandle } from 'react';
 
 // ===== TYPES =====
 interface MindmapNodeData {
@@ -341,7 +341,7 @@ function bezierPath(x1: number, y1: number, x2: number, y2: number): string {
 }
 
 // ===== COMPONENT =====
-export default function InteractiveMindmap({ chart, onCodeChange, documentId }: InteractiveMindmapProps) {
+const InteractiveMindmap = forwardRef(({ chart, onCodeChange, documentId }: InteractiveMindmapProps, ref) => {
   const [tree, setTree] = useState<MindmapNodeData | null>(null);
   const [positions, setPositions] = useState<Record<string, NodePos>>({});
   const lastExportedRef = useRef('');
@@ -353,6 +353,71 @@ export default function InteractiveMindmap({ chart, onCodeChange, documentId }: 
   const [menuPos, setMenuPos] = useState({ x: 0, y: 0 });
   const [menuMode, setMenuMode] = useState<'main' | 'color' | 'edit' | null>(null);
   const [editText, setEditText] = useState('');
+
+  // EXPORT ENGINE
+  useImperativeHandle(ref, () => ({
+    downloadImage: () => {
+      if (!svgRef.current || Object.keys(positions).length === 0) return;
+      
+      const svg = svgRef.current;
+      const posValues = Object.values(positions);
+      const minX = Math.min(...posValues.map(p => p.x - p.w/2)) - 100;
+      const maxX = Math.max(...posValues.map(p => p.x + p.w/2)) + 100;
+      const minY = Math.min(...posValues.map(p => p.y - p.h/2)) - 100;
+      const maxY = Math.max(...posValues.map(p => p.y + p.h/2)) + 100;
+      
+      const exportW = maxX - minX;
+      const exportH = maxY - minY;
+
+      const clone = svg.cloneNode(true) as SVGSVGElement;
+      
+      // Clean up UI elements from clone
+      clone.querySelectorAll('.resize-handles').forEach(el => el.remove());
+      clone.querySelectorAll('.animate-pulse').forEach(el => el.remove());
+      
+      // Setup export dimensions
+      clone.setAttribute('width', exportW.toString());
+      clone.setAttribute('height', exportH.toString());
+      clone.setAttribute('viewBox', `${minX} ${minY} ${exportW} ${exportH}`);
+      
+      // Background and Styles
+      const bg = document.body.classList.contains('dark') ? '#0f172a' : '#f8fafc';
+      const style = document.createElementNS('http://www.w3.org/2000/svg', 'style');
+      style.textContent = `
+        svg { background: ${bg}; font-family: 'Outfit', sans-serif; }
+        .mindmap-bg { fill: ${bg}; }
+      `;
+      clone.prepend(style);
+
+      const svgData = new XMLSerializer().serializeToString(clone);
+      const canvas = document.createElement('canvas');
+      const ctx = canvas.getContext('2d');
+      const img = new Image();
+      
+      const svgBlob = new Blob([svgData], { type: 'image/svg+xml;charset=utf-8' });
+      const url = URL.createObjectURL(svgBlob);
+
+      canvas.width = exportW * 2; // High DPI
+      canvas.height = exportH * 2;
+      
+      img.onload = () => {
+        if (!ctx) return;
+        ctx.fillStyle = bg;
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+        
+        const pngUrl = canvas.toDataURL('image/png');
+        const downloadLink = document.createElement('a');
+        downloadLink.href = pngUrl;
+        downloadLink.download = `mindmap-${documentId || 'export'}.png`;
+        document.body.appendChild(downloadLink);
+        downloadLink.click();
+        document.body.removeChild(downloadLink);
+        URL.revokeObjectURL(url);
+      };
+      img.src = url;
+    }
+  }));
 
   // Refs for listeners
   const svgRef = useRef<SVGSVGElement>(null);
@@ -976,4 +1041,6 @@ export default function InteractiveMindmap({ chart, onCodeChange, documentId }: 
       })()}
     </div>
   );
-}
+});
+
+export default InteractiveMindmap;
