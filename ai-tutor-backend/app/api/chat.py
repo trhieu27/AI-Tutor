@@ -154,6 +154,7 @@ async def get_document_quiz(document_id: str, request: Request, db: AsyncIOMotor
         return StreamingResponse(stream_cached(), media_type="application/json")
     
     async def generate_and_cache():
+        yield " " # Prime stream
         full_text = ""
         async for chunk in generate_quiz_stream(doc["chroma_collection_id"], is_cancelled=request.is_disconnected):
             full_text += chunk
@@ -177,18 +178,27 @@ async def get_document_quiz(document_id: str, request: Request, db: AsyncIOMotor
     return StreamingResponse(generate_and_cache(), media_type="text/plain")
 
 @router.get("/{document_id}/mindmap")
-async def get_document_mindmap(document_id: str, request: Request, db: AsyncIOMotorDatabase = Depends(get_db)):
+async def get_document_mindmap(
+    document_id: str, 
+    request: Request, 
+    db: AsyncIOMotorDatabase = Depends(get_db),
+    force: bool = False
+):
     doc = await db.documents.find_one({"id": document_id})
     if not doc or not doc.get("chroma_collection_id"):
         raise HTTPException(status_code=404, detail="Tài liệu chưa sẵn sàng")
     
-    # Cache check
-    if doc.get("mindmap"):
+    # Cache check - skip if force is true
+    if force:
+        # Hard clear cache to force AI re-gen
+        await db.documents.update_one({"id": document_id}, {"$unset": {"mindmap": ""}})
+    elif doc.get("mindmap"):
         async def stream_cached():
             yield doc["mindmap"]
         return StreamingResponse(stream_cached(), media_type="text/plain")
     
     async def generate_and_cache():
+        yield " " # Prime stream
         full_text = ""
         async for chunk in generate_mindmap_stream(doc["chroma_collection_id"], is_cancelled=request.is_disconnected):
             full_text += chunk
@@ -243,6 +253,7 @@ async def get_study_questions(document_id: str, request: Request, db: AsyncIOMot
         return StreamingResponse(stream_cached(), media_type="text/plain")
     
     async def generate_and_cache():
+        yield " " # Prime stream
         full_text = ""
         async for chunk in generate_study_questions_stream(doc["chroma_collection_id"], is_cancelled=request.is_disconnected):
             full_text += chunk
