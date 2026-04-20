@@ -3,13 +3,14 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { fetchDocument, fetchDocumentMindmap, fetchDocumentMindmapStream, DocumentResponse } from "@/services/api.service";
-import MermaidChart from "@/components/MermaidChart";
+import InteractiveMindmap from "@/components/InteractiveMindmap";
 import { MINDMAP_PAGE_TEXTS } from "@/constants/texts";
 
 export default function InteractiveMindmapPage() {
   const params = useParams();
   const router = useRouter();
   const documentId = params.documentId as string;
+  if (!documentId) return null;
 
   const [docData, setDocData] = useState<DocumentResponse | null>(null);
   const [mindmapCode, setMindmapCode] = useState<string>("");
@@ -29,6 +30,18 @@ export default function InteractiveMindmapPage() {
   const uiTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   const containerRef = useRef<HTMLDivElement>(null);
+
+  // RESTORE VIEWPORT
+  useEffect(() => {
+    const stored = localStorage.getItem(`mindmap_view_${documentId}`);
+    if (stored) {
+      try {
+        const { zoom: sz, position: sp } = JSON.parse(stored);
+        setZoom(sz);
+        setPosition(sp);
+      } catch (e) { }
+    }
+  }, [documentId]);
 
   const cleanMermaidCode = (code: string) => {
     let clean = code.trim();
@@ -92,7 +105,10 @@ export default function InteractiveMindmapPage() {
 
   const handleMouseDown = (e: React.MouseEvent) => {
     if (e.button !== 0) return;
-    if (e.target instanceof HTMLTextAreaElement || e.target instanceof HTMLButtonElement) return;
+    if (e.target instanceof HTMLTextAreaElement || e.target instanceof HTMLButtonElement || e.target instanceof HTMLInputElement) return;
+    // Don't start drag if clicking inside the interactive mindmap SVG/nodes
+    const target = e.target as HTMLElement;
+    if (target.closest('.cursor-pointer') || target.closest('[data-mindmap-node]')) return;
     setIsDragging(true);
     if (!hasInteracted) setHasInteracted(true);
     setDragStart({ x: e.clientX - position.x, y: e.clientY - position.y });
@@ -105,13 +121,19 @@ export default function InteractiveMindmapPage() {
 
   const handleMouseUp = () => {
     setIsDragging(false);
+    // Persist viewport state
+    localStorage.setItem(`mindmap_view_${documentId}`, JSON.stringify({ zoom, position }));
   };
 
   const handleWheel = (e: WheelEvent) => {
     e.preventDefault();
     if (!hasInteracted) setHasInteracted(true);
     const delta = e.deltaY > 0 ? -0.05 : 0.05;
-    setZoom(prev => Math.min(Math.max(prev + delta, 0.15), 3));
+    setZoom(prev => {
+      const next = Math.min(Math.max(prev + delta, 0.15), 3);
+      localStorage.setItem(`mindmap_view_${documentId}`, JSON.stringify({ zoom: next, position }));
+      return next;
+    });
   };
 
   useEffect(() => {
@@ -151,7 +173,7 @@ export default function InteractiveMindmapPage() {
       </div>
 
       {/* Floating Top Header - Human Design style */}
-      <div className={`absolute top-3 left-1/2 -translate-x-1/2 z-30 w-full max-w-3xl px-4 transition-all duration-700 delay-150 ${isUIVisible ? 'opacity-100 translate-y-0 pointer-events-auto' : 'opacity-0 -translate-y-4 pointer-events-none'}`}>
+      <div className="absolute top-3 left-1/2 -translate-x-1/2 z-30 w-full max-w-3xl px-4 transition-all duration-700">
         <header className="bg-white/80 dark:bg-slate-900/80 backdrop-blur-2xl border border-slate-200 dark:border-white/10 rounded-[22px] h-14 flex items-center justify-between px-5 shadow-[0_15px_40px_rgba(0,0,0,0.05)] dark:shadow-[0_20px_50px_rgba(0,0,0,0.3)]">
           <div className="flex items-center gap-3">
             <button
@@ -177,22 +199,25 @@ export default function InteractiveMindmapPage() {
             </div>
 
             <button
-              onClick={() => window.print()}
-              className="w-8 h-8 flex items-center justify-center rounded-xl bg-indigo-50 dark:bg-white text-indigo-600 dark:text-slate-900 group transition-all hover:bg-indigo-600 dark:hover:bg-indigo-400 hover:text-white"
-              title={MINDMAP_PAGE_TEXTS.CONTROLS.DOWNLOAD}
+              onClick={() => {
+                if (confirm("Bạn có chắc chắn muốn xóa toàn bộ sơ đồ và bắt đầu lại từ đầu không?")) {
+                  const resetCode = `mindmap\n  root((${docData?.file_name || "Chủ đề chính"}))`;
+                  setMindmapCode(resetCode);
+                  setEditableCode(resetCode);
+                }
+              }}
+              className="w-10 h-10 flex items-center justify-center rounded-xl bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 group transition-all hover:bg-red-600 dark:hover:bg-red-500 hover:text-white mr-1"
+              title="Đặt lại toàn bộ sơ đồ"
             >
-              <span className="material-symbols-outlined text-[14px]">download</span>
+              <span className="material-symbols-outlined text-[18px]">restart_alt</span>
             </button>
 
             <button
-              onClick={() => setIsSidebarOpen(!isSidebarOpen)}
-              className={`flex items-center gap-2 px-3 h-8 rounded-xl font-bold text-[11px] transition-all ${isSidebarOpen
-                  ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/30'
-                  : 'bg-white dark:bg-white/10 text-slate-700 dark:text-white border border-slate-200 dark:border-white/10 hover:border-indigo-500/50 hover:bg-slate-50 dark:hover:bg-white/20'
-                }`}
+              onClick={() => window.print()}
+              className="w-10 h-10 flex items-center justify-center rounded-xl bg-indigo-50 dark:bg-white text-indigo-600 dark:text-slate-900 group transition-all hover:bg-indigo-600 dark:hover:bg-indigo-400 hover:text-white"
+              title={MINDMAP_PAGE_TEXTS.CONTROLS.DOWNLOAD}
             >
-              <span className="material-symbols-outlined text-[14px] leading-none">{isSidebarOpen ? 'close' : 'tune'}</span>
-              <span className="hidden sm:inline leading-none">{isSidebarOpen ? MINDMAP_PAGE_TEXTS.CONTROLS.CLOSE : MINDMAP_PAGE_TEXTS.CONTROLS.CUSTOM}</span>
+              <span className="material-symbols-outlined text-[18px]">download</span>
             </button>
           </div>
         </header>
@@ -206,7 +231,6 @@ export default function InteractiveMindmapPage() {
         onMouseMove={handleMouseMove}
         onMouseUp={handleMouseUp}
         onMouseLeave={handleMouseUp}
-        onClick={toggleUI}
       >
         <div
           className="absolute inset-0 flex items-center justify-center pointer-events-none"
@@ -221,8 +245,22 @@ export default function InteractiveMindmapPage() {
               <p className="text-slate-400 dark:text-white/40 text-[11px] font-black uppercase tracking-[0.3em]">{MINDMAP_PAGE_TEXTS.STATUS.LOADING}</p>
             </div>
           ) : (
-            <div className="pointer-events-auto min-w-[1400px] flex items-center justify-center drop-shadow-[0_35px_60px_rgba(0,0,0,0.1)] dark:drop-shadow-[0_35px_60px_rgba(0,0,0,0.5)]">
-              <MermaidChart chart={mindmapCode} />
+            <div className="pointer-events-auto min-w-[1400px] flex items-center justify-center drop-shadow-[0_35px_60px_rgba(0,0,0,0.08)] dark:drop-shadow-[0_35px_60px_rgba(0,0,0,0.4)]">
+              <InteractiveMindmap
+                documentId={documentId}
+                chart={mindmapCode}
+                onCodeChange={async (code) => {
+                  setMindmapCode(code);
+                  setEditableCode(code);
+                  // Push to DB
+                  try {
+                    const { updateDocumentMindmap } = await import("@/services/api.service");
+                    await updateDocumentMindmap(documentId, code);
+                  } catch (err) {
+                    console.error("Failed to sync mindmap to DB:", err);
+                  }
+                }}
+              />
             </div>
           )}
         </div>
@@ -230,29 +268,29 @@ export default function InteractiveMindmapPage() {
         {/* User Guidance Overlay */}
         <div className={`absolute bottom-8 left-8 transition-all duration-1000 ${(!hasInteracted && isUIVisible) ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10 pointer-events-none'}`}>
           <div className="bg-white/90 dark:bg-slate-900/90 backdrop-blur-xl border border-slate-200 dark:border-white/10 rounded-[20px] shadow-2xl p-3 flex items-center gap-3 w-[340px]">
-             <div className="w-8 h-8 rounded-xl bg-indigo-500/10 dark:bg-indigo-500/20 flex items-center justify-center text-indigo-600 dark:text-indigo-400 shrink-0">
-                <span className="material-symbols-outlined text-[18px]">mouse</span>
-             </div>
-             <div>
-                <p className="text-[9px] text-slate-400 dark:text-white/30 font-bold mb-0">{MINDMAP_PAGE_TEXTS.GUIDE.TITLE}</p>
-                <p className="text-[11px] text-slate-800 dark:text-white/70 font-bold leading-tight">{MINDMAP_PAGE_TEXTS.GUIDE.DESC}</p>
-             </div>
+            <div className="w-8 h-8 rounded-xl bg-indigo-500/10 dark:bg-indigo-500/20 flex items-center justify-center text-indigo-600 dark:text-indigo-400 shrink-0">
+              <span className="material-symbols-outlined text-[18px]">mouse</span>
+            </div>
+            <div>
+              <p className="text-[9px] text-slate-400 dark:text-white/30 font-bold mb-0">{MINDMAP_PAGE_TEXTS.GUIDE.TITLE}</p>
+              <p className="text-[11px] text-slate-800 dark:text-white/70 font-bold leading-tight">{MINDMAP_PAGE_TEXTS.GUIDE.DESC}</p>
+            </div>
           </div>
         </div>
 
       </div>
 
       {/* Manual Reset Button - Always Visible - Moved outside to prevent event interference */}
-        <button
-          onClick={() => {
-            setPosition({ x: 0, y: 0 });
-            setZoom(0.8);
-          }}
-          className="absolute bottom-6 right-6 z-50 w-10 h-10 bg-white dark:bg-slate-800 border border-slate-200 dark:border-white/10 rounded-2xl flex items-center justify-center text-slate-500 dark:text-white/60 hover:text-indigo-600 dark:hover:text-indigo-400 shadow-xl transition-all active:scale-95"
-          title={MINDMAP_PAGE_TEXTS.CONTROLS.RESET_VIEW}
-        >
-          <span className="material-symbols-outlined">filter_center_focus</span>
-        </button>
+      <button
+        onClick={() => {
+          setPosition({ x: 0, y: 0 });
+          setZoom(0.8);
+        }}
+        className="absolute bottom-6 right-6 z-50 w-10 h-10 bg-white dark:bg-slate-800 border border-slate-200 dark:border-white/10 rounded-2xl flex items-center justify-center text-slate-500 dark:text-white/60 hover:text-indigo-600 dark:hover:text-indigo-400 shadow-xl transition-all active:scale-95"
+        title={MINDMAP_PAGE_TEXTS.CONTROLS.RESET_VIEW}
+      >
+        <span className="material-symbols-outlined">filter_center_focus</span>
+      </button>
 
       {/* Floating Glass Sidebar */}
       <aside className={`fixed top-28 right-8 bottom-8 z-40 transition-all duration-700 ease-[cubic-bezier(0.23,1,0.32,1)] overflow-hidden ${isSidebarOpen ? 'w-[420px] opacity-100 translate-x-0' : 'w-0 opacity-0 translate-x-12'}`}>

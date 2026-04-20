@@ -328,6 +328,21 @@ export async function fetchDocumentMindmap(documentId: string, signal?: AbortSig
   return res.text();
 }
 
+export async function updateDocumentMindmap(documentId: string, mindmapCode: string): Promise<void> {
+  const res = await authFetch(`${API_BASE}/chat/${documentId}/mindmap`, {
+    method: "PUT",
+    headers: {
+      "Content-Type": "application/json",
+      ...getAuthHeaders()
+    },
+    body: JSON.stringify({ mindmap_code: mindmapCode })
+  });
+  if (!res.ok) {
+    const errorData = await res.json().catch(() => ({}));
+    throw new Error(errorData.detail || "Không thể cập nhật sơ đồ tư duy");
+  }
+}
+
 export async function fetchDocumentStudyQuestionsStream(
   documentId: string,
   onChunk: (chunk: string) => void,

@@ -20,20 +20,66 @@ const MermaidChart: React.FC<MermaidChartProps> = ({ chart }) => {
       themeVariables: {
         primaryColor: isDark ? '#6366f1' : '#4f46e5',
         primaryTextColor: '#fff',
-        primaryBorderColor: isDark ? '#4338ca' : '#3730a3',
-        lineColor: isDark ? '#94a3b8' : '#475569',
+        primaryBorderColor: 'transparent',
+        lineColor: isDark ? '#6366f1' : '#4f46e5',
         secondaryColor: '#f59e0b',
         tertiaryColor: '#10b981',
-        nodeBorder: '1px',
-        fontSize: '14px',
-        fontFamily: 'Outfit, Inter, sans-serif'
+        nodeBorder: '0px',
+        fontSize: '13px',
+        fontFamily: 'Outfit, Inter, sans-serif',
+        // Mindmap specific adjustments for organic feel
+        cType10: isDark ? '#818cf8' : '#6366f1', // Root edge
+        cType1: isDark ? '#fb7185' : '#f43f5e',
+        cType2: isDark ? '#38bdf8' : '#0ea5e9',
+        cType3: isDark ? '#4ade80' : '#22c55e',
+        cType4: isDark ? '#fbbf24' : '#f59e0b',
+        edgeColor1: isDark ? '#818cf8' : '#6366f1',
       },
       securityLevel: 'loose',
       mindmap: {
         useMaxWidth: false,
-        padding: 40
+        padding: 50,
+        maxNodeWidth: 220,
       }
     });
+
+    // Injected CSS for organic "tree" look
+    const styleId = 'mermaid-tree-styles';
+    let styleTag = document.getElementById(styleId);
+    if (!styleTag) {
+      styleTag = document.createElement('style');
+      styleTag.id = styleId;
+      document.head.appendChild(styleTag);
+    }
+    styleTag.innerHTML = `
+      .mermaid-container svg {
+        filter: drop-shadow(0 10px 30px rgba(0,0,0,0.05));
+      }
+      .mindmap-node rect {
+        rx: 16px !important;
+        ry: 16px !important;
+        stroke-width: 0px !important;
+        transition: all 0.3s ease;
+      }
+      .mindmap-node:hover rect {
+        filter: brightness(1.1);
+      }
+      path.mindmap-edge {
+        stroke-width: 4px !important;
+        stroke-linecap: round !important;
+        stroke-opacity: 0.5 !important;
+        transition: all 0.3s ease;
+      }
+      .mindmap-node text {
+        font-weight: 700 !important;
+      }
+      /* Root node styling */
+      .mindmap-node--root rect {
+        rx: 100px !important;
+        ry: 100px !important;
+        fill: ${isDark ? '#6366f1' : '#4338ca'} !important;
+      }
+    `;
 
     // Re-render when theme changes (optional but good for consistency)
     const observer = new MutationObserver((mutations) => {
@@ -45,11 +91,10 @@ const MermaidChart: React.FC<MermaidChartProps> = ({ chart }) => {
             themeVariables: {
               primaryColor: updatedIsDark ? '#6366f1' : '#4f46e5',
               primaryTextColor: '#fff',
-              primaryBorderColor: updatedIsDark ? '#4338ca' : '#3730a3',
-              lineColor: updatedIsDark ? '#94a3b8' : '#475569',
+              primaryBorderColor: 'transparent',
+              lineColor: updatedIsDark ? '#6366f1' : '#4f46e5',
             }
           });
-          // This won't automatically re-render the SVG, but the next render will use new theme
         }
       });
     });
