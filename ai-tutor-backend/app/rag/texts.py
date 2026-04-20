@@ -18,7 +18,7 @@ QUERY_STUDY_QUESTIONS = "các chủ đề quan trọng để ôn tập"
 PROMPT_SUMMARIZE = """Bạn là một giáo sư đại học. Hãy tóm tắt tài liệu học tập sau đây một cách súc tích nhưng đầy đủ các ý chính.
     Sử dụng các đầu mục (bullet points) để liệt kê các khái niệm quan trọng.
     Kết thúc bằng một câu đánh giá về độ khó và đối tượng phù hợp của tài liệu này.
-    Trả lời bằng tiếng Việt.
+    Trả lời bằng tiếng Việt CÓ DẤU đầy đủ.
 
     Nội dung tài liệu:
     {context}"""
@@ -41,21 +41,22 @@ Nội dung tài liệu:
 {context}"""
 
 PROMPT_MINDMAP = """Dựa trên nội dung tài liệu học tập dưới đây, hãy tạo ra một sơ đồ tư duy (Mindmap) về các khái niệm chính.
-    Yêu cầu quan trọng về cú pháp:
+    Yêu cầu:
     1. Sử dụng định dạng Mermaid.js mindmap.
-    2. LUÔN LUÔN bao bọc nội dung văn bản của mỗi node trong dấu ngoặc vuông `[ ]`. Ví dụ: `Nhánh chính[Nội dung có (ngoặc)]`.
-    3. Cấu trúc rõ ràng, phân cấp từ chủ đề lớn đến các chi tiết nhỏ.
-    4. KHÔNG trả về gì khác ngoài mã Mermaid, không có block markdown (```).
-    5. Các nút trong sơ đồ phải bằng tiếng Việt.
+    2. Bắt đầu bằng từ khóa `mindmap`.
+    3. Cấu trúc phân cấp rõ ràng bằng cách thụt lề (2 dấu cách).
+    4. Đối với mỗi node, sử dụng ngoặc `(( ))` cho node chính và `[ ]` cho các node con.
+    5. ĐẢM BẢO văn bản trong các node không chứa ký tự đặc biệt như ( ) [ ] { } #.
+    7. KHÔNG trả về markdown block (```), chỉ trả về mã Mermaid.
+    8. Toàn bộ nội dung phải bằng tiếng Việt CÓ DẤU đầy đủ.
 
-    Ví dụ định dạng đúng:
+    Ví dụ:
     mindmap
-      root((Chủ đề chính))
-        Nhánh 1[Khái niệm phức tạp (có ngoặc)]
-          Ý 1.1[Chi tiết cụ thể: mô tả ngắn]
-          Ý 1.2[Chi tiết khác]
-        Nhánh 2[Khái niệm 2]
-
+      ((Chủ đề chính))
+        Khái niệm 1[Mô tả khái niệm 1]
+          Ý phụ 1[Chi tiết 1]
+        Khái niệm 2[Mô tả khái niệm 2]
+    
     Nội dung tài liệu:
     {context}"""
 

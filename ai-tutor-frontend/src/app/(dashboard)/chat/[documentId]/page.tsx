@@ -340,11 +340,11 @@ export default function ChatPage() {
     <div className="flex h-[calc(100vh-64px)] bg-white dark:bg-slate-950 overflow-hidden relative selection:bg-indigo-500/30">
       {/* Sessions Sidebar */}
       {isSidebarOpen && (
-        <aside className="w-64 bg-slate-50 dark:bg-slate-900/50 backdrop-blur-xl border-r border-slate-200 dark:border-white/5 flex flex-col h-full shrink-0 z-30 shadow-2xl">
+        <aside className="w-64 bg-slate-50 dark:bg-slate-900/50 backdrop-blur-xl border-r border-slate-200 dark:border-white/5 flex flex-col h-full shrink-0 z-30 shadow-sm">
           <div className="p-5 border-b border-slate-200 dark:border-white/5 flex justify-between items-center">
-            <h2 className="font-extrabold text-slate-700 dark:text-white text-[10px] flex items-center gap-2.5 tracking-widest uppercase opacity-80">
+            <h2 className="font-bold text-slate-700 dark:text-white text-[12px] flex items-center gap-2.5 opacity-80">
               <span className="material-symbols-outlined text-indigo-600 dark:text-indigo-400 text-[18px]">history</span>
-              {CHAT_TEXTS.SIDEBAR.TITLE}
+              Lịch sử hội thoại
             </h2>
             <button
               onClick={startNewChat}
@@ -378,7 +378,7 @@ export default function ChatPage() {
                         <p className={`font-bold text-[12px] truncate ${currentSessionId === session.id ? "text-indigo-700 dark:text-indigo-300" : "text-slate-700 dark:text-slate-300"}`}>
                           {session.title || "Cuộc trò chuyện mới"}
                         </p>
-                        <p className={`text-[9px] font-bold uppercase tracking-widest mt-0.5 ${currentSessionId === session.id ? "text-indigo-600 dark:text-indigo-400/70" : "text-slate-500 dark:text-slate-500"}`}>
+                        <p className={`text-[10px] font-medium mt-0.5 ${currentSessionId === session.id ? "text-indigo-600 dark:text-indigo-400/70" : "text-slate-500 dark:text-slate-500"}`}>
                           {new Date(session.updated_at).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })} • {new Date(session.updated_at).toLocaleDateString('vi-VN')}
                         </p>
                       </div>
@@ -406,7 +406,7 @@ export default function ChatPage() {
       {/* Main Chat Area */}
       <main className="flex-1 flex flex-col h-full min-w-0 bg-white dark:bg-slate-950 relative">
         {/* Header */}
-        <header className="h-16 bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl border-b border-slate-200 dark:border-white/5 flex items-center justify-between px-6 shrink-0 z-20 shadow-xl">
+        <header className="h-16 bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl border-b border-slate-200 dark:border-white/5 flex items-center justify-between px-6 shrink-0 z-20">
           <div className="flex items-center gap-4 min-w-0">
             <button
               onClick={() => setIsSidebarOpen(!isSidebarOpen)}
@@ -431,7 +431,7 @@ export default function ChatPage() {
           <div className="flex items-center gap-3 shrink-0">
             {[
               { onClick: handleGetSummary, icon: "summarize", label: CHAT_TEXTS.HEADER.ACTIONS.SUMMARY, color: "bg-purple-500/10 text-purple-600 dark:text-purple-400 hover:bg-purple-500 border-purple-500/20" },
-              { onClick: handleGetQuiz, icon: "quiz", label: CHAT_TEXTS.HEADER.ACTIONS.QUIZ, color: "bg-orange-500/10 text-orange-600 dark:text-orange-400 hover:bg-orange-500 border-orange-500/20" },
+              { onClick: () => router.push(`/quiz/${documentId}`), icon: "quiz", label: CHAT_TEXTS.HEADER.ACTIONS.QUIZ, color: "bg-orange-500/10 text-orange-600 dark:text-orange-400 hover:bg-orange-500 border-orange-500/20" },
               { onClick: () => router.push(`/mindmap/${documentId}`), icon: "hub", label: CHAT_TEXTS.HEADER.ACTIONS.MINDMAP, color: "bg-blue-500/10 text-blue-600 dark:text-blue-400 hover:bg-blue-500 border-blue-500/20" }
             ].map((btn, i) => (
               <button
@@ -500,7 +500,7 @@ export default function ChatPage() {
                   </div>
                   <div className={`flex-1 space-y-1.5 ${msg.role === "user" ? "text-right flex flex-col items-end" : ""}`}>
                     {msg.role === "assistant" && (
-                      <p className="text-[10px] font-black text-indigo-500 dark:text-indigo-400 uppercase tracking-widest ml-1 mb-1">AI Trợ lý</p>
+                      <p className="text-[11px] font-bold text-indigo-500 dark:text-indigo-400 ml-1 mb-1">AI Trợ lý</p>
                     )}
                     <div className={`max-w-[90%] prose dark:prose-invert prose-slate prose-sm leading-relaxed text-[13px] ${msg.role === "user"
                         ? "bg-indigo-600 text-white px-5 py-3 rounded-2xl rounded-tr-sm font-medium shadow-sm"
@@ -511,13 +511,13 @@ export default function ChatPage() {
                   </div>
                 </div>
               ))}
-              {isLoading && (
+              {isLoading && messages[messages.length - 1]?.role !== "assistant" && (
                 <div className="flex gap-4 py-2 animate-in fade-in duration-300">
                   <div className="w-10 h-10 rounded-xl bg-indigo-600 text-white border border-white/20 shadow-indigo-500/20 flex items-center justify-center animate-pulse">
                     <span className="material-symbols-outlined text-[20px]">auto_awesome</span>
                   </div>
                   <div className="flex flex-col gap-2 pt-1">
-                    <p className="text-[10px] font-black text-indigo-400 uppercase tracking-[0.2em] animate-pulse">{CHAT_TEXTS.MESSAGES.AI_ANALYZING}</p>
+                    <p className="text-[11px] font-bold text-indigo-400 animate-pulse">{CHAT_TEXTS.MESSAGES.AI_ANALYZING}</p>
                     <div className="flex gap-1.5 items-center bg-white/5 px-3 py-1.5 rounded-full w-fit border border-white/5">
                       <span className="w-1.5 h-1.5 bg-indigo-400 rounded-full animate-bounce"></span>
                       <span className="w-1.5 h-1.5 bg-indigo-500 rounded-full animate-bounce [animation-delay:0.2s]"></span>
@@ -564,8 +564,8 @@ export default function ChatPage() {
               </button>
             </form>
             <div className="flex justify-center items-center px-4 mt-3">
-              <p className="text-[9px] text-slate-500 dark:text-slate-400 font-bold uppercase tracking-widest">
-                {CHAT_TEXTS.INPUT.DISCLAIMER}
+              <p className="text-[10px] text-slate-500 dark:text-slate-400 font-medium tracking-wide">
+                AI có thể sai sót, hãy kiểm chứng thông tin.
               </p>
             </div>
           </div>

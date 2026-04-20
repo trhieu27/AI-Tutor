@@ -27,6 +27,7 @@ export default function DocumentTable({
 
   const getRedirectUrl = (docId: string) => {
     if (defaultAction === "mindmap") return `/mindmap/${docId}`;
+    if (defaultAction === "quiz") return `/quiz/${docId}`;
     const baseUrl = `/chat/${docId}`;
     return defaultAction ? `${baseUrl}?action=${defaultAction}` : baseUrl;
   };
@@ -222,7 +223,7 @@ export default function DocumentTable({
                             <Link href={getRedirectUrl(doc.id)} className="w-8 h-8 aspect-square shrink-0 rounded-full bg-indigo-50 dark:bg-white/5 border border-indigo-200 dark:border-white/10 text-indigo-500 dark:text-indigo-400 hover:bg-indigo-500 hover:text-white flex items-center justify-center transition-all shadow-sm active:scale-95" title="Hỏi AI">
                               <span className="material-symbols-outlined text-[16px]">chat_bubble</span>
                             </Link>
-                            <Link href={`/chat/${doc.id}?action=quiz`} className="w-8 h-8 aspect-square shrink-0 rounded-full bg-orange-50 dark:bg-white/5 border border-orange-200 dark:border-white/10 text-orange-500 dark:text-orange-400 hover:bg-orange-500 hover:text-white flex items-center justify-center transition-all shadow-sm active:scale-95" title="Luyện tập">
+                            <Link href={`/quiz/${doc.id}`} className="w-8 h-8 aspect-square shrink-0 rounded-full bg-orange-50 dark:bg-white/5 border border-orange-200 dark:border-white/10 text-orange-500 dark:text-orange-400 hover:bg-orange-500 hover:text-white flex items-center justify-center transition-all shadow-sm active:scale-95" title="Luyện tập">
                               <span className="material-symbols-outlined text-[16px]">quiz</span>
                             </Link>
                             <Link href={`/mindmap/${doc.id}`} className="w-8 h-8 aspect-square shrink-0 rounded-full bg-cyan-50 dark:bg-white/5 border border-cyan-200 dark:border-white/10 text-cyan-500 dark:text-cyan-400 hover:bg-cyan-500 hover:text-white flex items-center justify-center transition-all shadow-sm active:scale-95" title="Sơ đồ tư duy">
