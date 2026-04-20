@@ -62,9 +62,9 @@ function wrapText(text: string, width: number, height: number, fontSize: number)
       if (lines.length + 1 >= maxLines) {
         // This would be the last allowed line, so we must truncate
         if (currentLine.length > maxCharsPerLine - 3) {
-            currentLine = currentLine.substring(0, maxCharsPerLine - 3) + "...";
+          currentLine = currentLine.substring(0, maxCharsPerLine - 3) + "...";
         } else {
-            currentLine += "...";
+          currentLine += "...";
         }
         lines.push(currentLine);
         return lines;
@@ -75,9 +75,9 @@ function wrapText(text: string, width: number, height: number, fontSize: number)
   }
   if (currentLine) {
     if (lines.length >= maxLines) {
-        lines[lines.length - 1] = lines[lines.length - 1].substring(0, maxCharsPerLine - 3) + "...";
+      lines[lines.length - 1] = lines[lines.length - 1].substring(0, maxCharsPerLine - 3) + "...";
     } else {
-        lines.push(currentLine);
+      lines.push(currentLine);
     }
   }
   return lines;
@@ -144,31 +144,49 @@ function parseMermaid(code: string): MindmapNodeData | null {
       .replace(/:::h-\d+/g, '')
       .trim();
 
-    // 2. Extract ID and Content (more robust regex for nested chars)
-    // Check for ID + Shape structure: id((content))
-    const shapeMatch = cleanText.match(/^([a-zA-Z0-9_-]+)\s*(?:\(\(|\(|\[|\{\{)\s*(.*?)\s*(?:\)\)|\)|\]|\}\})/);
-    if (shapeMatch) {
-      id = shapeMatch[1];
-      text = shapeMatch[2].trim();
-    } else {
-      // Content-aware identity: Slugify text to create stable IDs
-      text = cleanText
-        .replace(/^[a-zA-Z0-9_-]+\s*[\(\[\{]*/, '')
-        .replace(/[\)\]\}]*$/, '')
-        .trim();
+    // 2. Extract ID and Content with Hyper-Robust Recursive Cleanup
+    // 2a. Strip ID prefix if polymorphic (id((text)) -> ((text)))
+    let contentOnly = cleanText.replace(/^[a-zA-Z0-9_-]+\s*(?=[\(\[\{])/, '');
+    
+    // 2b. Identify ID if present for structural purposes
+    const idExtractMatch = cleanText.match(/^([a-zA-Z0-9_-]+)\s*[\(\[\{]/);
+    if (idExtractMatch) id = idExtractMatch[1];
 
-      // Fallback ID if text is empty
-      if (!text) {
-        id = ensureUnique(`node-${++localNid}`);
-      } else {
-        // CONTENT-AWARE + PATH-AWARE SLUG
-        const parentPath = stack.length > 0 ? stack[stack.length - 1].path : '';
+    // 2c. Recursive Outer Shape Peeling
+    let finalizedText = contentOnly.trim();
+    let changed = true;
+    while (changed) {
+      changed = false;
+      const start = finalizedText;
+      if (finalizedText.startsWith('((') && finalizedText.endsWith('))')) {
+        finalizedText = finalizedText.substring(2, finalizedText.length - 2).trim();
+        changed = true;
+      } else if (finalizedText.startsWith('{{') && finalizedText.endsWith('}}')) {
+        finalizedText = finalizedText.substring(2, finalizedText.length - 2).trim();
+        changed = true;
+      } else if (finalizedText.startsWith('(') && finalizedText.endsWith(')')) {
+        finalizedText = finalizedText.substring(1, finalizedText.length - 1).trim();
+        changed = true;
+      } else if (finalizedText.startsWith('[') && finalizedText.endsWith(']')) {
+        finalizedText = finalizedText.substring(1, finalizedText.length - 1).trim();
+        changed = true;
+      }
+      if (start === finalizedText) changed = false;
+    }
+
+    // 2d. Final Aggressive Boundary Purge (Safety for asymmetrical markers)
+    text = finalizedText.replace(/^[\(\[\{]+/, '').replace(/[\)\]\}]+$/, '').trim();
+
+    // Fallback ID if text is empty
+    if (!text) {
+      id = ensureUnique(`node-${++localNid}`);
+    } else {
+      // CONTENT-AWARE + PATH-AWARE SLUG
+      const parentPath = stack.length > 0 ? stack[stack.length - 1].path : '';
         const textSlug = text.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/đ/g, 'd').replace(/[^a-z0-9]/g, '-').replace(/-+/g, '-').slice(0, 15);
         const baseId = `n-${parentPath ? parentPath + '-' : ''}${textSlug}`;
         id = ensureUnique(baseId);
       }
-    }
-
     id = ensureUnique(id);
 
     if (!text || text.toLowerCase().includes('undefined') || text === '') {
@@ -237,7 +255,7 @@ function addChild(root: MindmapNodeData, pid: string, depth: number): MindmapNod
   if (root.id === pid) {
     const id = `u-${Math.random().toString(36).substr(2, 9)}`;
     const text = 'Nhánh mới';
-    
+
     return {
       ...root,
       children: [
@@ -358,28 +376,28 @@ const InteractiveMindmap = forwardRef(({ chart, onCodeChange, documentId }: Inte
   useImperativeHandle(ref, () => ({
     downloadImage: () => {
       if (!svgRef.current || Object.keys(positions).length === 0) return;
-      
+
       const svg = svgRef.current;
       const posValues = Object.values(positions);
-      const minX = Math.min(...posValues.map(p => p.x - p.w/2)) - 100;
-      const maxX = Math.max(...posValues.map(p => p.x + p.w/2)) + 100;
-      const minY = Math.min(...posValues.map(p => p.y - p.h/2)) - 100;
-      const maxY = Math.max(...posValues.map(p => p.y + p.h/2)) + 100;
-      
+      const minX = Math.min(...posValues.map(p => p.x - p.w / 2)) - 100;
+      const maxX = Math.max(...posValues.map(p => p.x + p.w / 2)) + 100;
+      const minY = Math.min(...posValues.map(p => p.y - p.h / 2)) - 100;
+      const maxY = Math.max(...posValues.map(p => p.y + p.h / 2)) + 100;
+
       const exportW = maxX - minX;
       const exportH = maxY - minY;
 
       const clone = svg.cloneNode(true) as SVGSVGElement;
-      
+
       // Clean up UI elements from clone
       clone.querySelectorAll('.resize-handles').forEach(el => el.remove());
       clone.querySelectorAll('.animate-pulse').forEach(el => el.remove());
-      
+
       // Setup export dimensions
       clone.setAttribute('width', exportW.toString());
       clone.setAttribute('height', exportH.toString());
       clone.setAttribute('viewBox', `${minX} ${minY} ${exportW} ${exportH}`);
-      
+
       // Background and Styles
       const bg = document.body.classList.contains('dark') ? '#0f172a' : '#f8fafc';
       const style = document.createElementNS('http://www.w3.org/2000/svg', 'style');
@@ -393,19 +411,19 @@ const InteractiveMindmap = forwardRef(({ chart, onCodeChange, documentId }: Inte
       const canvas = document.createElement('canvas');
       const ctx = canvas.getContext('2d');
       const img = new Image();
-      
+
       const svgBlob = new Blob([svgData], { type: 'image/svg+xml;charset=utf-8' });
       const url = URL.createObjectURL(svgBlob);
 
       canvas.width = exportW * 2; // High DPI
       canvas.height = exportH * 2;
-      
+
       img.onload = () => {
         if (!ctx) return;
         ctx.fillStyle = bg;
         ctx.fillRect(0, 0, canvas.width, canvas.height);
         ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-        
+
         const pngUrl = canvas.toDataURL('image/png');
         const downloadLink = document.createElement('a');
         downloadLink.href = pngUrl;
@@ -416,6 +434,10 @@ const InteractiveMindmap = forwardRef(({ chart, onCodeChange, documentId }: Inte
         URL.revokeObjectURL(url);
       };
       img.src = url;
+    },
+    resetLayout: () => {
+      localStorage.removeItem(storageKey);
+      setPositions({});
     }
   }));
 
@@ -452,7 +474,7 @@ const InteractiveMindmap = forwardRef(({ chart, onCodeChange, documentId }: Inte
       // Create a metadata-rich layout for Fuzzy Recovery
       const layoutWithMeta: Record<string, any> = {};
       const flat = tree ? flattenTree(tree) : [];
-      
+
       Object.keys(positions).forEach(id => {
         const node = flat.find(n => n.id === id);
         layoutWithMeta[id] = {
@@ -508,39 +530,39 @@ const InteractiveMindmap = forwardRef(({ chart, onCodeChange, documentId }: Inte
       const merged: Record<string, NodePos> = {};
       const flatNodes = flattenTree(tree);
       const usedHistorical = new Set<string>();
-      
+
       flatNodes.forEach(node => {
         const isUserNode = node.id.startsWith('u-');
-        
+
         // 1. Direct ID Match (Fastest & Most Reliable)
         if (source[node.id]) {
           merged[node.id] = { ...defaultLayout[node.id], ...source[node.id] };
-        } 
+        }
         // 2. Semantic Content Match (ONLY for AI-generated nodes)
         // User nodes (u-*) should NEVER fuzzy-match to avoid stacking new branches
         else if (!isUserNode) {
-          const histKey = Object.keys(source).find(k => 
+          const histKey = Object.keys(source).find(k =>
             !usedHistorical.has(k) && source[k].text === node.text && !k.startsWith('u-')
           );
-          
+
           if (histKey) {
             usedHistorical.add(histKey);
             const { text: _t, ...pos } = source[histKey];
             merged[node.id] = { ...defaultLayout[node.id], ...pos };
           } else {
             // 3a. Brand New AI Node
-            merged[node.id] = { 
-              ...defaultLayout[node.id], 
+            merged[node.id] = {
+              ...defaultLayout[node.id],
               x: defaultLayout[node.id].x + dx,
-              y: defaultLayout[node.id].y + dy 
+              y: defaultLayout[node.id].y + dy
             };
           }
         } else {
           // 3b. Brand New USER Node: Always use structural default + Delta shift
-          merged[node.id] = { 
-            ...defaultLayout[node.id], 
+          merged[node.id] = {
+            ...defaultLayout[node.id],
             x: defaultLayout[node.id].x + dx,
-            y: defaultLayout[node.id].y + dy 
+            y: defaultLayout[node.id].y + dy
           };
         }
       });
@@ -703,7 +725,7 @@ const InteractiveMindmap = forwardRef(({ chart, onCodeChange, documentId }: Inte
     };
     const onMouseUp = (e: MouseEvent) => {
       // MANDATORY: Explicitly mark as manual one last time to catch the final mouse position
-      isManualChangeRef.current = true; 
+      isManualChangeRef.current = true;
 
       if (resizeRef.current) {
         const rs = resizeRef.current;
@@ -956,15 +978,15 @@ const InteractiveMindmap = forwardRef(({ chart, onCodeChange, documentId }: Inte
                     {/* Top Left */}
                     <path d={`M ${p.x - p.w / 2 - off} ${p.y - p.h / 2 - off + len} V ${p.y - p.h / 2 - off} H ${p.x - p.w / 2 - off + len}`} stroke="transparent" strokeWidth={24} cursor="nwse-resize" onMouseDown={e => handleResizeMouseDown(e, n.id, 'tl' as any)} />
                     <path d={`M ${p.x - p.w / 2 - off} ${p.y - p.h / 2 - off + len} V ${p.y - p.h / 2 - off} H ${p.x - p.w / 2 - off + len}`} pointerEvents="none" className="transition-colors" />
-                    
+
                     {/* Top Right */}
                     <path d={`M ${p.x + p.w / 2 + off - len} ${p.y - p.h / 2 - off} H ${p.x + p.w / 2 + off} V ${p.y - p.h / 2 - off + len}`} stroke="transparent" strokeWidth={24} cursor="nesw-resize" onMouseDown={e => handleResizeMouseDown(e, n.id, 'tr' as any)} />
                     <path d={`M ${p.x + p.w / 2 + off - len} ${p.y - p.h / 2 - off} H ${p.x + p.w / 2 + off} V ${p.y - p.h / 2 - off + len}`} pointerEvents="none" className="transition-colors" />
-                    
+
                     {/* Bottom Left */}
                     <path d={`M ${p.x - p.w / 2 - off} ${p.y + p.h / 2 + off - len} V ${p.y + p.h / 2 + off} H ${p.x - p.w / 2 - off + len}`} stroke="transparent" strokeWidth={24} cursor="nesw-resize" onMouseDown={e => handleResizeMouseDown(e, n.id, 'bl' as any)} />
                     <path d={`M ${p.x - p.w / 2 - off} ${p.y + p.h / 2 + off - len} V ${p.y + p.h / 2 + off} H ${p.x - p.w / 2 - off + len}`} pointerEvents="none" className="transition-colors" />
-                    
+
                     {/* Bottom Right */}
                     <path d={`M ${p.x + p.w / 2 + off - len} ${p.y + p.h / 2 + off} H ${p.x + p.w / 2 + off} V ${p.y + p.h / 2 + off - len}`} stroke="transparent" strokeWidth={24} cursor="nwse-resize" onMouseDown={e => handleResizeMouseDown(e, n.id, 'br' as any)} />
                     <path d={`M ${p.x + p.w / 2 + off - len} ${p.y + p.h / 2 + off} H ${p.x + p.w / 2 + off} V ${p.y + p.h / 2 + off - len}`} pointerEvents="none" className="transition-colors" />
