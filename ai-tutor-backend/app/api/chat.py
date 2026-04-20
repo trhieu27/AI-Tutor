@@ -198,6 +198,38 @@ async def get_document_mindmap(document_id: str, request: Request, db: AsyncIOMo
 
     return StreamingResponse(generate_and_cache(), media_type="text/plain")
 
+@router.put("/{document_id}/mindmap")
+async def update_document_mindmap(
+    document_id: str, 
+    request: Request,
+    db: AsyncIOMotorDatabase = Depends(get_db),
+    current_user_id: str = Depends(get_current_user)
+):
+    """Save manual mindmap changes to DB."""
+    try:
+        body = await request.json()
+        mindmap_code = body.get("mindmap_code")
+        if not mindmap_code:
+            raise HTTPException(status_code=400, detail="Thiếu mã sơ đồ tư duy")
+        
+        result = await db.documents.update_one(
+            {"id": document_id, "owner_id": current_user_id},
+            {"$set": {"mindmap": mindmap_code, "updated_at": datetime.utcnow()}}
+        )
+        
+        if result.matched_count == 0:
+             # Check if it was because it didn't exist or user doesn't own it
+             doc = await db.documents.find_one({"id": document_id})
+             if not doc:
+                 raise HTTPException(status_code=404, detail="Không tìm thấy tài liệu")
+             if doc.get("owner_id") != current_user_id:
+                 raise HTTPException(status_code=403, detail="Bạn không có quyền chỉnh sửa tài liệu này")
+        
+        return {"status": "success"}
+    except Exception as e:
+        logger.error(f"Save Mindmap error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
 @router.get("/{document_id}/study-questions")
 async def get_study_questions(document_id: str, request: Request, db: AsyncIOMotorDatabase = Depends(get_db)):
     doc = await db.documents.find_one({"id": document_id})
