@@ -301,9 +301,13 @@ export async function fetchDocumentQuiz(documentId: string, signal?: AbortSignal
 export async function fetchDocumentMindmapStream(
   documentId: string,
   onChunk: (chunk: string) => void,
-  signal?: AbortSignal
+  signal?: AbortSignal,
+  force: boolean = false
 ): Promise<void> {
-  const res = await authFetch(`${API_BASE}/chat/${documentId}/mindmap`, {
+  const url = `${API_BASE}/chat/${documentId}/mindmap${force ? '?force=true' : ''}`;
+  console.log(`[API] Fetching Mindmap: ${url} (Force: ${force})`);
+  
+  const res = await authFetch(url, {
     headers: { ...getAuthHeaders() },
     signal
   });
@@ -319,8 +323,8 @@ export async function fetchDocumentMindmapStream(
   }
 }
 
-export async function fetchDocumentMindmap(documentId: string, signal?: AbortSignal): Promise<string> {
-  const res = await authFetch(`${API_BASE}/chat/${documentId}/mindmap`, {
+export async function fetchDocumentMindmap(documentId: string, signal?: AbortSignal, force: boolean = false): Promise<string> {
+  const res = await authFetch(`${API_BASE}/chat/${documentId}/mindmap${force ? '?force=true' : ''}`, {
     headers: { ...getAuthHeaders() },
     signal
   });

@@ -63,7 +63,7 @@ export default function InteractiveMindmapPage() {
     return clean.replace(/\n\s*\n/g, '\n');
   };
 
-  const loadData = useCallback(async () => {
+  const loadData = useCallback(async (force: boolean = false) => {
     setIsLoading(true);
     setMindmapCode(""); // Clear to show fresh stream
 
@@ -84,7 +84,8 @@ export default function InteractiveMindmapPage() {
           setMindmapCode(clean);
           setEditableCode(clean);
         },
-        controller.signal
+        controller.signal,
+        force
       );
     } catch (error: any) {
       if (error.name === 'AbortError') return;
@@ -203,7 +204,7 @@ export default function InteractiveMindmapPage() {
               onClick={() => {
                 if (confirm("Bạn có chắc chắn muốn xóa toàn bộ sơ đồ và yêu cầu AI tạo lại từ đầu không?")) {
                   mindmapRef.current?.resetLayout();
-                  loadData(); // Re-call AI API
+                  loadData(true); // Re-call AI API with force=true
                   handleReset(); // Reset viewport
                 }
               }}
