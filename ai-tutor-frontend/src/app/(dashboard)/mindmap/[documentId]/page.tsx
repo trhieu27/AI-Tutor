@@ -30,6 +30,7 @@ export default function InteractiveMindmapPage() {
   const uiTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   const containerRef = useRef<HTMLDivElement>(null);
+  const mindmapRef = useRef<any>(null);
 
   // RESTORE VIEWPORT
   useEffect(() => {
@@ -213,7 +214,7 @@ export default function InteractiveMindmapPage() {
             </button>
 
             <button
-              onClick={() => window.print()}
+              onClick={() => mindmapRef.current?.downloadImage()}
               className="w-10 h-10 flex items-center justify-center rounded-xl bg-indigo-50 dark:bg-white text-indigo-600 dark:text-slate-900 group transition-all hover:bg-indigo-600 dark:hover:bg-indigo-400 hover:text-white"
               title={MINDMAP_PAGE_TEXTS.CONTROLS.DOWNLOAD}
             >
@@ -247,6 +248,7 @@ export default function InteractiveMindmapPage() {
           ) : (
             <div className="pointer-events-auto min-w-[1400px] flex items-center justify-center drop-shadow-[0_35px_60px_rgba(0,0,0,0.08)] dark:drop-shadow-[0_35px_60px_rgba(0,0,0,0.4)]">
               <InteractiveMindmap
+                ref={mindmapRef}
                 documentId={documentId}
                 chart={mindmapCode}
                 onCodeChange={async (code) => {
