@@ -201,10 +201,10 @@ export default function InteractiveMindmapPage() {
 
             <button
               onClick={() => {
-                if (confirm("Bạn có chắc chắn muốn xóa toàn bộ sơ đồ và bắt đầu lại từ đầu không?")) {
-                  const resetCode = `mindmap\n  root((${docData?.file_name || "Chủ đề chính"}))`;
-                  setMindmapCode(resetCode);
-                  setEditableCode(resetCode);
+                if (confirm("Bạn có chắc chắn muốn xóa toàn bộ sơ đồ và yêu cầu AI tạo lại từ đầu không?")) {
+                  mindmapRef.current?.resetLayout();
+                  loadData(); // Re-call AI API
+                  handleReset(); // Reset viewport
                 }
               }}
               className="w-10 h-10 flex items-center justify-center rounded-xl bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 group transition-all hover:bg-red-600 dark:hover:bg-red-500 hover:text-white mr-1"
