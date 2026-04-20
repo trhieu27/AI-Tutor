@@ -42,6 +42,47 @@ const NODE_H = 60;
 const NODE_MIN_W = 180;
 const PAD = 200;
 
+function wrapText(text: string, width: number, height: number, fontSize: number): string[] {
+  const charWidth = fontSize * 0.55;
+  const padding = 30;
+  const availW = width - padding;
+  const availH = height - 20;
+  const lineHeight = fontSize * 1.2;
+  const maxLines = Math.max(1, Math.floor(availH / lineHeight));
+  const maxCharsPerLine = Math.max(5, Math.floor(availW / charWidth));
+
+  const words = text.split(' ');
+  const lines: string[] = [];
+  let currentLine = "";
+
+  for (const word of words) {
+    if ((currentLine + word).length <= maxCharsPerLine) {
+      currentLine += (currentLine === "" ? "" : " ") + word;
+    } else {
+      if (lines.length + 1 >= maxLines) {
+        // This would be the last allowed line, so we must truncate
+        if (currentLine.length > maxCharsPerLine - 3) {
+            currentLine = currentLine.substring(0, maxCharsPerLine - 3) + "...";
+        } else {
+            currentLine += "...";
+        }
+        lines.push(currentLine);
+        return lines;
+      }
+      lines.push(currentLine);
+      currentLine = word;
+    }
+  }
+  if (currentLine) {
+    if (lines.length >= maxLines) {
+        lines[lines.length - 1] = lines[lines.length - 1].substring(0, maxCharsPerLine - 3) + "...";
+    } else {
+        lines.push(currentLine);
+    }
+  }
+  return lines;
+}
+
 // ===== PARSER =====
 function extractText(raw: string): string {
   let t = raw.trim();
@@ -105,7 +146,7 @@ function parseMermaid(code: string): MindmapNodeData | null {
 
     // 2. Extract ID and Content (more robust regex for nested chars)
     // Check for ID + Shape structure: id((content))
-    const shapeMatch = cleanText.match(/^([a-zA-Z0-9_-]+)\s*(?:\(\(|\(|\[|\{\{)\s*(.*)\s*(?:\)\)|\)|\]|\}\})/);
+    const shapeMatch = cleanText.match(/^([a-zA-Z0-9_-]+)\s*(?:\(\(|\(|\[|\{\{)\s*(.*?)\s*(?:\)\)|\)|\]|\}\})/);
     if (shapeMatch) {
       id = shapeMatch[1];
       text = shapeMatch[2].trim();
@@ -787,6 +828,7 @@ export default function InteractiveMindmap({ chart, onCodeChange, documentId }: 
           if (!p) return null;
           const isRoot = p.depth === 0;
           const isSelected = n.id === selectedNodeId;
+          const fSize = isRoot ? 28 : 24;
 
           return (
             <g
@@ -819,32 +861,51 @@ export default function InteractiveMindmap({ chart, onCodeChange, documentId }: 
                 fill={n.color}
                 filter={isSelected ? 'url(#node-glow)' : 'url(#node-shadow)'}
               />
-              {/* Text */}
+              {/* Text: Multi-line Support */}
               <text
                 x={p.x} y={p.y}
                 textAnchor="middle" dominantBaseline="central"
                 fill="white"
-                fontSize={isRoot ? 28 : 24}
+                fontSize={fSize}
                 fontWeight={900}
                 fontFamily="'Outfit','Inter',sans-serif"
                 className="pointer-events-none select-none"
               >
-                {n.text}
+                {(() => {
+                  const lines = wrapText(n.text || '', p.w, p.h, fSize);
+                  const lineHeight = fSize * 1.2;
+                  const totalH = lines.length * lineHeight;
+                  const firstLineY = -(totalH / 2) + (lineHeight / 2);
+                  return lines.map((line, i) => (
+                    <tspan key={i} x={p.x} dy={i === 0 ? firstLineY : lineHeight}>{line}</tspan>
+                  ));
+                })()}
               </text>
 
-              {/* L-shaped corner brackets for a professional design feel */}
-              {isSelected && (
-                <g className="resize-handles" stroke="#6366f1" strokeWidth={3} fill="none" strokeLinecap="round">
-                  {/* Top Left */}
-                  <path d={`M ${p.x - p.w / 2} ${p.y - p.h / 2 + 15} V ${p.y - p.h / 2} H ${p.x - p.w / 2 + 15}`} cursor="nwse-resize" onMouseDown={e => handleResizeMouseDown(e, n.id, 'tl' as any)} className="hover:stroke-indigo-400 transition-colors" />
-                  {/* Top Right */}
-                  <path d={`M ${p.x + p.w / 2 - 15} ${p.y - p.h / 2} H ${p.x + p.w / 2} V ${p.y - p.h / 2 + 15}`} cursor="nesw-resize" onMouseDown={e => handleResizeMouseDown(e, n.id, 'tr' as any)} className="hover:stroke-indigo-400 transition-colors" />
-                  {/* Bottom Left */}
-                  <path d={`M ${p.x - p.w / 2} ${p.y + p.h / 2 - 15} V ${p.y + p.h / 2} H ${p.x - p.w / 2 + 15}`} cursor="nesw-resize" onMouseDown={e => handleResizeMouseDown(e, n.id, 'bl' as any)} className="hover:stroke-indigo-400 transition-colors" />
-                  {/* Bottom Right */}
-                  <path d={`M ${p.x + p.w / 2 - 15} ${p.y + p.h / 2} H ${p.x + p.w / 2} V ${p.y + p.h / 2 - 15}`} cursor="nwse-resize" onMouseDown={e => handleResizeMouseDown(e, n.id, 'br' as any)} className="hover:stroke-indigo-400 transition-colors" />
-                </g>
-              )}
+              {/* L-shaped corner brackets with floating padding */}
+              {isSelected && (() => {
+                const off = 10; // Floating Padding (khoảng cách khung)
+                const len = 15; // Chiều dài cạnh khung
+                return (
+                  <g className="resize-handles" stroke="#6366f1" strokeWidth={2.5} fill="none" strokeLinecap="round">
+                    {/* Top Left */}
+                    <path d={`M ${p.x - p.w / 2 - off} ${p.y - p.h / 2 - off + len} V ${p.y - p.h / 2 - off} H ${p.x - p.w / 2 - off + len}`} stroke="transparent" strokeWidth={24} cursor="nwse-resize" onMouseDown={e => handleResizeMouseDown(e, n.id, 'tl' as any)} />
+                    <path d={`M ${p.x - p.w / 2 - off} ${p.y - p.h / 2 - off + len} V ${p.y - p.h / 2 - off} H ${p.x - p.w / 2 - off + len}`} pointerEvents="none" className="transition-colors" />
+                    
+                    {/* Top Right */}
+                    <path d={`M ${p.x + p.w / 2 + off - len} ${p.y - p.h / 2 - off} H ${p.x + p.w / 2 + off} V ${p.y - p.h / 2 - off + len}`} stroke="transparent" strokeWidth={24} cursor="nesw-resize" onMouseDown={e => handleResizeMouseDown(e, n.id, 'tr' as any)} />
+                    <path d={`M ${p.x + p.w / 2 + off - len} ${p.y - p.h / 2 - off} H ${p.x + p.w / 2 + off} V ${p.y - p.h / 2 - off + len}`} pointerEvents="none" className="transition-colors" />
+                    
+                    {/* Bottom Left */}
+                    <path d={`M ${p.x - p.w / 2 - off} ${p.y + p.h / 2 + off - len} V ${p.y + p.h / 2 + off} H ${p.x - p.w / 2 - off + len}`} stroke="transparent" strokeWidth={24} cursor="nesw-resize" onMouseDown={e => handleResizeMouseDown(e, n.id, 'bl' as any)} />
+                    <path d={`M ${p.x - p.w / 2 - off} ${p.y + p.h / 2 + off - len} V ${p.y + p.h / 2 + off} H ${p.x - p.w / 2 - off + len}`} pointerEvents="none" className="transition-colors" />
+                    
+                    {/* Bottom Right */}
+                    <path d={`M ${p.x + p.w / 2 + off - len} ${p.y + p.h / 2 + off} H ${p.x + p.w / 2 + off} V ${p.y + p.h / 2 + off - len}`} stroke="transparent" strokeWidth={24} cursor="nwse-resize" onMouseDown={e => handleResizeMouseDown(e, n.id, 'br' as any)} />
+                    <path d={`M ${p.x + p.w / 2 + off - len} ${p.y + p.h / 2 + off} H ${p.x + p.w / 2 + off} V ${p.y + p.h / 2 + off - len}`} pointerEvents="none" className="transition-colors" />
+                  </g>
+                );
+              })()}
             </g>
           );
         })}
@@ -860,14 +921,14 @@ export default function InteractiveMindmap({ chart, onCodeChange, documentId }: 
         if (menuMode === 'edit') {
           return (
             <div className="absolute z-[999]" style={{ left: menuPos.x, top: menuPos.y, transform: 'translate(-50%, -100%)' }} onClick={e => e.stopPropagation()}>
-              <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-white/10 rounded-2xl shadow-2xl p-3 mb-2 w-[260px]">
-                <p className="text-[10px] font-bold text-slate-400 dark:text-white/40 mb-2">Chỉnh sửa nội dung</p>
+              <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-white/10 rounded-2xl shadow-2xl p-4 mb-2 w-[320px]">
+                <p className="text-[12px] font-bold text-slate-400 dark:text-white/40 mb-3 px-1">Chỉnh sửa nội dung</p>
                 <input autoFocus value={editText} onChange={e => setEditText(e.target.value)}
                   onKeyDown={e => { if (e.key === 'Enter') doCommitEdit(); if (e.key === 'Escape') { setMenuMode(null); setSelectedNodeId(null); } e.stopPropagation(); }}
-                  className="w-full px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-white/10 text-sm text-slate-900 dark:text-white font-semibold outline-none focus:ring-2 focus:ring-indigo-500/50" />
-                <div className="flex gap-2 mt-2">
-                  <button onClick={doCommitEdit} className="flex-1 py-2 bg-indigo-500 text-white rounded-xl text-[11px] font-bold hover:bg-indigo-400 active:scale-95">Lưu</button>
-                  <button onClick={() => setMenuMode('main')} className="px-3 py-2 bg-slate-100 dark:bg-white/10 text-slate-600 dark:text-white/60 rounded-xl text-[11px] font-bold">Hủy</button>
+                  className="w-full px-4 py-3 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-white/10 text-base text-slate-900 dark:text-white font-semibold outline-none focus:ring-2 focus:ring-indigo-500/50" />
+                <div className="flex gap-3 mt-4">
+                  <button onClick={doCommitEdit} className="flex-1 py-3 bg-indigo-500 text-white rounded-xl text-xs font-bold hover:bg-indigo-400 active:scale-95 shadow-lg shadow-indigo-500/20">Lưu thay đổi</button>
+                  <button onClick={() => setMenuMode('main')} className="px-5 py-3 bg-slate-100 dark:bg-white/10 text-slate-600 dark:text-white/60 rounded-xl text-xs font-bold">Hủy</button>
                 </div>
               </div>
             </div>
@@ -877,16 +938,16 @@ export default function InteractiveMindmap({ chart, onCodeChange, documentId }: 
         if (menuMode === 'color') {
           return (
             <div className="absolute z-[999]" style={{ left: menuPos.x, top: menuPos.y, transform: 'translate(-50%, -100%)' }} onClick={e => e.stopPropagation()}>
-              <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-white/10 rounded-2xl shadow-2xl p-3 mb-2">
-                <p className="text-[10px] font-bold text-slate-400 dark:text-white/40 mb-2 px-1">Chọn màu nhánh</p>
-                <div className="grid grid-cols-6 gap-2">
+              <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-white/10 rounded-2xl shadow-2xl p-4 mb-2">
+                <p className="text-[12px] font-bold text-slate-400 dark:text-white/40 mb-3 px-1">Chọn màu nhánh</p>
+                <div className="grid grid-cols-6 gap-3">
                   {NODE_COLORS.map(c => (
                     <button key={c.value} onClick={e => { e.stopPropagation(); doColorChange(c.value); }}
-                      className="w-7 h-7 rounded-lg transition-all hover:scale-125 active:scale-95"
-                      style={{ backgroundColor: c.value, boxShadow: c.value === node.color ? `0 0 0 2px white, 0 0 0 4px ${c.value}` : 'none' }} title={c.name} />
+                      className="w-9 h-9 rounded-xl transition-all hover:scale-125 active:scale-95 shadow-sm"
+                      style={{ backgroundColor: c.value, boxShadow: c.value === node.color ? `0 0 0 2px white, 0 0 0 5px ${c.value}` : 'none' }} title={c.name} />
                   ))}
                 </div>
-                <button onClick={e => { e.stopPropagation(); setMenuMode('main'); }} className="w-full mt-2 py-1.5 text-[10px] font-bold text-slate-400 hover:text-slate-600 dark:text-white/40">← Quay lại</button>
+                <button onClick={e => { e.stopPropagation(); setMenuMode('main'); }} className="w-full mt-3 py-2 text-xs font-bold text-slate-400 hover:text-slate-600 dark:text-white/40 transition-colors">← Quay lại</button>
               </div>
             </div>
           );
@@ -894,19 +955,19 @@ export default function InteractiveMindmap({ chart, onCodeChange, documentId }: 
 
         return (
           <div className="absolute z-[999]" style={{ left: menuPos.x, top: menuPos.y, transform: 'translate(-50%, -100%)' }} onClick={e => e.stopPropagation()}>
-            <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-white/10 rounded-2xl shadow-2xl p-1.5 mb-2 flex items-center gap-0.5">
-              <button onClick={e => { e.stopPropagation(); doStartEdit(); }} className="p-2 rounded-xl text-slate-600 dark:text-white/70 hover:bg-slate-100 dark:hover:bg-white/10" title="Sửa nội dung">
-                <span className="material-symbols-outlined text-[16px]">edit</span>
+            <div className="bg-white dark:bg-slate-800 border-2 border-slate-200 dark:border-white/10 rounded-[32px] shadow-[0_40px_80px_-20px_rgba(0,0,0,0.4)] p-3 mb-8 flex items-center gap-4">
+              <button onClick={e => { e.stopPropagation(); doStartEdit(); }} className="p-4 rounded-[24px] text-slate-600 dark:text-white/70 hover:bg-slate-100 dark:hover:bg-white/10 transition-all active:scale-90" title="Sửa nội dung">
+                <span className="material-symbols-outlined" style={{ fontSize: '64px' }}>edit</span>
               </button>
-              <button onClick={e => { e.stopPropagation(); doAddChild(); }} className="p-2 rounded-xl text-slate-600 dark:text-white/70 hover:bg-slate-100 dark:hover:bg-white/10" title="Thêm nhánh con">
-                <span className="material-symbols-outlined text-[16px]">add_circle</span>
+              <button onClick={e => { e.stopPropagation(); doAddChild(); }} className="p-4 rounded-[24px] text-slate-600 dark:text-white/70 hover:bg-slate-100 dark:hover:bg-white/10 transition-all active:scale-90" title="Thêm nhánh con">
+                <span className="material-symbols-outlined" style={{ fontSize: '64px' }}>add_circle</span>
               </button>
-              <button onClick={e => { e.stopPropagation(); setMenuMode('color'); }} className="p-2 rounded-xl text-slate-600 dark:text-white/70 hover:bg-slate-100 dark:hover:bg-white/10" title="Đổi màu">
-                <span className="material-symbols-outlined text-[16px]" style={{ color: node.color }}>palette</span>
+              <button onClick={e => { e.stopPropagation(); setMenuMode('color'); }} className="p-4 rounded-[24px] text-slate-600 dark:text-white/70 hover:bg-slate-100 dark:hover:bg-white/10 transition-all active:scale-90" title="Đổi màu">
+                <span className="material-symbols-outlined" style={{ color: node.color, fontSize: '64px' }}>palette</span>
               </button>
               {!isRoot && (
-                <button onClick={e => { e.stopPropagation(); doDelete(); }} className="p-2 rounded-xl text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10" title="Xóa nhánh">
-                  <span className="material-symbols-outlined text-[16px]">delete</span>
+                <button onClick={e => { e.stopPropagation(); doDelete(); }} className="p-4 rounded-[24px] text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10 transition-all active:scale-90" title="Xóa nhánh">
+                  <span className="material-symbols-outlined" style={{ fontSize: '64px' }}>delete</span>
                 </button>
               )}
             </div>
