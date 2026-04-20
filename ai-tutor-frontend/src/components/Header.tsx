@@ -63,7 +63,7 @@ export default function Header({ onMenuClick }: HeaderProps) {
   };
 
   return (
-    <header className="h-16 w-full sticky top-0 bg-[var(--header-bg)] backdrop-blur-md border-b border-[var(--border-color)] flex items-center justify-between px-6 shrink-0 z-50 shadow-sm transition-colors duration-500">
+    <header className="h-16 w-full sticky top-0 bg-[var(--header-bg)] backdrop-blur-md border-b border-[var(--border-color)] flex items-center justify-between px-6 shrink-0 z-50 transition-colors duration-500">
       <div className="flex items-center gap-4">
         <button
           className="lg:hidden w-10 h-10 flex items-center justify-center rounded-xl bg-slate-100 dark:bg-white/5 text-slate-600 dark:text-white"
@@ -93,7 +93,7 @@ export default function Header({ onMenuClick }: HeaderProps) {
               {/* Notification content here... same as before */}
               <div className="px-4 py-3 bg-slate-50 dark:bg-white/5 flex items-center justify-between border-b border-slate-200 dark:border-white/10">
                 <h3 className="text-sm font-black text-slate-900 dark:text-white">{HEADER_TEXTS.notifications.title}</h3>
-                <button onClick={markAllAsRead} className="text-[10px] text-indigo-500 font-bold uppercase">{HEADER_TEXTS.notifications.markAsRead}</button>
+                <button onClick={markAllAsRead} className="text-[10px] text-indigo-500 font-bold hover:underline">Đã đọc hết</button>
               </div>
               <div className="max-h-[350px] overflow-y-auto">
                 {notifications.map(n => (
@@ -128,7 +128,7 @@ export default function Header({ onMenuClick }: HeaderProps) {
                 <p className="text-[13px] font-extrabold text-slate-900 dark:text-white line-clamp-1">{user.full_name || HEADER_TEXTS.user.defaultName}</p>
                 <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-amber-50 dark:bg-amber-500/10 border border-amber-200 dark:border-amber-500/20">
                   <span className="w-1 h-1 rounded-full bg-amber-500"></span>
-                  <p className="text-[8px] font-black text-amber-600 uppercase tracking-widest">{HEADER_TEXTS.proBadge}</p>
+                  <p className="text-[9px] font-black text-amber-600">Phiên bản Pro</p>
                 </div>
               </div>
               <div className="relative group">

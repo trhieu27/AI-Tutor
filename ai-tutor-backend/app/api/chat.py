@@ -124,10 +124,21 @@ async def get_summary(document_id: str, request: Request, db: AsyncIOMotorDataba
     if not doc or not doc.get("chroma_collection_id"):
         raise HTTPException(status_code=404, detail="Tài liệu chưa sẵn sàng")
     
-    return StreamingResponse(
-        summarize_document_stream(doc["chroma_collection_id"], is_cancelled=request.is_disconnected),
-        media_type="text/plain"
-    )
+    # Cache check
+    if doc.get("summary"):
+        async def stream_cached():
+            yield doc["summary"]
+        return StreamingResponse(stream_cached(), media_type="text/plain")
+    
+    async def generate_and_cache():
+        full_text = ""
+        async for chunk in summarize_document_stream(doc["chroma_collection_id"], is_cancelled=request.is_disconnected):
+            full_text += chunk
+            yield chunk
+        if full_text.strip():
+            await db.documents.update_one({"id": document_id}, {"$set": {"summary": full_text}})
+
+    return StreamingResponse(generate_and_cache(), media_type="text/plain")
 
 @router.get("/{document_id}/quiz")
 async def get_document_quiz(document_id: str, request: Request, db: AsyncIOMotorDatabase = Depends(get_db)):
@@ -135,10 +146,35 @@ async def get_document_quiz(document_id: str, request: Request, db: AsyncIOMotor
     if not doc or not doc.get("chroma_collection_id"):
         raise HTTPException(status_code=404, detail="Tài liệu chưa sẵn sàng")
     
-    return StreamingResponse(
-        generate_quiz_stream(doc["chroma_collection_id"], is_cancelled=request.is_disconnected),
-        media_type="text/plain"
-    )
+    # Cache check
+    if doc.get("quiz"):
+        async def stream_cached():
+            import json
+            yield json.dumps(doc["quiz"])
+        return StreamingResponse(stream_cached(), media_type="application/json")
+    
+    async def generate_and_cache():
+        full_text = ""
+        async for chunk in generate_quiz_stream(doc["chroma_collection_id"], is_cancelled=request.is_disconnected):
+            full_text += chunk
+            yield chunk
+        
+        if full_text.strip():
+            try:
+                # Basic cleaning of markdown if present
+                clean_json = full_text.strip()
+                if "```json" in clean_json:
+                    clean_json = clean_json.split("```json")[1].split("```")[0]
+                elif "```" in clean_json:
+                    clean_json = clean_json.split("```")[1].split("```")[0]
+                
+                import json
+                parsed_quiz = json.loads(clean_json)
+                await db.documents.update_one({"id": document_id}, {"$set": {"quiz": parsed_quiz}})
+            except Exception as e:
+                logger.error(f"Failed to cache quiz: {e}")
+
+    return StreamingResponse(generate_and_cache(), media_type="text/plain")
 
 @router.get("/{document_id}/mindmap")
 async def get_document_mindmap(document_id: str, request: Request, db: AsyncIOMotorDatabase = Depends(get_db)):
@@ -146,10 +182,21 @@ async def get_document_mindmap(document_id: str, request: Request, db: AsyncIOMo
     if not doc or not doc.get("chroma_collection_id"):
         raise HTTPException(status_code=404, detail="Tài liệu chưa sẵn sàng")
     
-    return StreamingResponse(
-        generate_mindmap_stream(doc["chroma_collection_id"], is_cancelled=request.is_disconnected),
-        media_type="text/plain"
-    )
+    # Cache check
+    if doc.get("mindmap"):
+        async def stream_cached():
+            yield doc["mindmap"]
+        return StreamingResponse(stream_cached(), media_type="text/plain")
+    
+    async def generate_and_cache():
+        full_text = ""
+        async for chunk in generate_mindmap_stream(doc["chroma_collection_id"], is_cancelled=request.is_disconnected):
+            full_text += chunk
+            yield chunk
+        if full_text.strip():
+            await db.documents.update_one({"id": document_id}, {"$set": {"mindmap": full_text}})
+
+    return StreamingResponse(generate_and_cache(), media_type="text/plain")
 
 @router.get("/{document_id}/study-questions")
 async def get_study_questions(document_id: str, request: Request, db: AsyncIOMotorDatabase = Depends(get_db)):
@@ -157,10 +204,24 @@ async def get_study_questions(document_id: str, request: Request, db: AsyncIOMot
     if not doc or not doc.get("chroma_collection_id"):
         raise HTTPException(status_code=404, detail="Tài liệu chưa sẵn sàng")
     
-    return StreamingResponse(
-        generate_study_questions_stream(doc["chroma_collection_id"], is_cancelled=request.is_disconnected),
-        media_type="text/plain"
-    )
+    # Cache check
+    if doc.get("study_questions"):
+        async def stream_cached():
+            yield "\n".join(doc["study_questions"])
+        return StreamingResponse(stream_cached(), media_type="text/plain")
+    
+    async def generate_and_cache():
+        full_text = ""
+        async for chunk in generate_study_questions_stream(doc["chroma_collection_id"], is_cancelled=request.is_disconnected):
+            full_text += chunk
+            yield chunk
+        
+        if full_text.strip():
+            # Parse lines for caching
+            questions = [l.strip() for l in full_text.split("\n") if l.strip()]
+            await db.documents.update_one({"id": document_id}, {"$set": {"study_questions": questions}})
+
+    return StreamingResponse(generate_and_cache(), media_type="text/plain")
 
 @router.get("/{document_id}/sessions", response_model=list[ChatSessionResponse])
 async def list_sessions(

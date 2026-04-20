@@ -26,6 +26,10 @@ class Document(BaseModel):
     page_count: int = 0
     status: DocumentStatus = DocumentStatus.UPLOADING
     chroma_collection_id: Optional[str] = None
+    mindmap: Optional[str] = None
+    summary: Optional[str] = None
+    quiz: Optional[List[dict]] = None
+    study_questions: Optional[List[str]] = None
     uploaded_at: datetime = Field(default_factory=datetime.utcnow)
     updated_at: datetime = Field(default_factory=datetime.utcnow)
 

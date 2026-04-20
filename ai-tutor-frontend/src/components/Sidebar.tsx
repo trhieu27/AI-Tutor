@@ -41,7 +41,7 @@ export default function Sidebar({ onClose }: { onClose?: () => void }) {
       <div className="px-4 pt-6 pb-2 flex flex-col flex-1">
         {/* Navigation */}
         <nav className="flex flex-col gap-1">
-          <p className="text-[10px] text-slate-400 dark:text-slate-500 font-bold uppercase tracking-wider mb-3 px-3">Menu</p>
+          <p className="text-[11px] text-slate-400 dark:text-slate-500 font-bold mb-3 px-3">Menu</p>
           {navItems.map((item) => {
             const isActive = pathname === item.href;
             return (
@@ -103,7 +103,7 @@ export default function Sidebar({ onClose }: { onClose?: () => void }) {
                 </span>
               </div>
               <div className="flex flex-col">
-                <p className="text-[10px] font-bold text-white uppercase tracking-wider mb-0.5">{SIDEBAR_TEXTS.upgrade.header}</p>
+                <p className="text-[11px] font-bold text-white mb-0.5">Phiên bản Pro</p>
                 <p className="text-white/90 text-[10px] font-medium leading-tight">
                   {SIDEBAR_TEXTS.upgrade.desc}
                 </p>

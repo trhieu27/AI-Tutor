@@ -298,7 +298,15 @@ export const MINDMAP_PAGE_TEXTS = {
     ZOOM_IN: "Phóng to",
     ZOOM_OUT: "Thu nhỏ",
     RESET_ZOOM: "Reset Zoom",
-    REFRESH: "Làm mới sơ đồ từ AI"
+    REFRESH: "Làm mới sơ đồ từ AI",
+    CUSTOM: "Tùy chỉnh",
+    CLOSE: "Đóng",
+    DOWNLOAD: "Xuất file",
+    RESET_VIEW: "Căn giữa sơ đồ"
+  },
+  GUIDE: {
+    TITLE: "Thao tác",
+    DESC: "Cầm kéo để di chuyển • Lăn chuột để thu phóng"
   },
   STATUS: {
     LOADING: "AI đang thiết kế sơ đồ...",
@@ -328,4 +336,36 @@ export const ERROR_MESSAGES = {
   MODEL_NOT_AVAILABLE: "Mô hình AI hiện đang được bảo trì hoặc không khả dụng. Vui lòng thử lại sau ít phút.",
   NETWORK_ERROR: "Lỗi kết nối máy chủ. Vui lòng kiểm tra lại đường truyền mạng của bạn.",
   CANCELLED: "Tác vụ đã được hủy theo yêu cầu của người dùng."
+};
+
+export const QUIZ_PAGE_TEXTS = {
+  header: {
+    badge: "Kiểm tra trắc nghiệm",
+    completed: "Đã hoàn thành",
+    scoreBadge: (score: number, total: number) => `${score} / ${total} câu đúng`,
+    retake: "Làm lại"
+  },
+  status: {
+    loading: {
+      title: "Đang chuẩn bị bài thi...",
+      desc: "AI đang trích xuất câu hỏi từ tài liệu của bạn"
+    },
+    error: {
+      title: "Lỗi tải bài thi",
+      back: "Quay lại"
+    }
+  },
+  results: {
+    title: "Kết quả bài thi",
+    expertExplanation: "Giải thích chi tiết",
+    perfect: "Tuyệt vời! Bạn đã nắm vững kiến thức từ tài liệu này.",
+    good: "Khá tốt! Bạn đã hiểu phần lớn nội dung quan trọng.",
+    keepTrying: "Cần cố gắng thêm. Hãy xem lại phần giải thích để củng cố kiến thức.",
+    correct: "Đúng",
+    incorrect: "Sai"
+  },
+  actions: {
+    submit: "Nộp bài và xem đáp án",
+    confirmIncomplete: "Bạn chưa hoàn thành hết tất cả câu hỏi. Vẫn muốn nộp bài?"
+  }
 };

@@ -63,9 +63,8 @@ def get_llm():
     global _llm
     if _llm is None:
         _llm = ChatGoogleGenerativeAI(
-            model="gemini-1.5-flash",
+            model="gemini-flash-latest",
             google_api_key=settings.GEMINI_API_KEY,
-            transport="rest", # Fixes unawaited coroutine warnings in some environments
             temperature=0.2,
         )
     return _llm
@@ -424,8 +423,11 @@ async def generate_mindmap(collection_name: str, is_cancelled=None) -> str:
         
         # Final safety check: ensure the word mindmap is there
         if "mindmap" not in content.lower():
-            content = "mindmap\n  root((Sơ đồ tư duy))\n" + content
-            
+            content = "mindmap\n" + content
+        
+        # Clean up common AI artifacts
+        content = content.replace("**", "").replace("*", "")
+        
         return content.strip()
     except Exception as e:
         print(f"🔥 ERROR in generate_mindmap: {str(e)}")
