@@ -402,7 +402,7 @@ const InteractiveMindmap = forwardRef(({ chart, onCodeChange, documentId }: Inte
       const bg = document.body.classList.contains('dark') ? '#0f172a' : '#f8fafc';
       const style = document.createElementNS('http://www.w3.org/2000/svg', 'style');
       style.textContent = `
-        svg { background: ${bg}; font-family: 'Outfit', sans-serif; }
+        svg { background: ${bg}; font-family: 'Inter', sans-serif; }
         .mindmap-bg { fill: ${bg}; }
       `;
       clone.prepend(style);

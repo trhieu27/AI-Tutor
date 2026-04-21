@@ -369,3 +369,115 @@ export const QUIZ_PAGE_TEXTS = {
     confirmIncomplete: "Bạn chưa hoàn thành hết tất cả câu hỏi. Vẫn muốn nộp bài?"
   }
 };
+
+export const HELP_PAGE_TEXTS = {
+  hero: {
+    badge: "Trung tâm hỗ trợ",
+    title: "Chúng tôi ở đây để ",
+    titleHighlight: "giúp bạn",
+    subtitle: "Tìm câu trả lời nhanh, khám phá hướng dẫn sử dụng chi tiết, và liên hệ trực tiếp đội ngũ hỗ trợ kỹ thuật."
+  },
+  tabs: {
+    faq: "Câu hỏi thường gặp",
+    guide: "Hướng dẫn sử dụng",
+    contact: "Liên hệ hỗ trợ"
+  },
+  faq: {
+    searchPlaceholder: "Tìm kiếm câu hỏi...",
+    allCategory: "Tất cả",
+    noResults: "Không tìm thấy kết quả cho",
+    clearFilter: "Xóa bộ lọc",
+    items: [
+      {
+        question: "AI Tutor hoạt động như thế nào?",
+        answer: "AI Tutor sử dụng công nghệ RAG (Retrieval-Augmented Generation) kết hợp với mô hình ngôn ngữ lớn (LLM) để phân tích tài liệu của bạn. Sau khi bạn tải lên, hệ thống sẽ 'đọc' và ghi nhớ nội dung, giúp bạn có thể trò chuyện, đặt câu hỏi, soạn đề thi hoặc tóm tắt tài liệu đó một cách chính xác.",
+        icon: "auto_awesome",
+        category: "Tổng quan"
+      },
+      {
+        question: "Tôi có thể tải lên các định dạng tệp nào?",
+        answer: "Hiện tại hệ thống hỗ trợ định dạng PDF với dung lượng tối đa 50MB. Bạn chỉ cần kéo thả hoặc chọn file PDF từ máy tính, AI sẽ tự động phân tích và sẵn sàng hỗ trợ bạn sau vài giây.",
+        icon: "upload_file",
+        category: "Tài liệu"
+      },
+      {
+        question: "Làm thế nào để tạo Sơ đồ tư duy hiệu quả?",
+        answer: "Sau khi tài liệu được xử lý thành công, hãy chọn tính năng 'Sơ đồ tư duy' từ thanh điều hướng hoặc trong mục Thư viện học tập. Hệ thống sẽ tự động trích xuất các ý chính và phân cấp chúng thành một sơ đồ trực quan. Bạn có thể tương tác, chỉnh sửa trực tiếp, phóng to/thu nhỏ, và xuất sơ đồ ra file ảnh.",
+        icon: "hub",
+        category: "Tính năng"
+      },
+      {
+        question: "Bài kiểm tra trắc nghiệm được tạo ra như thế nào?",
+        answer: "AI sẽ phân tích toàn bộ nội dung tài liệu và tự động tạo ra các câu hỏi trắc nghiệm bao quát nhiều khía cạnh kiến thức. Mỗi câu hỏi đều kèm theo đáp án đúng và lời giải thích chi tiết, giúp bạn hiểu rõ tại sao đáp án đó lại đúng/sai.",
+        icon: "assignment",
+        category: "Tính năng"
+      },
+      {
+        question: "Tôi có thể sử dụng AI Tutor trên điện thoại không?",
+        answer: "Có! Giao diện AI Tutor được thiết kế responsive, hoạt động tốt trên mọi kích thước màn hình từ điện thoại, máy tính bảng cho đến máy tính để bàn. Bạn chỉ cần truy cập thông qua trình duyệt web.",
+        icon: "devices",
+        category: "Tổng quan"
+      }
+    ]
+  },
+  guide: {
+    stepsLabel: "Các bước sử dụng",
+    stepLabel: "Bước",
+    prevButton: "Quay lại",
+    nextButton: "Tiếp theo",
+    steps: [
+      {
+        title: "Tải lên tài liệu",
+        description: "Truy cập Tổng quan, kéo thả hoặc chọn file PDF từ máy tính. AI sẽ tự động phân tích và xử lý tài liệu trong vài giây.",
+        icon: "cloud_upload",
+        color: "from-blue-500 to-indigo-600"
+      },
+      {
+        title: "Chat hỏi đáp với AI",
+        description: "Vào Thư viện học tập, chọn tài liệu và bắt đầu đặt câu hỏi. AI sẽ trả lời dựa trên nội dung chính xác từ tài liệu của bạn.",
+        icon: "forum",
+        color: "from-violet-500 to-purple-600"
+      },
+      {
+        title: "Tóm tắt thông minh",
+        description: "Nhấn nút 'Tóm tắt' trong trang chat để AI trích xuất các ý chính và tạo bản tóm tắt súc tích cho toàn bộ tài liệu.",
+        icon: "summarize",
+        color: "from-amber-500 to-orange-600"
+      },
+      {
+        title: "Luyện tập trắc nghiệm",
+        description: "Truy cập mục Luyện tập, chọn tài liệu để AI tự động tạo bài kiểm tra. Sau khi nộp bài, AI sẽ giải thích từng câu hỏi.",
+        icon: "quiz",
+        color: "from-rose-500 to-pink-600"
+      },
+      {
+        title: "Tạo sơ đồ tư duy",
+        description: "Chọn Sơ đồ tư duy từ thanh điều hướng, chọn tài liệu và xem AI trực quan hóa các khái niệm. Bạn có thể chỉnh sửa và xuất file.",
+        icon: "hub",
+        color: "from-emerald-500 to-teal-600"
+      },
+      {
+        title: "Câu hỏi ôn tập",
+        description: "Sử dụng tính năng câu hỏi ôn tập để AI tạo các câu hỏi mở giúp bạn tự kiểm tra kiến thức và chuẩn bị cho kỳ thi.",
+        icon: "psychology",
+        color: "from-cyan-500 to-blue-600"
+      }
+    ]
+  },
+  contact: {
+    formTitle: "Gửi yêu cầu hỗ trợ",
+    formSubtitle: "Mô tả vấn đề bạn gặp phải, chúng tôi sẽ phản hồi qua email.",
+    subjectLabel: "Tiêu đề",
+    subjectPlaceholder: "Ví dụ: Lỗi khi tải lên tài liệu PDF",
+    messageLabel: "Nội dung chi tiết",
+    messagePlaceholder: "Mô tả chi tiết vấn đề bạn đang gặp phải...",
+    charCount: "ký tự",
+    submitButton: "Gửi yêu cầu hỗ trợ",
+    successToast: "Yêu cầu hỗ trợ đã được gửi thành công! Chúng tôi sẽ phản hồi trong 24 giờ.",
+    errors: {
+      subjectRequired: "Vui lòng nhập tiêu đề",
+      messageRequired: "Vui lòng nhập nội dung",
+      messageMinLength: "Nội dung cần ít nhất 20 ký tự"
+    }
+  }
+};
