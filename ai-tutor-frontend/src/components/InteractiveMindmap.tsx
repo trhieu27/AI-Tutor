@@ -12,18 +12,25 @@ interface MindmapNodeData {
   height?: number;
 }
 
-interface NodePos {
-  x: number; y: number; w: number; h: number; depth: number;
+interface StoredNodePos {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+  text?: string;
+  manual?: boolean; // NEW: Only pin nodes moved by user
 }
 
-interface StoredNodePos extends NodePos {
-  text?: string;
+interface NodePos extends StoredNodePos {
+  depth: number;
 }
 
 interface InteractiveMindmapProps {
   chart: string;
   onCodeChange?: (code: string) => void;
   documentId?: string;
+  zoom?: number;
+  onUndoRedoStateChange?: (canUndo: boolean, canRedo: boolean) => void;
 }
 
 // ===== CONSTANTS =====
@@ -36,8 +43,8 @@ const NODE_COLORS = [
   { name: 'Lime', value: '#84cc16' }, { name: 'Orange', value: '#f97316' },
 ];
 const DEPTH_COLORS = ['#4338ca', '#6366f1', '#f43f5e', '#0ea5e9', '#10b981', '#f59e0b', '#8b5cf6', '#ec4899'];
-const V_GAP = 150;
-const H_PADDING = 180;
+const V_GAP = 180;
+const H_PADDING = 220;
 const NODE_H = 60;
 const NODE_MIN_W = 180;
 const PAD = 200;
@@ -147,7 +154,7 @@ function parseMermaid(code: string): MindmapNodeData | null {
     // 2. Extract ID and Content with Hyper-Robust Recursive Cleanup
     // 2a. Strip ID prefix if polymorphic (id((text)) -> ((text)))
     let contentOnly = cleanText.replace(/^[a-zA-Z0-9_-]+\s*(?=[\(\[\{])/, '');
-    
+
     // 2b. Identify ID if present for structural purposes
     const idExtractMatch = cleanText.match(/^([a-zA-Z0-9_-]+)\s*[\(\[\{]/);
     if (idExtractMatch) id = idExtractMatch[1];
@@ -177,17 +184,28 @@ function parseMermaid(code: string): MindmapNodeData | null {
     // 2d. Final Aggressive Boundary Purge (Safety for asymmetrical markers)
     text = finalizedText.replace(/^[\(\[\{]+/, '').replace(/[\)\]\}]+$/, '').trim();
 
-    // Fallback ID if text is empty
-    if (!text) {
+    // ID Assignment: Preserve explicit IDs from mermaid code, only generate for missing ones
+    const hasExplicitId = idExtractMatch && idExtractMatch[1];
+    if (hasExplicitId) {
+      // The mermaid code had an explicit ID (e.g., u-abc123 or n-some-slug)
+      // Preserve it exactly — this is critical for localStorage position matching
+      id = idExtractMatch[1];
+      if (usedIds.has(id)) {
+        // Only add suffix if there's a genuine collision
+        let counter = 1;
+        while (usedIds.has(`${id}-${counter}`)) counter++;
+        id = `${id}-${counter}`;
+      }
+      usedIds.add(id);
+    } else if (!text) {
       id = ensureUnique(`node-${++localNid}`);
     } else {
-      // CONTENT-AWARE + PATH-AWARE SLUG
+      // No explicit ID in source — generate a stable content-based slug
       const parentPath = stack.length > 0 ? stack[stack.length - 1].path : '';
-        const textSlug = text.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/đ/g, 'd').replace(/[^a-z0-9]/g, '-').replace(/-+/g, '-').slice(0, 15);
-        const baseId = `n-${parentPath ? parentPath + '-' : ''}${textSlug}`;
-        id = ensureUnique(baseId);
-      }
-    id = ensureUnique(id);
+      const textSlug = text.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/đ/g, 'd').replace(/[^a-z0-9]/g, '-').replace(/-+/g, '-').slice(0, 15);
+      const baseId = `n-${parentPath ? parentPath + '-' : ''}${textSlug}`;
+      id = ensureUnique(baseId);
+    }
 
     if (!text || text.toLowerCase().includes('undefined') || text === '') {
       text = stack.length === 0 ? 'Chủ đề chính' : 'Nhánh mới';
@@ -267,7 +285,13 @@ function addChild(root: MindmapNodeData, pid: string, depth: number): MindmapNod
   return { ...root, children: children.map(c => addChild(c, pid, depth + 1)) };
 }
 function removeNode(root: MindmapNodeData, id: string): MindmapNodeData {
-  return { ...root, children: root.children.filter(c => c.id !== id).map(c => removeNode(c, id)) };
+  const children = Array.isArray(root.children) ? root.children : [];
+  return { 
+    ...root, 
+    children: children
+      .filter(c => c.id !== id)
+      .map(c => removeNode(c, id)) 
+  };
 }
 function findDepth(root: MindmapNodeData, id: string, d = 0): number {
   if (root.id === id) return d;
@@ -294,50 +318,52 @@ function getDescendantIds(node: MindmapNodeData): string[] {
 }
 
 // ===== LAYOUT =====
-function stH(node: MindmapNodeData): number {
+function stH(node: MindmapNodeData, sizeMap?: Record<string, { w?: number, h?: number }>): number {
   const children = Array.isArray(node.children) ? node.children : [];
-  if (children.length === 0) return node.height || NODE_H;
-  const childSum = children.reduce((acc, c) => acc + stH(c), 0);
+  const h = sizeMap?.[node.id]?.h || node.height || NODE_H;
+  if (children.length === 0) return h;
+  const childSum = children.reduce((acc, c) => acc + stH(c, sizeMap), 0);
   const gapSum = (children.length - 1) * V_GAP;
-  return Math.max(node.height || NODE_H, childSum + gapSum);
+  return Math.max(h, childSum + gapSum);
 }
 
-function computePositions(root: MindmapNodeData): Record<string, NodePos> {
+// Pure auto-layout: computes ideal positions based only on tree structure and node sizes.
+// Does NOT use stored x/y positions — that's mergeRecursive's job.
+function computePositions(root: MindmapNodeData, sizeMap?: Record<string, { w?: number, h?: number }>): Record<string, NodePos> {
   const pos: Record<string, NodePos> = {};
   if (!root) return pos;
-  const rw = root.width || Math.max(estW(root.text || ""), 140);
-  const rh = root.height || Math.max(NODE_H, 80);
-  pos[root.id] = { x: 0, y: 0, w: rw, h: rh, depth: 0 };
+  const rw = sizeMap?.[root.id]?.w || root.width || Math.max(estW(root.text || ""), 140);
+  const rh = sizeMap?.[root.id]?.h || root.height || Math.max(NODE_H, 80);
+  pos[root.id] = { x: 0, y: 0, w: rw, h: rh, depth: 0, text: root.text };
 
-  const left = root.children.slice(0, Math.ceil(root.children.length / 2));
-  const right = root.children.slice(Math.ceil(root.children.length / 2));
+  const left: MindmapNodeData[] = [];
+  const right: MindmapNodeData[] = [];
+  root.children.forEach((c, i) => {
+    if (i % 2 === 0) right.push(c);
+    else left.push(c);
+  });
 
   function layoutSide(parent: MindmapNodeData, children: MindmapNodeData[], dir: 1 | -1, depth: number) {
     const pp = pos[parent.id];
     const px = pp.x, py = pp.y;
 
-    // Calculate total height needed for children
-    const totalH = children.reduce((s, c) => s + stH(c) + V_GAP, 0) - V_GAP;
+    const totalH = children.reduce((s, c) => s + stH(c, sizeMap) + V_GAP, 0) - V_GAP;
     let cy = py - totalH / 2;
 
-    // To prevent overlaps, find the max width among siblings to align them
-    const widths = children.map(c => c.width || estW(c.text));
+    const widths = children.map(c => sizeMap?.[c.id]?.w || c.width || estW(c.text));
     const maxCW = Math.max(...widths, NODE_MIN_W);
 
     for (let i = 0; i < children.length; i++) {
       const child = children[i];
-      const sh = stH(child);
+      const sh = stH(child, sizeMap);
       const cw = widths[i];
-      const ch = child.height || NODE_H;
+      const ch = sizeMap?.[child.id]?.h || child.height || NODE_H;
 
-      // Align children so their "inner" edges are at the same distance from parent
-      // For dir=-1 (left): cx = px - (pp.w/2 + H_PADDING + maxCW/2)
-      // But we then shift by (maxCW - cw)/2 to keep the inner edge aligned
+      const centerY = cy + sh / 2;
       const baseDist = pp.w / 2 + H_PADDING + maxCW / 2;
       const cx = px + dir * (baseDist - (maxCW - cw) / 2);
 
-      const centerY = cy + sh / 2;
-      pos[child.id] = { x: cx, y: centerY, w: cw, h: ch, depth };
+      pos[child.id] = { x: cx, y: centerY, w: cw, h: ch, depth, text: child.text };
 
       if (child.children.length) {
         layoutSide(child, child.children, dir, depth + 1);
@@ -359,7 +385,7 @@ function bezierPath(x1: number, y1: number, x2: number, y2: number): string {
 }
 
 // ===== COMPONENT =====
-const InteractiveMindmap = forwardRef(({ chart, onCodeChange, documentId }: InteractiveMindmapProps, ref) => {
+const InteractiveMindmap = forwardRef(({ chart, onCodeChange, documentId, zoom = 1, onUndoRedoStateChange }: InteractiveMindmapProps, ref) => {
   const [tree, setTree] = useState<MindmapNodeData | null>(null);
   const [positions, setPositions] = useState<Record<string, NodePos>>({});
   const lastExportedRef = useRef('');
@@ -371,6 +397,95 @@ const InteractiveMindmap = forwardRef(({ chart, onCodeChange, documentId }: Inte
   const [menuPos, setMenuPos] = useState({ x: 0, y: 0 });
   const [menuMode, setMenuMode] = useState<'main' | 'color' | 'edit' | null>(null);
   const [editText, setEditText] = useState('');
+
+  // Unified Undo/Redo tracking both Structure (Code) and Layout (Positions)
+  interface HistorySnapshot {
+    code: string;
+    positions: Record<string, NodePos>;
+  }
+  const historyRef = useRef<HistorySnapshot[]>([]);
+  const redoRef = useRef<HistorySnapshot[]>([]);
+  const MAX_HISTORY = 40;
+
+  const updateUndoRedoState = useCallback(() => {
+    onUndoRedoStateChange?.(historyRef.current.length > 0, redoRef.current.length > 0);
+  }, [onUndoRedoStateChange]);
+
+  // Notify parent of initial state on mount
+  useEffect(() => {
+    updateUndoRedoState();
+  }, [updateUndoRedoState]);
+
+  const pushSnapshot = useCallback(() => {
+    if (!treeRef.current) return;
+    const currentCode = toMermaid(treeRef.current);
+    const snapshot: HistorySnapshot = {
+      code: currentCode,
+      positions: { ...posRef.current }
+    };
+
+    // Prevent duplicate consecutive snapshots
+    const last = historyRef.current[historyRef.current.length - 1];
+    if (last && last.code === snapshot.code && JSON.stringify(last.positions) === JSON.stringify(snapshot.positions)) {
+      return;
+    }
+
+    historyRef.current = [...historyRef.current.slice(-(MAX_HISTORY - 1)), snapshot];
+    redoRef.current = []; // Clear redo on action
+    updateUndoRedoState();
+  }, [updateUndoRedoState]);
+
+  const undo = useCallback(() => {
+    if (historyRef.current.length === 0) return;
+    
+    const currentSnapshot: HistorySnapshot = {
+      code: toMermaid(treeRef.current!),
+      positions: { ...posRef.current }
+    };
+    
+    const prev = historyRef.current[historyRef.current.length - 1];
+    historyRef.current = historyRef.current.slice(0, -1);
+    redoRef.current = [currentSnapshot, ...redoRef.current.slice(0, MAX_HISTORY - 1)];
+
+    // Apply previous state
+    const parsed = parseMermaid(prev.code);
+    if (parsed) {
+      setTree(parsed);
+      treeRef.current = parsed;
+      lastExportedRef.current = prev.code;
+      if (onCodeChange) onCodeChange(prev.code);
+    }
+    setPositions(prev.positions);
+    posRef.current = prev.positions;
+    
+    updateUndoRedoState();
+  }, [onCodeChange, updateUndoRedoState]);
+
+  const redo = useCallback(() => {
+    if (redoRef.current.length === 0) return;
+
+    const currentSnapshot: HistorySnapshot = {
+      code: toMermaid(treeRef.current!),
+      positions: { ...posRef.current }
+    };
+
+    const next = redoRef.current[0];
+    redoRef.current = redoRef.current.slice(1);
+    historyRef.current = [...historyRef.current, currentSnapshot];
+
+    // Apply next state
+    const parsed = parseMermaid(next.code);
+    if (parsed) {
+      setTree(parsed);
+      treeRef.current = parsed;
+      lastExportedRef.current = next.code;
+      if (onCodeChange) onCodeChange(next.code);
+    }
+    setPositions(next.positions);
+    posRef.current = next.positions;
+
+    updateUndoRedoState();
+  }, [onCodeChange, updateUndoRedoState]);
 
   // EXPORT ENGINE
   useImperativeHandle(ref, () => ({
@@ -438,6 +553,18 @@ const InteractiveMindmap = forwardRef(({ chart, onCodeChange, documentId }: Inte
     resetLayout: () => {
       localStorage.removeItem(storageKey);
       setPositions({});
+      historyRef.current = [];
+      redoRef.current = [];
+      updateUndoRedoState();
+    },
+    undo: undo,
+    redo: redo,
+    pushSnapshot: pushSnapshot,
+    getPositions: () => ({ ...posRef.current }),
+    forceSetPositions: (newPos: Record<string, NodePos>) => {
+      setPositions(newPos);
+      posRef.current = newPos;
+      isManualChangeRef.current = true;
     }
   }));
 
@@ -461,6 +588,7 @@ const InteractiveMindmap = forwardRef(({ chart, onCodeChange, documentId }: Inte
     startW: number;
     startH: number;
     startCTM: DOMMatrix | null;
+    startSnapshot: Record<string, NodePos>;
   } | null>(null);
 
   useEffect(() => { treeRef.current = tree; }, [tree]);
@@ -468,10 +596,10 @@ const InteractiveMindmap = forwardRef(({ chart, onCodeChange, documentId }: Inte
 
   const isManualChangeRef = useRef(false);
 
+
   // AUTO-PERSIST LAYOUT: Save every change instantly
   useEffect(() => {
-    if (isManualChangeRef.current && Object.keys(positions).length > 0 && lastStructureRef.current) {
-      // Create a metadata-rich layout for Fuzzy Recovery
+    if (Object.keys(positions).length > 0 && lastStructureRef.current) {
       const layoutWithMeta: Record<string, any> = {};
       const flat = tree ? flattenTree(tree) : [];
 
@@ -479,7 +607,7 @@ const InteractiveMindmap = forwardRef(({ chart, onCodeChange, documentId }: Inte
         const node = flat.find(n => n.id === id);
         layoutWithMeta[id] = {
           ...positions[id],
-          text: node?.text || '' // Save text for reverse matching
+          text: node?.text || ''
         };
       });
 
@@ -487,7 +615,7 @@ const InteractiveMindmap = forwardRef(({ chart, onCodeChange, documentId }: Inte
         layout: layoutWithMeta,
         hash: lastStructureRef.current
       }));
-      isManualChangeRef.current = false; // Reset ONLY after save
+      isManualChangeRef.current = false;
     }
   }, [positions, storageKey, tree]);
 
@@ -506,80 +634,110 @@ const InteractiveMindmap = forwardRef(({ chart, onCodeChange, documentId }: Inte
     const currentStructure = flattenTree(tree).map(n => n.id).join('|');
     lastStructureRef.current = currentStructure;
 
-    const defaultLayout = computePositions(tree);
-    const savedData = localStorage.getItem(storageKey);
-
     setPositions(prev => {
-      // Build a comprehensive source: Combine live manual edits and historical storage
-      let source: Record<string, StoredNodePos> = { ...prev };
+      // Step 1: Load stored layout data
+      const savedData = localStorage.getItem(storageKey);
+      let stored: Record<string, StoredNodePos> = {};
       if (savedData) {
         try {
           const parsed = JSON.parse(savedData);
-          source = { ...(parsed.layout || {}), ...source };
+          stored = parsed.layout || {};
         } catch (e) { }
       }
 
-      // 0. Calculate Global Shift (Delta) based on Root position
-      // This ensures new nodes appear near the rest of the diagram, not at (0,0)
-      let dx = 0, dy = 0;
-      if (tree && source[tree.id]) {
-        dx = source[tree.id].x - defaultLayout[tree.id].x;
-        dy = source[tree.id].y - defaultLayout[tree.id].y;
-      }
-
-      const merged: Record<string, NodePos> = {};
-      const flatNodes = flattenTree(tree);
-      const usedHistorical = new Set<string>();
-
-      flatNodes.forEach(node => {
-        const isUserNode = node.id.startsWith('u-');
-
-        // 1. Direct ID Match (Fastest & Most Reliable)
-        if (source[node.id]) {
-          merged[node.id] = { ...defaultLayout[node.id], ...source[node.id] };
-        }
-        // 2. Semantic Content Match (ONLY for AI-generated nodes)
-        // User nodes (u-*) should NEVER fuzzy-match to avoid stacking new branches
-        else if (!isUserNode) {
-          const histKey = Object.keys(source).find(k =>
-            !usedHistorical.has(k) && source[k].text === node.text && !k.startsWith('u-')
-          );
-
-          if (histKey) {
-            usedHistorical.add(histKey);
-            const { text: _t, ...pos } = source[histKey];
-            merged[node.id] = { ...defaultLayout[node.id], ...pos };
-          } else {
-            // 3a. Brand New AI Node
-            merged[node.id] = {
-              ...defaultLayout[node.id],
-              x: defaultLayout[node.id].x + dx,
-              y: defaultLayout[node.id].y + dy
-            };
-          }
-        } else {
-          // 3b. Brand New USER Node: Always use structural default + Delta shift
-          merged[node.id] = {
-            ...defaultLayout[node.id],
-            x: defaultLayout[node.id].x + dx,
-            y: defaultLayout[node.id].y + dy
-          };
+      // Step 2: Merge with current in-memory state (handles rapid successive adds)
+      const treeIds = new Set(flattenTree(tree).map(n => n.id));
+      Object.keys(prev).forEach(id => {
+        if (treeIds.has(id) && prev[id]) {
+          stored[id] = { ...stored[id], ...prev[id] };
         }
       });
 
-      posRef.current = merged;
-      return merged;
+      // Step 3: Build a size-only map for auto-layout computation
+      const sizeMap: Record<string, { w?: number, h?: number }> = {};
+      Object.keys(stored).forEach(id => {
+        if (stored[id]) {
+          sizeMap[id] = { w: stored[id].w, h: stored[id].h };
+        }
+      });
+
+      // Step 4: Compute pure auto-layout (determines ideal positions based on tree structure)
+      const autoLayout = computePositions(tree, sizeMap);
+
+      // Step 5: Merge auto-layout with stored positions + recursive parent shifts
+      const final: Record<string, NodePos> = {};
+
+      const mergeRecursive = (node: MindmapNodeData, parentShift = { dx: 0, dy: 0 }) => {
+        const auto = autoLayout[node.id];
+        if (!auto) return;
+
+        let currentShift = { ...parentShift };
+        let finalPos: NodePos;
+
+        const saved = stored[node.id];
+        if (saved && typeof saved.x === 'number' && typeof saved.y === 'number') {
+          // Absolute position recovery
+          finalPos = {
+            x: saved.x,
+            y: saved.y,
+            w: saved.w || auto.w,
+            h: saved.h || auto.h,
+            depth: auto.depth,
+            text: saved.text || node.text,
+          };
+          // Update shift for children: how much does THIS manual pos differ from its IDEAL auto pos?
+          currentShift = {
+            dx: finalPos.x - auto.x,
+            dy: finalPos.y - auto.y
+          };
+        } else {
+          // Relative recovery: use auto-layout + parent's shift
+          finalPos = {
+            ...auto,
+            x: auto.x + parentShift.dx,
+            y: auto.y + parentShift.dy,
+            text: node.text,
+          };
+        }
+
+        final[node.id] = finalPos;
+        node.children?.forEach(child => mergeRecursive(child, currentShift));
+      };
+
+      if (tree) mergeRecursive(tree);
+
+      const flat = tree ? flattenTree(tree) : [];
+
+      // Step 6: Immediate persistence — save to localStorage right now
+      // We merge with 'stored' to preserve positions of nodes that might be 
+      // temporarily missing from the tree (due to Undo/Redo or structural edits).
+      const layoutToSave: Record<string, any> = { ...stored };
+      Object.keys(final).forEach(id => {
+        const n = flat.find(n => n.id === id);
+        layoutToSave[id] = { ...final[id], text: n?.text || layoutToSave[id]?.text || '' };
+      });
+
+      localStorage.setItem(storageKey, JSON.stringify({
+        layout: layoutToSave,
+        hash: currentStructure
+      }));
+
+      posRef.current = final;
+      return final;
     });
   }, [tree, storageKey]);
 
   // Shared update wrapper that handles both full tree replacement and partial node updates
-  const applyUpdate = useCallback((target: MindmapNodeData | string, updates?: Partial<MindmapNodeData>) => {
+  const applyUpdate = useCallback((target: MindmapNodeData | string, updates?: Partial<MindmapNodeData>, skipHistory = false) => {
     if (!tree) return;
+
+    if (!skipHistory) {
+      pushSnapshot();
+    }
 
     let newTree: MindmapNodeData;
     if (typeof target === 'string') {
-      // Find the specific node and clone the tree
-      newTree = JSON.parse(JSON.stringify(tree)); // Deep clone to be safe
+      newTree = JSON.parse(JSON.stringify(tree));
       const node = findNode(newTree, target);
       if (node && updates) {
         Object.assign(node, updates);
@@ -592,13 +750,7 @@ const InteractiveMindmap = forwardRef(({ chart, onCodeChange, documentId }: Inte
     const code = toMermaid(newTree);
     lastExportedRef.current = code;
     if (onCodeChange) onCodeChange(code);
-
-    // Explicitly persist everything on update
-    localStorage.setItem(storageKey, JSON.stringify({
-      layout: posRef.current,
-      hash: flattenTree(newTree).map(n => n.id).join('|')
-    }));
-  }, [tree, onCodeChange, storageKey]);
+  }, [tree, onCodeChange, pushSnapshot]);
 
   // === DRAG HANDLERS ===
   const toSvgCoords = useCallback((clientX: number, clientY: number) => {
@@ -658,7 +810,8 @@ const InteractiveMindmap = forwardRef(({ chart, onCodeChange, documentId }: Inte
       startY: svgPt.y,
       startW: p.w,
       startH: p.h,
-      startCTM: ctm
+      startCTM: ctm,
+      startSnapshot: { ...posRef.current }
     };
     dragRef.current = null;
     document.body.classList.add('select-none');
@@ -696,7 +849,7 @@ const InteractiveMindmap = forwardRef(({ chart, onCodeChange, documentId }: Inte
           const p = posRef.current[rs.nodeId];
           setMenuPos({
             x: p.x - vb.x,
-            y: p.y - nh / 2 - vb.y - 12
+            y: p.y - nh / 2 - vb.y
           });
         }
         return;
@@ -724,23 +877,32 @@ const InteractiveMindmap = forwardRef(({ chart, onCodeChange, documentId }: Inte
       isManualChangeRef.current = true; // MARK AS MANUAL
     };
     const onMouseUp = (e: MouseEvent) => {
-      // MANDATORY: Explicitly mark as manual one last time to catch the final mouse position
       isManualChangeRef.current = true;
 
+      // 1. Handle Resize Completion
       if (resizeRef.current) {
         const rs = resizeRef.current;
         const finalPos = posRef.current[rs.nodeId];
+        
+        // Push pre-resize state to history
+        const snapshot: HistorySnapshot = {
+          code: toMermaid(treeRef.current!),
+          positions: rs.startSnapshot
+        };
+        historyRef.current = [...historyRef.current.slice(-(MAX_HISTORY - 1)), snapshot];
+        redoRef.current = [];
+        updateUndoRedoState();
 
-        // COMMIT: Now update the actual tree data and DB
         if (finalPos) {
-          applyUpdate(rs.nodeId, { width: finalPos.w, height: finalPos.h });
+          applyUpdate(rs.nodeId, { width: finalPos.w, height: finalPos.h }, true);
         }
-
         resizeRef.current = null;
         dragRef.current = null;
         document.body.classList.remove('select-none');
         return;
       }
+
+      // 2. Handle Drag Completion
       const ds = dragRef.current;
       if (!ds) {
         document.body.classList.remove('select-none');
@@ -751,15 +913,26 @@ const InteractiveMindmap = forwardRef(({ chart, onCodeChange, documentId }: Inte
       const dx = Math.abs(svgPt.x - ds.startX);
       const dy = Math.abs(svgPt.y - ds.startY);
 
+      // If actually dragged (not just a click), push to undo history
+      if (dx > 5 || dy > 5) {
+        const snapshot: HistorySnapshot = {
+          code: toMermaid(treeRef.current!),
+          positions: ds.snapPositions
+        };
+        historyRef.current = [...historyRef.current.slice(-(MAX_HISTORY - 1)), snapshot];
+        redoRef.current = [];
+        updateUndoRedoState();
+      }
+
+      // Handle Click (Select)
       if (dx < 6 && dy < 6) {
-        // Precise Click → update UI state
         const p = posRef.current[ds.nodeId];
         if (p && svgRef.current) {
           const vb = svgRef.current.viewBox.baseVal;
           setSelectedNodeId(ds.nodeId);
           setMenuPos({
             x: p.x - vb.x,
-            y: p.y - p.h / 2 - vb.y - 12
+            y: p.y - p.h / 2 - vb.y
           });
           setMenuMode('main');
         }
@@ -955,7 +1128,7 @@ const InteractiveMindmap = forwardRef(({ chart, onCodeChange, documentId }: Inte
                 fill="white"
                 fontSize={fSize}
                 fontWeight={900}
-                fontFamily="'Outfit','Inter',sans-serif"
+                fontFamily="'Inter', sans-serif"
                 className="pointer-events-none select-none"
               >
                 {(() => {
@@ -1007,7 +1180,7 @@ const InteractiveMindmap = forwardRef(({ chart, onCodeChange, documentId }: Inte
 
         if (menuMode === 'edit') {
           return (
-            <div className="absolute z-[999]" style={{ left: menuPos.x, top: menuPos.y, transform: 'translate(-50%, -100%)' }} onClick={e => e.stopPropagation()}>
+            <div className="absolute z-[999]" style={{ left: menuPos.x, top: menuPos.y, transform: `translate(-50%, calc(-100% - 12px)) scale(${Math.sqrt(1 / zoom)})`, transformOrigin: 'bottom center' }} onClick={e => e.stopPropagation()}>
               <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-white/10 rounded-2xl shadow-2xl p-4 mb-2 w-[320px]">
                 <p className="text-[12px] font-bold text-slate-400 dark:text-white/40 mb-3 px-1">Chỉnh sửa nội dung</p>
                 <input autoFocus value={editText} onChange={e => setEditText(e.target.value)}
@@ -1024,37 +1197,37 @@ const InteractiveMindmap = forwardRef(({ chart, onCodeChange, documentId }: Inte
 
         if (menuMode === 'color') {
           return (
-            <div className="absolute z-[999]" style={{ left: menuPos.x, top: menuPos.y, transform: 'translate(-50%, -100%)' }} onClick={e => e.stopPropagation()}>
+            <div className="absolute z-[999]" style={{ left: menuPos.x, top: menuPos.y, transform: `translate(-50%, calc(-100% - 12px)) scale(${Math.sqrt(1 / zoom)})`, transformOrigin: 'bottom center' }} onClick={e => e.stopPropagation()}>
               <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-white/10 rounded-2xl shadow-2xl p-4 mb-2">
                 <p className="text-[12px] font-bold text-slate-400 dark:text-white/40 mb-3 px-1">Chọn màu nhánh</p>
-                <div className="grid grid-cols-6 gap-3">
+                <div className="grid grid-cols-6 gap-2">
                   {NODE_COLORS.map(c => (
                     <button key={c.value} onClick={e => { e.stopPropagation(); doColorChange(c.value); }}
-                      className="w-9 h-9 rounded-xl transition-all hover:scale-125 active:scale-95 shadow-sm"
-                      style={{ backgroundColor: c.value, boxShadow: c.value === node.color ? `0 0 0 2px white, 0 0 0 5px ${c.value}` : 'none' }} title={c.name} />
+                      className="w-7 h-7 rounded-lg transition-all hover:scale-125 active:scale-95 shadow-sm"
+                      style={{ backgroundColor: c.value, boxShadow: c.value === node.color ? `0 0 0 2px white, 0 0 0 4px ${c.value}` : 'none' }} title={c.name} />
                   ))}
                 </div>
-                <button onClick={e => { e.stopPropagation(); setMenuMode('main'); }} className="w-full mt-3 py-2 text-xs font-bold text-slate-400 hover:text-slate-600 dark:text-white/40 transition-colors">← Quay lại</button>
+                <button onClick={e => { e.stopPropagation(); setMenuMode('main'); }} className="w-full mt-3 py-2 text-[11px] font-bold text-slate-400 hover:text-slate-600 dark:text-white/40 transition-colors">← Quay lại</button>
               </div>
             </div>
           );
         }
 
         return (
-          <div className="absolute z-[999]" style={{ left: menuPos.x, top: menuPos.y, transform: 'translate(-50%, -100%)' }} onClick={e => e.stopPropagation()}>
-            <div className="bg-white dark:bg-slate-800 border-2 border-slate-200 dark:border-white/10 rounded-[32px] shadow-[0_40px_80px_-20px_rgba(0,0,0,0.4)] p-3 mb-8 flex items-center gap-4">
-              <button onClick={e => { e.stopPropagation(); doStartEdit(); }} className="p-4 rounded-[24px] text-slate-600 dark:text-white/70 hover:bg-slate-100 dark:hover:bg-white/10 transition-all active:scale-90" title="Sửa nội dung">
-                <span className="material-symbols-outlined" style={{ fontSize: '64px' }}>edit</span>
+          <div className="absolute z-[999]" style={{ left: menuPos.x, top: menuPos.y, transform: `translate(-50%, calc(-100% - 12px)) scale(${Math.sqrt(1 / zoom)})`, transformOrigin: 'bottom center' }} onClick={e => e.stopPropagation()}>
+            <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-white/10 rounded-xl shadow-2xl p-2.5 mb-4 flex items-center gap-1">
+              <button onClick={e => { e.stopPropagation(); doStartEdit(); }} className="p-2 rounded-lg text-slate-600 dark:text-white/70 hover:bg-slate-100 dark:hover:bg-white/10 transition-all active:scale-90" title="Sửa nội dung">
+                <span className="material-symbols-outlined" style={{ fontSize: '22px' }}>edit</span>
               </button>
-              <button onClick={e => { e.stopPropagation(); doAddChild(); }} className="p-4 rounded-[24px] text-slate-600 dark:text-white/70 hover:bg-slate-100 dark:hover:bg-white/10 transition-all active:scale-90" title="Thêm nhánh con">
-                <span className="material-symbols-outlined" style={{ fontSize: '64px' }}>add_circle</span>
+              <button onClick={e => { e.stopPropagation(); doAddChild(); }} className="p-2 rounded-lg text-slate-600 dark:text-white/70 hover:bg-slate-100 dark:hover:bg-white/10 transition-all active:scale-90" title="Thêm nhánh con">
+                <span className="material-symbols-outlined" style={{ fontSize: '22px' }}>add_circle</span>
               </button>
-              <button onClick={e => { e.stopPropagation(); setMenuMode('color'); }} className="p-4 rounded-[24px] text-slate-600 dark:text-white/70 hover:bg-slate-100 dark:hover:bg-white/10 transition-all active:scale-90" title="Đổi màu">
-                <span className="material-symbols-outlined" style={{ color: node.color, fontSize: '64px' }}>palette</span>
+              <button onClick={e => { e.stopPropagation(); setMenuMode('color'); }} className="p-2 rounded-lg text-slate-600 dark:text-white/70 hover:bg-slate-100 dark:hover:bg-white/10 transition-all active:scale-90" title="Đổi màu">
+                <span className="material-symbols-outlined" style={{ color: node.color, fontSize: '22px' }}>palette</span>
               </button>
               {!isRoot && (
-                <button onClick={e => { e.stopPropagation(); doDelete(); }} className="p-4 rounded-[24px] text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10 transition-all active:scale-90" title="Xóa nhánh">
-                  <span className="material-symbols-outlined" style={{ fontSize: '64px' }}>delete</span>
+                <button onClick={e => { e.stopPropagation(); doDelete(); }} className="p-2 rounded-lg text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10 transition-all active:scale-90" title="Xóa nhánh">
+                  <span className="material-symbols-outlined" style={{ fontSize: '22px' }}>delete</span>
                 </button>
               )}
             </div>
