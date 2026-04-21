@@ -14,6 +14,47 @@ export default function InteractiveMindmapPage() {
 
   const [docData, setDocData] = useState<DocumentResponse | null>(null);
   const [mindmapCode, setMindmapCode] = useState<string>("");
+  const mindmapCodeRef = useRef<string>("");
+
+  const updateCode = useCallback((code: string) => {
+    setMindmapCode(code);
+    setEditableCode(code);
+    mindmapCodeRef.current = code;
+  }, []);
+
+  const [canUndo, setCanUndo] = useState(false);
+  const [canRedo, setCanRedo] = useState(false);
+  const isStreamingRef = useRef(false);
+
+  const syncToDB = useCallback(async (code: string) => {
+    try {
+      const { updateDocumentMindmap } = await import("@/services/api.service");
+      await updateDocumentMindmap(documentId as string, code);
+    } catch (err) {
+      console.error("Failed to sync mindmap to DB:", err);
+    }
+  }, [documentId]);
+
+  const handleCodeChange = useCallback((newCode: string) => {
+    if (newCode === mindmapCode) return;
+    updateCode(newCode);
+    syncToDB(newCode);
+  }, [mindmapCode, updateCode, syncToDB]);
+
+  const handleUndoRedoStateChange = useCallback((canUndo: boolean, canRedo: boolean) => {
+    setCanUndo(canUndo);
+    setCanRedo(canRedo);
+  }, []);
+
+  const unifiedUndo = useCallback(() => {
+    mindmapRef.current?.undo();
+  }, []);
+
+  const unifiedRedo = useCallback(() => {
+    mindmapRef.current?.redo();
+  }, []);
+
+
   const [isLoading, setIsLoading] = useState(true);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
@@ -31,6 +72,17 @@ export default function InteractiveMindmapPage() {
 
   const containerRef = useRef<HTMLDivElement>(null);
   const mindmapRef = useRef<any>(null);
+
+  // Keyboard shortcuts for UNIFIED undo/redo
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
+      if ((e.ctrlKey || e.metaKey) && e.key === 'z') { e.preventDefault(); unifiedUndo(); }
+      if ((e.ctrlKey || e.metaKey) && e.key === 'y') { e.preventDefault(); unifiedRedo(); }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [unifiedUndo, unifiedRedo]);
 
   // RESTORE VIEWPORT
   useEffect(() => {
@@ -65,7 +117,8 @@ export default function InteractiveMindmapPage() {
 
   const loadData = useCallback(async (force: boolean = false) => {
     setIsLoading(true);
-    setMindmapCode(""); // Clear to show fresh stream
+    setMindmapCode("");
+    isStreamingRef.current = false;
 
     const controller = new AbortController();
 
@@ -75,14 +128,24 @@ export default function InteractiveMindmapPage() {
       setDocData(doc);
 
       let accumulated = "";
+      const lineCountRef = { current: 0 };
+      isStreamingRef.current = true;
       await fetchDocumentMindmapStream(
         documentId,
         (chunk) => {
-          setIsLoading(false); // Hide loading as soon as first chunk arrives
+          setIsLoading(false);
           accumulated += chunk;
           const clean = cleanMermaidCode(accumulated);
-          setMindmapCode(clean);
-          setEditableCode(clean);
+
+          // CRITICAL: Use the latest code from the REF to avoid stale closure issues
+          // Push history checkpoint periodically during streaming (only if regenerating)
+          const currentLines = clean.split('\n').filter(l => l.trim()).length;
+          if (force && currentLines > lineCountRef.current + 5) { 
+            mindmapRef.current?.pushSnapshot();
+            lineCountRef.current = currentLines;
+          }
+
+          updateCode(clean);
         },
         controller.signal,
         force
@@ -92,6 +155,7 @@ export default function InteractiveMindmapPage() {
       console.error("Error loading mindmap:", error);
     } finally {
       setIsLoading(false);
+      isStreamingRef.current = false;
     }
 
     return () => controller.abort();
@@ -161,8 +225,12 @@ export default function InteractiveMindmapPage() {
 
   const handleApplyEdit = () => {
     const code = cleanMermaidCode(editableCode);
-    setMindmapCode(code);
-    setEditableCode(code);
+    if (code !== mindmapCode) {
+      mindmapRef.current?.pushSnapshot();
+      setMindmapCode(code);
+      setEditableCode(code);
+      syncToDB(code);
+    }
     setIsEditing(false);
   };
 
@@ -184,12 +252,32 @@ export default function InteractiveMindmapPage() {
             >
               <span className="material-symbols-outlined text-[18px]">west</span>
             </button>
-            <h1 className="font-bold text-slate-900 dark:text-white text-xs md:text-sm truncate max-w-[150px] md:max-w-xs">
+            <h1 className="font-bold text-slate-900 dark:text-white text-xs md:text-sm truncate max-w-[200px] md:max-w-md lg:max-w-lg">
               {docData?.file_name}
             </h1>
           </div>
 
           <div className="flex items-center gap-2">
+            {/* Undo/Redo Controls */}
+            <div className="flex items-center bg-slate-100 dark:bg-black/20 rounded-xl p-0.5 border border-slate-200 dark:border-white/5 mr-1">
+              <button
+                onClick={unifiedUndo}
+                disabled={!canUndo}
+                className={`w-8 h-8 flex items-center justify-center rounded-lg transition-all ${!canUndo ? 'text-slate-300 dark:text-slate-700 opacity-40 cursor-not-allowed' : 'text-slate-600 dark:text-white/70 hover:bg-white dark:hover:bg-white/10'}`}
+                title="Hoàn tác (Ctrl+Z)"
+              >
+                <span className="material-symbols-outlined text-[18px]">undo</span>
+              </button>
+              <button
+                onClick={unifiedRedo}
+                disabled={!canRedo}
+                className={`w-8 h-8 flex items-center justify-center rounded-lg transition-all ${!canRedo ? 'text-slate-300 dark:text-slate-700 opacity-40 cursor-not-allowed' : 'text-slate-600 dark:text-white/70 hover:bg-white dark:hover:bg-white/10'}`}
+                title="Làm lại (Ctrl+Y)"
+              >
+                <span className="material-symbols-outlined text-[18px]">redo</span>
+              </button>
+            </div>
+
             <div className="hidden md:flex items-center bg-slate-100 dark:bg-black/20 rounded-xl p-0.5 border border-slate-200 dark:border-white/5 mr-1">
               <button onClick={() => setZoom(prev => Math.max(0.2, prev - 0.1))} className="w-7 h-7 flex items-center justify-center text-slate-500 dark:text-white/60 hover:text-slate-900 dark:hover:text-white transition-colors cursor-pointer">
                 <span className="material-symbols-outlined text-[14px]">remove</span>
@@ -250,19 +338,11 @@ export default function InteractiveMindmapPage() {
             <div className="pointer-events-auto min-w-[1400px] flex items-center justify-center drop-shadow-[0_35px_60px_rgba(0,0,0,0.08)] dark:drop-shadow-[0_35px_60px_rgba(0,0,0,0.4)]">
               <InteractiveMindmap
                 ref={mindmapRef}
-                documentId={documentId}
+                documentId={documentId as string}
                 chart={mindmapCode}
-                onCodeChange={async (code) => {
-                  setMindmapCode(code);
-                  setEditableCode(code);
-                  // Push to DB
-                  try {
-                    const { updateDocumentMindmap } = await import("@/services/api.service");
-                    await updateDocumentMindmap(documentId, code);
-                  } catch (err) {
-                    console.error("Failed to sync mindmap to DB:", err);
-                  }
-                }}
+                zoom={zoom}
+                onCodeChange={handleCodeChange}
+                onUndoRedoStateChange={handleUndoRedoStateChange}
               />
             </div>
           )}
