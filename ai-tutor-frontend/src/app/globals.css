@@ -56,7 +56,20 @@ input:autofill:active {
 body {
   background-color: var(--background);
   color: var(--foreground);
-  @apply transition-colors duration-500 tracking-normal;
+  @apply transition-colors duration-500;
+  font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+  letter-spacing: -0.01em;
+}
+
+/* Fix tight bold text and uppercase text */
+b, strong, h1, h2, h3, h4, h5, h6, 
+.font-bold, .font-semibold, .font-medium,
+[style*="font-weight: 600"], [style*="font-weight: 700"], [style*="font-weight: bold"] {
+  letter-spacing: 0.015em;
+}
+
+.uppercase, [style*="text-transform: uppercase"] {
+  letter-spacing: 0.06em;
 }
 
 @layer utilities {
