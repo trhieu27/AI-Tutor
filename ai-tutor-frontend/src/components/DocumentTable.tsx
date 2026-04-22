@@ -1,12 +1,12 @@
 "use client";
-
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { DocumentResponse, deleteDocument } from "@/services/api.service";
 import { DOCUMENT_TABLE_TEXTS } from "@/constants/texts";
 import { useUpload } from "@/context/UploadContext";
 import { useDocuments } from "@/context/DocumentContext";
+import ConfirmDialog from "@/components/ConfirmDialog";
 
 interface DocumentTableProps {
   refreshTrigger?: number;
@@ -15,15 +15,59 @@ interface DocumentTableProps {
   limit?: number;
 }
 
+/* ── Skeleton row ─────────────────────────────────────────── */
+function SkeletonRow({ index, showActions }: { index: number; showActions?: boolean }) {
+  return (
+    <tr
+      className="row-enter border-b border-[var(--border-subtle)]"
+      style={{ animationDelay: `${index * 60}ms` }}
+    >
+      <td className="py-3.5 px-5">
+        <div className="flex items-center gap-3">
+          <div className="w-9 h-9 rounded-lg shimmer shrink-0" />
+          <div className="space-y-2 flex-1">
+            <div className="h-3 w-3/4 rounded-full shimmer" />
+            <div className="h-2 w-1/3 rounded-full shimmer" />
+          </div>
+        </div>
+      </td>
+      <td className="py-3.5 px-4 text-center">
+        <div className="h-3 w-16 rounded-full shimmer mx-auto" />
+      </td>
+      <td className="py-3.5 px-4 text-center">
+        <div className="h-3 w-12 rounded-full shimmer mx-auto" />
+      </td>
+      <td className="py-3.5 px-4 text-center">
+        <div className="h-5 w-20 rounded-md shimmer mx-auto" />
+      </td>
+      {showActions && (
+        <td className="py-3.5 px-3 text-center">
+          <div className="flex items-center justify-center gap-1">
+            <div className="w-7 h-7 rounded-md shimmer" />
+            <div className="w-7 h-7 rounded-md shimmer" />
+            <div className="w-7 h-7 rounded-md shimmer" />
+            <div className="w-7 h-7 rounded-md shimmer" />
+          </div>
+        </td>
+      )}
+    </tr>
+  );
+}
+
 export default function DocumentTable({
   refreshTrigger = 0,
   showActions = false,
   defaultAction,
-  limit
+  limit,
 }: DocumentTableProps) {
   const router = useRouter();
   const { lastUploadTime } = useUpload();
   const { documents, loading, refreshDocuments } = useDocuments();
+
+  const [searchTerm, setSearchTerm] = useState("");
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [retryingId, setRetryingId] = useState<string | null>(null);
+  const [pendingDelete, setPendingDelete] = useState<{ id: string; name: string } | null>(null);
 
   const getRedirectUrl = (docId: string) => {
     if (defaultAction === "mindmap") return `/mindmap/${docId}`;
@@ -32,35 +76,31 @@ export default function DocumentTable({
     return defaultAction ? `${baseUrl}?action=${defaultAction}` : baseUrl;
   };
 
-  const [searchTerm, setSearchTerm] = useState("");
-  const [deletingId, setDeletingId] = useState<string | null>(null);
-  const [retryingId, setRetryingId] = useState<string | null>(null);
-
-  // Tự động làm mới nếu có tài liệu đang xử lý
   useEffect(() => {
-    const hasProcessing = documents.some(doc => doc.status === 'PROCESSING' || doc.status === 'UPLOADING');
-    
+    const hasProcessing = documents.some(
+      (d) => d.status === "PROCESSING" || d.status === "UPLOADING"
+    );
     if (hasProcessing) {
-      const timer = setInterval(() => {
-        refreshDocuments(true); // Tải lại nhưng không hiện loading xoay
-      }, 5000); // 5 giây một lần
-      
+      const timer = setInterval(() => refreshDocuments(true), 5000);
       return () => clearInterval(timer);
     }
   }, [documents, refreshDocuments]);
 
   useEffect(() => {
-    if (refreshTrigger > 0) {
-      refreshDocuments();
-    }
+    if (refreshTrigger > 0) refreshDocuments();
   }, [refreshTrigger, refreshDocuments]);
 
   const handleDelete = async (documentId: string, fileName: string) => {
-    if (!confirm(`Xóa "${fileName}"? Thao tác này không thể hoàn tác.`)) return;
-    setDeletingId(documentId);
+    setPendingDelete({ id: documentId, name: fileName });
+  };
+
+  const confirmDelete = async () => {
+    if (!pendingDelete) return;
+    setDeletingId(pendingDelete.id);
+    setPendingDelete(null);
     try {
-      await deleteDocument(documentId);
-      await refreshDocuments(true); // Tải lại danh sách (chế độ không hiện loading xoay)
+      await deleteDocument(pendingDelete.id);
+      await refreshDocuments(true);
     } catch {
       alert("Xóa tài liệu thất bại.");
     } finally {
@@ -81,240 +121,284 @@ export default function DocumentTable({
     }
   };
 
+  /* ── Status badge — border-only with pulsing dot ────────── */
   const getStatusBadge = (status: DocumentResponse["status"], docId: string) => {
     switch (status) {
       case "READY":
         return (
-          <span className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-[11px] font-black uppercase tracking-widest bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-500/20 whitespace-nowrap">
-            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,1)] animate-pulse shrink-0" />
+          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-[6px] text-[10px] font-bold border border-[hsl(158_64%_44%/0.35)] text-[hsl(158_60%_35%)] dark:text-[hsl(158_58%_58%)] bg-[hsl(158_64%_44%/0.04)] whitespace-nowrap">
+            <span className="relative flex w-1.5 h-1.5 shrink-0">
+              <span className="animate-ping absolute inset-0 rounded-full bg-[hsl(158_64%_44%)] opacity-40" />
+              <span className="relative rounded-full w-1.5 h-1.5 bg-[hsl(158_64%_44%)]" />
+            </span>
             {DOCUMENT_TABLE_TEXTS.status.processed}
           </span>
         );
       case "PROCESSING":
       case "UPLOADING":
         return (
-          <span className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-[11px] font-black uppercase tracking-widest bg-indigo-50 dark:bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border border-indigo-200 dark:border-indigo-500/20 whitespace-nowrap">
+          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-[6px] text-[10px] font-bold border border-[hsl(239_68%_58%/0.35)] text-[hsl(239_55%_50%)] dark:text-[hsl(239_68%_68%)] bg-[hsl(239_68%_58%/0.04)] whitespace-nowrap">
             <svg className="w-3 h-3 animate-spin shrink-0" fill="none" viewBox="0 0 24 24">
-              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" />
               <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
             </svg>
-            {status === "UPLOADING" ? "ĐANG TẢI" : "ĐANG PHÂN TÍCH"}
+            {status === "UPLOADING" ? "Đang tải" : "Đang xử lý"}
           </span>
         );
       case "FAILED":
         return (
-          <button 
+          <button
             onClick={(e) => { e.stopPropagation(); handleRetry(docId); }}
             disabled={retryingId === docId}
-            className="group/retry inline-flex items-center justify-center gap-2 px-4 py-2 rounded-full text-[11px] font-black uppercase tracking-widest bg-red-50 dark:bg-red-500/10 text-red-600 dark:text-red-400 border border-red-200 dark:border-red-500/20 hover:bg-red-500 hover:text-white transition-all whitespace-nowrap"
+            className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-[6px] text-[10px] font-bold border border-[hsl(343_85%_58%/0.35)] text-[hsl(343_70%_45%)] bg-[hsl(343_85%_58%/0.04)] hover:bg-[hsl(343_85%_58%)] hover:text-white hover:border-transparent transition-all whitespace-nowrap"
           >
-            <span className={`material-symbols-outlined text-xs shrink-0 ${retryingId === docId ? 'animate-spin' : 'group-hover/retry:rotate-180 transition-transform'}`}>refresh</span>
-            <span className="whitespace-nowrap">THỬ LẠI</span>
+            <span className={`material-symbols-outlined icon-thin text-[12px] ${retryingId === docId ? "animate-spin" : ""}`}>refresh</span>
+            Thử lại
           </button>
         );
     }
   };
 
+  /* ── File icon ───────────────────────────────────────────── */
   const getFileIcon = (fileName: string) => {
     const ext = fileName.split(".").pop()?.toLowerCase();
     const isPdf = ext === "pdf";
     return (
-      <div className={`w-12 h-12 rounded-[18px] flex items-center justify-center shrink-0 border transition-all group-hover:scale-110 shadow-md dark:shadow-lg ${isPdf ? 'bg-red-50 dark:bg-red-500/10 text-red-500 dark:text-red-400 border-red-200 dark:border-white/10' : 'bg-blue-50 dark:bg-blue-500/10 text-blue-500 dark:text-blue-400 border-blue-200 dark:border-white/10'}`}>
-        <span className="material-symbols-outlined text-[28px]">{isPdf ? 'picture_as_pdf' : 'description'}</span>
+      <div className={`w-9 h-9 rounded-lg flex items-center justify-center shrink-0 border transition-transform group-hover:scale-105 ${
+        isPdf
+          ? "bg-[hsl(343_85%_58%/0.07)] text-[hsl(343_72%_48%)] border-[hsl(343_85%_58%/0.15)]"
+          : "bg-[hsl(217_91%_60%/0.07)] text-[hsl(217_72%_48%)] border-[hsl(217_91%_60%/0.15)]"
+      }`}>
+        <span className="material-symbols-outlined icon-thin text-[17px]">
+          {isPdf ? "picture_as_pdf" : "description"}
+        </span>
       </div>
     );
   };
 
-  if (loading && documents.length === 0) {
-    return (
-      <div className="p-20 flex flex-col items-center gap-4 bg-slate-50 dark:bg-slate-900/20 rounded-[48px] border border-slate-200 dark:border-white/5">
-        <div className="w-10 h-10 border-2 border-indigo-200 dark:border-indigo-500/20 border-t-indigo-500 dark:border-t-indigo-400 rounded-full animate-spin"></div>
-        <p className="text-[10px] text-slate-400 dark:text-white/30 font-black uppercase tracking-[0.3em]">Đang đồng bộ dữ liệu...</p>
-      </div>
-    );
-  }
-
-  const filteredDocuments = documents.filter(doc =>
+  const filteredDocuments = documents.filter((doc) =>
     doc.file_name.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   return (
-    <div className="flex flex-col h-fit max-h-full bg-white dark:bg-slate-900/20 rounded-[48px] overflow-hidden border border-[var(--border-color)] transition-all duration-500">
-      {/* Header with Search */}
-      <div className="px-8 py-5 flex flex-col lg:flex-row lg:items-center justify-between gap-6 bg-slate-50 dark:bg-slate-900/40 border-b border-slate-200 dark:border-white/10 transition-colors duration-500">
+    <>
+    <div className="flex flex-col bg-[var(--card-bg)] rounded-3xl overflow-hidden border border-[var(--border-color)] shadow-sm">
+
+      {/* ── Card Header ────────────────────────────────────── */}
+      <div className="px-5 py-4 flex flex-col lg:flex-row lg:items-center justify-between gap-3 border-b border-[var(--border-subtle)]">
         <div>
-          <h2 className="text-2xl font-bold text-slate-900 dark:text-white tracking-tight leading-none mb-2">{DOCUMENT_TABLE_TEXTS.title}</h2>
-          <div className="flex items-center gap-2">
-            <span className="w-1.5 h-1.5 rounded-full bg-indigo-500 shadow-[0_0_8px_rgba(99,102,241,1)]"></span>
-            <p className="text-[13px] text-slate-500 dark:text-slate-400 font-medium">{documents.length} tài liệu trong thư viện</p>
+          <h2 className="text-[14px] font-bold text-[var(--foreground)] leading-none mb-1">
+            {DOCUMENT_TABLE_TEXTS.title}
+          </h2>
+          <div className="flex items-center gap-1.5">
+            <span className="w-1.5 h-1.5 rounded-full bg-[hsl(239_68%_58%)]" />
+            <p className="text-[11px] text-[var(--muted)] font-medium">
+              {documents.length} {documents.length === 1 ? "tài liệu" : "tài liệu"}
+            </p>
           </div>
         </div>
 
-        <div className="flex items-center gap-4 flex-1 max-w-xl">
-          <div className="relative flex-1 group">
-            <span className="material-symbols-outlined absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 dark:text-white/40 group-focus-within:text-indigo-500 transition-colors text-[20px]">search</span>
+        {/* Search + Refresh */}
+        <div className="flex items-center gap-2 flex-1 max-w-sm">
+          <div className="relative flex-1">
+            {/* Search icon — SVG inline để luôn hiện */}
+            <svg
+              className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--muted)] pointer-events-none"
+              fill="none" stroke="currentColor" strokeWidth={2}
+              viewBox="0 0 24 24"
+            >
+              <circle cx={11} cy={11} r={8} />
+              <path d="m21 21-4.35-4.35" strokeLinecap="round" />
+            </svg>
             <input
               type="text"
-              placeholder="Tìm kiếm tài liệu học tập..."
+              placeholder="Tìm tên tài liệu, chủ đề..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-12 pr-6 py-3 bg-white dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-2xl focus:outline-none focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500/30 transition-all text-sm text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-white/40 font-bold"
+              className="w-full pl-9 pr-4 py-2.5 bg-white/60 dark:bg-white/5 backdrop-blur-lg border border-[hsl(214_32%_91%)] dark:border-white/10 rounded-xl text-[12px] text-[var(--foreground)] placeholder:text-[var(--muted-light)] focus:outline-none focus:ring-1 focus:ring-[hsl(239_68%_58%/0.35)] focus:border-transparent transition-all font-medium shadow-[0_1px_3px_hsl(0_0%_0%/0.04)]"
             />
           </div>
-          <button onClick={() => refreshDocuments()} className="w-12 h-12 aspect-square shrink-0 flex items-center justify-center bg-white dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-full text-slate-500 dark:text-white/60 hover:text-indigo-600 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-white/10 transition-all active:scale-95 shadow-sm">
-            <span className="material-symbols-outlined text-[22px]">refresh</span>
+          <button
+            onClick={() => refreshDocuments()}
+            className="w-10 h-10 shrink-0 flex items-center justify-center bg-white/60 dark:bg-white/5 backdrop-blur-lg border border-[hsl(214_32%_91%)] dark:border-white/10 rounded-xl text-[var(--muted)] hover:text-[hsl(239_68%_58%)] hover:border-[hsl(239_68%_58%/0.30)] shadow-[0_1px_3px_hsl(0_0%_0%/0.04)] transition-all active:scale-90"
+          >
+            <span className="material-symbols-outlined icon-thin text-[17px]">refresh</span>
           </button>
         </div>
       </div>
 
-      {/* Table Content */}
-      <div className="overflow-x-auto h-auto overflow-y-auto w-full custom-scrollbar relative">
+      {/* ── Table ──────────────────────────────────────────── */}
+      <div className="overflow-x-auto overflow-y-auto max-h-[330px] w-full custom-scrollbar">
         <table className="w-full text-left border-collapse table-fixed min-w-full">
-          <thead className="sticky top-0 z-20 bg-slate-50 dark:bg-slate-900 shadow-sm">
-            <tr className="border-b border-slate-200 dark:border-white/10">
-              <th className="py-5 px-8 text-[11px] font-bold tracking-wider uppercase text-slate-500 dark:text-slate-200" style={{ width: '32%' }}>{DOCUMENT_TABLE_TEXTS.colName}</th>
-              <th className="py-5 px-4 text-[11px] font-bold tracking-wider uppercase text-slate-500 dark:text-slate-200 text-center" style={{ width: '15%' }}>{DOCUMENT_TABLE_TEXTS.colDate}</th>
-              <th className="py-5 px-4 text-[11px] font-bold tracking-wider uppercase text-slate-500 dark:text-slate-200 text-center" style={{ width: '13%' }}>Quy mô</th>
-              <th className="py-5 px-4 text-[11px] font-bold tracking-wider uppercase text-slate-500 dark:text-slate-200 text-center" style={{ width: '15%' }}>{DOCUMENT_TABLE_TEXTS.colStatus}</th>
-              {showActions && <th className="py-5 px-3 text-[11px] font-bold tracking-wider uppercase text-slate-500 dark:text-slate-200 text-center" style={{ width: '25%' }}>Thao tác</th>}
+          <thead className="sticky top-0 z-20 bg-[var(--surface)]">
+            <tr className="border-b border-[hsl(214_32%_91%)] dark:border-white/8">
+              <th className="py-3 px-5 text-[10px] font-bold tracking-[0.06em] text-[var(--muted-light)]" style={{ width: "36%" }}>
+                {DOCUMENT_TABLE_TEXTS.colName}
+              </th>
+              <th className="py-3 px-4 text-[10px] font-bold tracking-[0.06em] text-[var(--muted-light)] text-center" style={{ width: "15%" }}>
+                {DOCUMENT_TABLE_TEXTS.colDate}
+              </th>
+              <th className="py-3 px-4 text-[10px] font-bold tracking-[0.06em] text-[var(--muted-light)] text-center" style={{ width: "11%" }}>
+                Quy mô
+              </th>
+              <th className="py-3 px-4 text-[10px] font-bold tracking-[0.06em] text-[var(--muted-light)] text-center" style={{ width: "16%" }}>
+                {DOCUMENT_TABLE_TEXTS.colStatus}
+              </th>
+              {showActions && (
+                <th className="py-3 px-3 text-[10px] font-bold tracking-[0.06em] text-[var(--muted-light)] text-center" style={{ width: "22%" }}>
+                  Thao tác
+                </th>
+              )}
             </tr>
           </thead>
-          <tbody className="divide-y divide-slate-100 dark:divide-white/[0.05]">
-            {filteredDocuments.length > 0 ? (
-              filteredDocuments.map((doc) => (
-                <tr
-                  key={doc.id}
-                  onClick={() => doc.status === "READY" && router.push(getRedirectUrl(doc.id))}
-                  className={`transition-all duration-300 relative group ${doc.status === "READY" ? "hover:bg-slate-50 dark:hover:bg-white/[0.04] cursor-pointer" : "opacity-60 cursor-wait"}`}
-                >
-                  <td className="py-6 px-4">
-                    <div className="flex items-center gap-4">
-                      {getFileIcon(doc.file_name)}
-                      <div className="min-w-0">
-                        <p className="text-[14px] font-semibold text-slate-900 dark:text-white truncate max-w-[150px] lg:max-w-[250px] mb-1 group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors">
-                          {doc.file_name}
-                        </p>
-                        <p className="text-[12px] text-slate-500 dark:text-slate-400">
-                          {doc.file_size_mb} MB • {doc.file_name.split('.').pop()?.toUpperCase()}
-                        </p>
-                      </div>
-                    </div>
-                  </td>
-                  <td className="py-6 px-4 whitespace-nowrap text-center">
-                    <p className="text-[13px] font-bold text-slate-600 dark:text-slate-300">
-                      {new Date(doc.uploaded_at).toLocaleDateString("vi-VN")}
-                    </p>
-                  </td>
-                  <td className="py-6 px-4 whitespace-nowrap text-center">
-                    <p className="text-[13px] font-bold text-slate-600 dark:text-slate-300">
-                      {doc.page_count > 0 ? `${doc.page_count} TRANG` : "—"}
-                    </p>
-                  </td>
-                  <td className="py-6 px-4 text-center">
-                    <div className="flex justify-center scale-90">
-                      {getStatusBadge(doc.status, doc.id)}
-                    </div>
-                  </td>
-                  {showActions && (
-                    <td className="py-6 px-3 text-center" onClick={(e) => e.stopPropagation()}>
-                      <div className="flex items-center justify-center gap-2">
-                        {doc.status === "READY" && (
-                          <>
-                            <Link href={getRedirectUrl(doc.id)} className="w-8 h-8 aspect-square shrink-0 rounded-full bg-indigo-50 dark:bg-white/5 border border-indigo-200 dark:border-white/10 text-indigo-500 dark:text-indigo-400 hover:bg-indigo-500 hover:text-white flex items-center justify-center transition-all shadow-sm active:scale-95" title="Hỏi AI">
-                              <span className="material-symbols-outlined text-[16px]">chat_bubble</span>
-                            </Link>
-                            <Link href={`/quiz/${doc.id}`} className="w-8 h-8 aspect-square shrink-0 rounded-full bg-orange-50 dark:bg-white/5 border border-orange-200 dark:border-white/10 text-orange-500 dark:text-orange-400 hover:bg-orange-500 hover:text-white flex items-center justify-center transition-all shadow-sm active:scale-95" title="Luyện tập">
-                              <span className="material-symbols-outlined text-[16px]">quiz</span>
-                            </Link>
-                            <Link href={`/mindmap/${doc.id}`} className="w-8 h-8 aspect-square shrink-0 rounded-full bg-cyan-50 dark:bg-white/5 border border-cyan-200 dark:border-white/10 text-cyan-500 dark:text-cyan-400 hover:bg-cyan-500 hover:text-white flex items-center justify-center transition-all shadow-sm active:scale-95" title="Sơ đồ tư duy">
-                              <span className="material-symbols-outlined text-[16px]">hub</span>
-                            </Link>
-                          </>
-                        )}
-                        <button
-                          onClick={() => handleDelete(doc.id, doc.file_name)}
-                          disabled={deletingId === doc.id}
-                          className="w-8 h-8 aspect-square shrink-0 rounded-full bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 text-slate-400 hover:bg-red-500 hover:text-white hover:border-red-500 flex items-center justify-center transition-all disabled:opacity-50 shadow-sm"
-                          title="Xóa"
-                        >
-                          {deletingId === doc.id ? (
-                            <div className="w-3 h-3 border-2 border-slate-300 dark:border-white/20 border-t-slate-600 dark:border-t-white rounded-full animate-spin"></div>
-                          ) : (
-                            <span className="material-symbols-outlined text-base">delete</span>
-                          )}
-                        </button>
-                      </div>
-                    </td>
-                  )}
-                </tr>
-              ))
-            ) : (
-              <tr>
-                <td
-                  colSpan={showActions ? 5 : 4}
-                  className="p-0 border-none"
-                >
-                  <div
-                    className="min-h-[280px] flex flex-col items-center justify-center text-center cursor-pointer group/empty py-10"
-                    onClick={() => {
-                      if (window.location.pathname !== '/') {
-                        router.push('/?action=upload');
-                      } else {
-                        document.getElementById('upload-area')?.scrollIntoView({ behavior: 'smooth' });
-                        const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement;
-                        if (fileInput) fileInput.click();
-                      }
-                    }}
+
+          <tbody>
+            {/* Skeleton loading */}
+            {loading && documents.length === 0
+              ? Array.from({ length: 5 }).map((_, i) => (
+                  <SkeletonRow key={i} index={i} showActions={showActions} />
+                ))
+              : filteredDocuments.length > 0
+              ? filteredDocuments.map((doc, index) => (
+                  <tr
+                    key={doc.id}
+                    onClick={() => doc.status === "READY" && router.push(getRedirectUrl(doc.id))}
+                    className={`row-enter border-b border-[var(--border-subtle)] last:border-0 transition-colors duration-150 group ${
+                      doc.status === "READY"
+                        ? "hover:bg-[var(--surface)] cursor-pointer"
+                        : "opacity-60 cursor-wait"
+                    }`}
+                    style={{ animationDelay: `${index * 45}ms` }}
                   >
-                    <div className="flex flex-col items-center gap-6 max-w-sm mx-auto transition-all duration-300 group-hover/empty:scale-105">
-                      <div className="relative group">
-                        <div className="w-24 h-24 bg-slate-100 dark:bg-white/5 rounded-[40px] flex items-center justify-center border border-slate-200 dark:border-white/10 shadow-lg dark:shadow-2xl transition-all duration-500 group-hover/empty:bg-indigo-50 dark:group-hover/empty:bg-indigo-500/20 group-hover/empty:border-indigo-300 dark:group-hover/empty:border-indigo-500/30">
-                          <span className="material-symbols-outlined text-indigo-500 dark:text-indigo-400 text-5xl group-hover/empty:text-indigo-600 dark:group-hover/empty:text-indigo-300">cloud_upload</span>
+                    {/* Name */}
+                    <td className="py-3.5 px-5">
+                      <div className="flex items-center gap-3 overflow-hidden">
+                        {getFileIcon(doc.file_name)}
+                        <div className="min-w-0 flex-1">
+                          <p className="text-[13px] font-semibold text-[var(--foreground)] truncate group-hover:text-[hsl(239_68%_58%)] transition-colors">
+                            {doc.file_name}
+                          </p>
+                          <p className="text-[11px] text-[var(--muted-light)] mt-0.5 font-medium">
+                            {doc.file_size_mb} MB · {doc.file_name.split(".").pop()?.toUpperCase()}
+                          </p>
                         </div>
                       </div>
-                      <div className="space-y-2">
-                        <h3 className="text-xl font-black text-slate-900 dark:text-white tracking-tight group-hover/empty:text-indigo-600 dark:group-hover/empty:text-indigo-300 transition-colors">{DOCUMENT_TABLE_TEXTS.empty?.title}</h3>
-                        <p className="text-[13px] text-slate-500 dark:text-slate-300 font-medium leading-relaxed px-4">
-                          {DOCUMENT_TABLE_TEXTS.empty?.subtitle}
-                        </p>
+                    </td>
+
+                    {/* Date */}
+                    <td className="py-3.5 px-4 text-center">
+                      <p className="text-[12px] font-medium text-[var(--muted)]">
+                        {new Date(doc.uploaded_at).toLocaleDateString("vi-VN")}
+                      </p>
+                    </td>
+
+                    {/* Size */}
+                    <td className="py-3.5 px-4 text-center">
+                      <p className="text-[12px] font-medium text-[var(--muted)]">
+                        {doc.page_count > 0 ? `${doc.page_count} trang` : "—"}
+                      </p>
+                    </td>
+
+                    {/* Status */}
+                    <td className="py-3.5 px-4 text-center">
+                      <div className="flex justify-center">
+                        {getStatusBadge(doc.status, doc.id)}
+                      </div>
+                    </td>
+
+                    {/* Actions */}
+                    {showActions && (
+                      <td className="py-3.5 px-3 text-center" onClick={(e) => e.stopPropagation()}>
+                        <div className="flex items-center justify-center gap-1.5">
+                          {doc.status === "READY" && (
+                            <>
+                              <Link
+                                href={getRedirectUrl(doc.id)}
+                                className="w-9 h-9 rounded-lg border border-[hsl(239_68%_58%/0.20)] text-[hsl(239_55%_50%)] hover:bg-[hsl(239_68%_58%)] hover:text-white hover:border-transparent flex items-center justify-center transition-all"
+                                title="Hỏi AI"
+                              >
+                                <span className="material-symbols-outlined icon-thin text-[15px]">chat_bubble</span>
+                              </Link>
+                              <Link
+                                href={`/quiz/${doc.id}`}
+                                className="w-9 h-9 rounded-lg border border-[hsl(38_92%_50%/0.20)] text-[hsl(38_80%_42%)] hover:bg-[hsl(38_92%_50%)] hover:text-white hover:border-transparent flex items-center justify-center transition-all"
+                                title="Luyện tập"
+                              >
+                                <span className="material-symbols-outlined icon-thin text-[15px]">quiz</span>
+                              </Link>
+                              <Link
+                                href={`/mindmap/${doc.id}`}
+                                className="w-9 h-9 rounded-lg border border-[hsl(173_58%_42%/0.20)] text-[hsl(173_50%_36%)] hover:bg-[hsl(173_58%_42%)] hover:text-white hover:border-transparent flex items-center justify-center transition-all"
+                                title="Sơ đồ tư duy"
+                              >
+                                <span className="material-symbols-outlined icon-thin text-[15px]">hub</span>
+                              </Link>
+                            </>
+                          )}
+                          <button
+                            onClick={() => handleDelete(doc.id, doc.file_name)}
+                            disabled={deletingId === doc.id}
+                            className="w-9 h-9 rounded-lg border border-[var(--border-color)] text-[var(--muted-light)] hover:bg-[hsl(343_85%_58%)] hover:text-white hover:border-transparent flex items-center justify-center transition-all disabled:opacity-50"
+                            title="Xóa"
+                          >
+                            {deletingId === doc.id ? (
+                              <div className="w-3 h-3 border border-current/30 border-t-current rounded-full animate-spin" />
+                            ) : (
+                              <span className="material-symbols-outlined icon-thin text-[15px]">delete</span>
+                            )}
+                          </button>
+                        </div>
+                      </td>
+                    )}
+                  </tr>
+                ))
+              : (
+                <tr>
+                  <td colSpan={showActions ? 5 : 4} className="p-0 border-none">
+                    <div
+                      className="min-h-[200px] flex flex-col items-center justify-center text-center cursor-pointer group/empty py-8"
+                      onClick={() => {
+                        if (window.location.pathname !== "/") {
+                          router.push("/?action=upload");
+                        } else {
+                          const fi = document.querySelector('input[type="file"]') as HTMLInputElement;
+                          if (fi) fi.click();
+                        }
+                      }}
+                    >
+                      <div className="flex flex-col items-center gap-4 max-w-xs mx-auto transition-all duration-300 group-hover/empty:scale-105">
+                        <div className="w-14 h-14 bg-[var(--surface)] rounded-xl flex items-center justify-center border border-[var(--border-color)] group-hover/empty:border-[hsl(239_68%_58%/0.30)] transition-all">
+                          <span className="material-symbols-outlined icon-thin text-[hsl(239_68%_58%)] text-[32px]">cloud_upload</span>
+                        </div>
+                        <div className="space-y-1">
+                          <h3 className="text-[14px] font-bold text-[var(--foreground)] group-hover/empty:text-[hsl(239_68%_58%)] transition-colors">
+                            {DOCUMENT_TABLE_TEXTS.empty?.title}
+                          </h3>
+                          <p className="text-[11px] text-[var(--muted)] font-medium leading-relaxed px-4">
+                            {DOCUMENT_TABLE_TEXTS.empty?.subtitle}
+                          </p>
+                        </div>
                       </div>
                     </div>
-                  </div>
-                </td>
-              </tr>
-            )}
+                  </td>
+                </tr>
+              )}
           </tbody>
         </table>
       </div>
-
-      <style jsx global>{`
-        .custom-scrollbar::-webkit-scrollbar {
-          width: 5px;
-          height: 8px;
-        }
-        .custom-scrollbar::-webkit-scrollbar-track {
-          background: transparent;
-        }
-        .custom-scrollbar::-webkit-scrollbar-thumb {
-          background: rgba(148, 163, 184, 0.3);
-          border-radius: 10px;
-        }
-        .dark .custom-scrollbar::-webkit-scrollbar-thumb {
-          background: rgba(255, 255, 255, 0.1);
-        }
-
-        @keyframes marquee {
-          0% { transform: translateX(0); }
-          5% { transform: translateX(0); }
-          85% { transform: translateX(-40%); }
-          100% { transform: translateX(0); }
-        }
-        .group\/name:hover .group-hover\/name\:animate-marquee {
-          animation: marquee 8s linear infinite;
-          display: inline-block;
-          padding-right: 50px;
-        }
-      `}</style>
     </div>
+
+    {/* ── Confirm Delete Dialog ─────────────────────── */}
+    <ConfirmDialog
+      open={!!pendingDelete}
+      title="Xóa tài liệu"
+      message={`Bạn có chắc muốn xóa "${pendingDelete?.name}"? Thao tác này không thể hoàn tác.`}
+      confirmLabel="Xóa"
+      cancelLabel="Giữ lại"
+      variant="danger"
+      onConfirm={confirmDelete}
+      onCancel={() => setPendingDelete(null)}
+    />
+    </>
   );
 }

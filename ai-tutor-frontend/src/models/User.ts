@@ -9,6 +9,7 @@ export abstract class User {
     public full_name: string,
     public email: string,
     public role: UserRole,
+    public isPro: boolean = false,
     public student_id?: string,
     public avatarUrl?: string,
     public createdAt: Date = new Date()
@@ -34,11 +35,12 @@ export class Student extends User {
     email: string,
     student_id?: string,
     avatarUrl?: string,
+    public isPro_flag: boolean = false,
     public totalDocumentsUploaded: number = 0,
     public totalQuizzesTaken: number = 0,
     public lastActive: Date = new Date()
   ) {
-    super(id, full_name, email, UserRole.STUDENT, student_id, avatarUrl);
+    super(id, full_name, email, UserRole.STUDENT, isPro_flag, student_id, avatarUrl);
   }
 
   getDashboardUrl(): string {

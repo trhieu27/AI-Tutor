@@ -34,15 +34,26 @@ interface InteractiveMindmapProps {
 }
 
 // ===== CONSTANTS =====
+// ── High-contrast SaaS colour palette ──
 const NODE_COLORS = [
-  { name: 'Indigo', value: '#6366f1' }, { name: 'Rose', value: '#f43f5e' },
-  { name: 'Sky', value: '#0ea5e9' }, { name: 'Emerald', value: '#10b981' },
-  { name: 'Amber', value: '#f59e0b' }, { name: 'Violet', value: '#8b5cf6' },
-  { name: 'Pink', value: '#ec4899' }, { name: 'Teal', value: '#14b8a6' },
-  { name: 'Red', value: '#ef4444' }, { name: 'Blue', value: '#3b82f6' },
-  { name: 'Lime', value: '#84cc16' }, { name: 'Orange', value: '#f97316' },
+  { name: 'Indigo',  value: 'hsl(239 68% 58%)' },
+  { name: 'Rose',    value: 'hsl(343 85% 58%)' },
+  { name: 'Sky',     value: 'hsl(199 89% 48%)' },
+  { name: 'Emerald', value: 'hsl(158 64% 44%)' },
+  { name: 'Amber',   value: 'hsl(38 92% 50%)'  },
+  { name: 'Violet',  value: 'hsl(263 70% 62%)' },
+  { name: 'Pink',    value: 'hsl(328 81% 58%)' },
+  { name: 'Teal',    value: 'hsl(173 58% 42%)' },
+  { name: 'Red',     value: 'hsl(4 86% 58%)'   },
+  { name: 'Blue',    value: 'hsl(217 91% 60%)' },
+  { name: 'Lime',    value: 'hsl(84 81% 44%)'  },
+  { name: 'Orange',  value: 'hsl(27 96% 54%)'  },
 ];
-const DEPTH_COLORS = ['#4338ca', '#6366f1', '#f43f5e', '#0ea5e9', '#10b981', '#f59e0b', '#8b5cf6', '#ec4899'];
+const DEPTH_COLORS = [
+  'hsl(239 62% 50%)', 'hsl(239 68% 58%)', 'hsl(343 85% 58%)',
+  'hsl(199 89% 48%)', 'hsl(158 64% 44%)', 'hsl(38 92% 50%)',
+  'hsl(263 70% 62%)', 'hsl(328 81% 58%)'
+];
 const V_GAP = 180;
 const H_PADDING = 220;
 const NODE_H = 60;
@@ -286,11 +297,11 @@ function addChild(root: MindmapNodeData, pid: string, depth: number): MindmapNod
 }
 function removeNode(root: MindmapNodeData, id: string): MindmapNodeData {
   const children = Array.isArray(root.children) ? root.children : [];
-  return { 
-    ...root, 
+  return {
+    ...root,
     children: children
       .filter(c => c.id !== id)
-      .map(c => removeNode(c, id)) 
+      .map(c => removeNode(c, id))
   };
 }
 function findDepth(root: MindmapNodeData, id: string, d = 0): number {
@@ -377,11 +388,29 @@ function computePositions(root: MindmapNodeData, sizeMap?: Record<string, { w?: 
   return pos;
 }
 
-// ===== SVG CONNECTION PATH =====
+// ===== SVG CONNECTION PATH — Smooth organic cubic Bézier =====
+// Uses asymmetric tension: high initial tangent pull (0.55) + subtle
+// mid-curve S-bend that avoids the robotic 90-degree elbow feel.
 function bezierPath(x1: number, y1: number, x2: number, y2: number): string {
   const dx = x2 - x1;
-  const cp = Math.max(20, Math.abs(dx) * 0.45);
-  return `M ${x1} ${y1} C ${x1 + (dx > 0 ? cp : -cp)} ${y1}, ${x2 - (dx > 0 ? cp : -cp)} ${y2}, ${x2} ${y2}`;
+  const dy = y2 - y1;
+  const absDx = Math.abs(dx);
+  const absDy = Math.abs(dy);
+
+  // Tension scales with both axes for a more natural arc
+  const tensionX = Math.max(30, absDx * 0.55);
+  const tensionY = absDy * 0.12; // slight S-curve lift
+
+  const signX = dx > 0 ? 1 : -1;
+
+  // CP1: depart from parent with horizontal bias + subtle vertical drift
+  const cp1x = x1 + signX * tensionX;
+  const cp1y = y1 + tensionY;
+  // CP2: arrive at child with horizontal bias + mirror drift
+  const cp2x = x2 - signX * tensionX;
+  const cp2y = y2 - tensionY;
+
+  return `M ${x1} ${y1} C ${cp1x} ${cp1y}, ${cp2x} ${cp2y}, ${x2} ${y2}`;
 }
 
 // ===== COMPONENT =====
@@ -437,12 +466,12 @@ const InteractiveMindmap = forwardRef(({ chart, onCodeChange, documentId, zoom =
 
   const undo = useCallback(() => {
     if (historyRef.current.length === 0) return;
-    
+
     const currentSnapshot: HistorySnapshot = {
       code: toMermaid(treeRef.current!),
       positions: { ...posRef.current }
     };
-    
+
     const prev = historyRef.current[historyRef.current.length - 1];
     historyRef.current = historyRef.current.slice(0, -1);
     redoRef.current = [currentSnapshot, ...redoRef.current.slice(0, MAX_HISTORY - 1)];
@@ -457,7 +486,7 @@ const InteractiveMindmap = forwardRef(({ chart, onCodeChange, documentId, zoom =
     }
     setPositions(prev.positions);
     posRef.current = prev.positions;
-    
+
     updateUndoRedoState();
   }, [onCodeChange, updateUndoRedoState]);
 
@@ -883,7 +912,7 @@ const InteractiveMindmap = forwardRef(({ chart, onCodeChange, documentId, zoom =
       if (resizeRef.current) {
         const rs = resizeRef.current;
         const finalPos = posRef.current[rs.nodeId];
-        
+
         // Push pre-resize state to history
         const snapshot: HistorySnapshot = {
           code: toMermaid(treeRef.current!),
@@ -1010,7 +1039,20 @@ const InteractiveMindmap = forwardRef(({ chart, onCodeChange, documentId, zoom =
   }, [tree]);
 
   if (!tree || !Object.keys(positions).length) {
-    return <div className="flex items-center justify-center p-20"><div className="w-12 h-12 border-2 border-indigo-500/20 border-t-indigo-500 rounded-full animate-spin" /></div>;
+    return (
+      <div className="flex items-center justify-center p-20">
+        <div className="flex flex-col items-center gap-4">
+          {/* Layered spinner — outer ring rotates, inner ring pulses */}
+          <div className="relative w-14 h-14">
+            <div className="absolute inset-0 border-[1.5px] border-[hsl(239_68%_58%/0.15)] rounded-full" />
+            <div className="absolute inset-0 border-[1.5px] border-t-[hsl(239_68%_58%)] border-r-[hsl(239_68%_58%/0.3)] rounded-full animate-spin" />
+            <div className="absolute inset-[4px] border-[1.5px] border-[hsl(263_70%_62%/0.12)] rounded-full" />
+            <div className="absolute inset-[4px] border-[1.5px] border-b-[hsl(263_70%_62%)] border-l-[hsl(263_70%_62%/0.3)] rounded-full animate-spin [animation-direction:reverse] [animation-duration:1.2s]" />
+          </div>
+          <p className="text-[10px] font-bold uppercase tracking-[0.25em] text-[var(--muted-light)]">Đang xây dựng…</p>
+        </div>
+      </div>
+    );
   }
 
   const allNodes = flattenTree(tree);
@@ -1050,24 +1092,32 @@ const InteractiveMindmap = forwardRef(({ chart, onCodeChange, documentId, zoom =
               </linearGradient>
             );
           })}
-          <filter id="node-shadow">
-            <feDropShadow dx="0" dy="4" stdDeviation="8" floodColor="#000" floodOpacity="0.08" />
+          {/* Refined shadow — faint, lifted, two-layer */}
+          <filter id="node-shadow" x="-20%" y="-20%" width="140%" height="140%">
+            <feDropShadow dx="0" dy="2" stdDeviation="4"  floodColor="hsl(222 47% 4%)" floodOpacity="0.10" />
+            <feDropShadow dx="0" dy="8" stdDeviation="14" floodColor="hsl(222 47% 4%)" floodOpacity="0.07" />
           </filter>
-          <filter id="node-glow">
-            <feDropShadow dx="0" dy="0" stdDeviation="6" floodColor="#6366f1" floodOpacity="0.5" />
+          {/* Selection glow — brand hue */}
+          <filter id="node-glow" x="-30%" y="-30%" width="160%" height="160%">
+            <feDropShadow dx="0" dy="0" stdDeviation="10" floodColor="hsl(239 68% 58%)" floodOpacity="0.55" />
+            <feDropShadow dx="0" dy="4" stdDeviation="6"  floodColor="hsl(239 68% 58%)" floodOpacity="0.25" />
+          </filter>
+          {/* Root node aura */}
+          <filter id="root-glow" x="-30%" y="-30%" width="160%" height="160%">
+            <feDropShadow dx="0" dy="0" stdDeviation="18" floodColor="hsl(239 62% 50%)" floodOpacity="0.30" />
+            <feDropShadow dx="0" dy="6" stdDeviation="10" floodColor="hsl(0 0% 0%)"    floodOpacity="0.12" />
           </filter>
         </defs>
 
-        {/* Connection paths */}
+        {/* Connection paths — organic, tapered, gradient-lit */}
         {connections.map(c => {
           const pp = positions[c.parentId];
           const cp = positions[c.childId];
           if (!pp || !cp) return null;
 
-          const cn = findNode(tree!, c.childId);
           const gid = `g-${c.parentId}-${c.childId}`.replace(/[^a-zA-Z0-9-]/g, '_');
-          const strokeW = Math.max(2, 5 - c.depth * 0.7);
-          const strokeColor = cn?.color || '#cbd5e1';
+          // Taper stroke: root connectors are heavier, leaf connectors are hairlines
+          const strokeW = Math.max(1.2, 3.2 - c.depth * 0.6);
 
           return (
             <path
@@ -1077,7 +1127,7 @@ const InteractiveMindmap = forwardRef(({ chart, onCodeChange, documentId, zoom =
               stroke={`url(#${gid})`}
               strokeWidth={strokeW}
               strokeLinecap="round"
-              style={{ stroke: `url(#${gid})`, fill: 'none' } as any}
+              opacity={0.72}
             />
           );
         })}
@@ -1088,7 +1138,15 @@ const InteractiveMindmap = forwardRef(({ chart, onCodeChange, documentId, zoom =
           if (!p) return null;
           const isRoot = p.depth === 0;
           const isSelected = n.id === selectedNodeId;
-          const fSize = isRoot ? 28 : 24;
+          // Root: larger, bolder; branches: slightly smaller — đều dùng Inter
+          const fSize = isRoot ? 24 : 13;
+          const fontWeight = isRoot ? '700' : '600';
+          const rx = isRoot ? p.h / 2 : Math.min(p.h / 2, 14);
+          const filter = isSelected
+            ? 'url(#node-glow)'
+            : isRoot
+              ? 'url(#root-glow)'
+              : 'url(#node-shadow)';
 
           return (
             <g
@@ -1099,41 +1157,60 @@ const InteractiveMindmap = forwardRef(({ chart, onCodeChange, documentId, zoom =
               onClick={(e) => e.stopPropagation()}
               style={{ cursor: dragRef.current ? 'grabbing' : 'grab' }}
             >
-              {/* Selection indicator */}
+              {/* Selection ring — dashed, brand-indigo */}
               {isSelected && (
                 <rect
-                  x={p.x - p.w / 2 - 5} y={p.y - p.h / 2 - 5}
-                  width={p.w + 10} height={p.h + 10}
-                  rx={isRoot ? 50 : 18} ry={isRoot ? 50 : 18}
-                  fill="none" stroke="#6366f1" strokeWidth={2.5} strokeDasharray="6 3"
+                  x={p.x - p.w / 2 - 6} y={p.y - p.h / 2 - 6}
+                  width={p.w + 12} height={p.h + 12}
+                  rx={rx + 4} ry={rx + 4}
+                  fill="none"
+                  stroke="hsl(239 68% 68%)"
+                  strokeWidth={1.5}
+                  strokeDasharray="5 4"
+                  opacity={0.9}
                   className="animate-pulse"
                 />
               )}
 
-              {/* Shape: Use Capsule (Rounded Rect) for all levels to ensure text fits */}
+              {/* Main capsule / pill shape */}
               <rect
                 x={p.x - p.w / 2}
                 y={p.y - p.h / 2}
                 width={p.w}
                 height={p.h}
-                rx={p.h / 2}
-                ry={p.h / 2}
+                rx={rx}
+                ry={rx}
                 fill={n.color}
-                filter={isSelected ? 'url(#node-glow)' : 'url(#node-shadow)'}
+                filter={filter}
               />
-              {/* Text: Multi-line Support */}
+
+              {/* Inner highlight — top edge luminosity stroke */}
+              <rect
+                x={p.x - p.w / 2 + 1}
+                y={p.y - p.h / 2 + 1}
+                width={p.w - 2}
+                height={Math.min(p.h * 0.45, 28)}
+                rx={rx - 1}
+                ry={rx - 1}
+                fill="white"
+                opacity={isRoot ? 0.12 : 0.09}
+                className="pointer-events-none"
+              />
+
+              {/* Text: Multi-line, refined typography */}
               <text
                 x={p.x} y={p.y}
                 textAnchor="middle" dominantBaseline="central"
                 fill="white"
                 fontSize={fSize}
-                fontWeight={900}
-                fontFamily="'Inter', sans-serif"
+                fontWeight={fontWeight}
+                fontFamily="'Inter', system-ui, -apple-system, sans-serif"
+                letterSpacing={isRoot ? '-0.02em' : '-0.015em'}
                 className="pointer-events-none select-none"
               >
                 {(() => {
                   const lines = wrapText(n.text || '', p.w, p.h, fSize);
-                  const lineHeight = fSize * 1.2;
+                  const lineHeight = fSize * 1.35;
                   const totalH = lines.length * lineHeight;
                   const firstLineY = -(totalH / 2) + (lineHeight / 2);
                   return lines.map((line, i) => (
@@ -1142,27 +1219,24 @@ const InteractiveMindmap = forwardRef(({ chart, onCodeChange, documentId, zoom =
                 })()}
               </text>
 
-              {/* L-shaped corner brackets with floating padding */}
+              {/* L-bracket resize handles */}
               {isSelected && (() => {
-                const off = 10; // Floating Padding (khoảng cách khung)
-                const len = 15; // Chiều dài cạnh khung
+                const off = 10;
+                const len = 14;
                 return (
-                  <g className="resize-handles" stroke="#6366f1" strokeWidth={2.5} fill="none" strokeLinecap="round">
+                  <g className="resize-handles" stroke="hsl(239 68% 68%)" strokeWidth={2} fill="none" strokeLinecap="round">
                     {/* Top Left */}
                     <path d={`M ${p.x - p.w / 2 - off} ${p.y - p.h / 2 - off + len} V ${p.y - p.h / 2 - off} H ${p.x - p.w / 2 - off + len}`} stroke="transparent" strokeWidth={24} cursor="nwse-resize" onMouseDown={e => handleResizeMouseDown(e, n.id, 'tl' as any)} />
-                    <path d={`M ${p.x - p.w / 2 - off} ${p.y - p.h / 2 - off + len} V ${p.y - p.h / 2 - off} H ${p.x - p.w / 2 - off + len}`} pointerEvents="none" className="transition-colors" />
-
+                    <path d={`M ${p.x - p.w / 2 - off} ${p.y - p.h / 2 - off + len} V ${p.y - p.h / 2 - off} H ${p.x - p.w / 2 - off + len}`} pointerEvents="none" />
                     {/* Top Right */}
                     <path d={`M ${p.x + p.w / 2 + off - len} ${p.y - p.h / 2 - off} H ${p.x + p.w / 2 + off} V ${p.y - p.h / 2 - off + len}`} stroke="transparent" strokeWidth={24} cursor="nesw-resize" onMouseDown={e => handleResizeMouseDown(e, n.id, 'tr' as any)} />
-                    <path d={`M ${p.x + p.w / 2 + off - len} ${p.y - p.h / 2 - off} H ${p.x + p.w / 2 + off} V ${p.y - p.h / 2 - off + len}`} pointerEvents="none" className="transition-colors" />
-
+                    <path d={`M ${p.x + p.w / 2 + off - len} ${p.y - p.h / 2 - off} H ${p.x + p.w / 2 + off} V ${p.y - p.h / 2 - off + len}`} pointerEvents="none" />
                     {/* Bottom Left */}
                     <path d={`M ${p.x - p.w / 2 - off} ${p.y + p.h / 2 + off - len} V ${p.y + p.h / 2 + off} H ${p.x - p.w / 2 - off + len}`} stroke="transparent" strokeWidth={24} cursor="nesw-resize" onMouseDown={e => handleResizeMouseDown(e, n.id, 'bl' as any)} />
-                    <path d={`M ${p.x - p.w / 2 - off} ${p.y + p.h / 2 + off - len} V ${p.y + p.h / 2 + off} H ${p.x - p.w / 2 - off + len}`} pointerEvents="none" className="transition-colors" />
-
+                    <path d={`M ${p.x - p.w / 2 - off} ${p.y + p.h / 2 + off - len} V ${p.y + p.h / 2 + off} H ${p.x - p.w / 2 - off + len}`} pointerEvents="none" />
                     {/* Bottom Right */}
                     <path d={`M ${p.x + p.w / 2 + off - len} ${p.y + p.h / 2 + off} H ${p.x + p.w / 2 + off} V ${p.y + p.h / 2 + off - len}`} stroke="transparent" strokeWidth={24} cursor="nwse-resize" onMouseDown={e => handleResizeMouseDown(e, n.id, 'br' as any)} />
-                    <path d={`M ${p.x + p.w / 2 + off - len} ${p.y + p.h / 2 + off} H ${p.x + p.w / 2 + off} V ${p.y + p.h / 2 + off - len}`} pointerEvents="none" className="transition-colors" />
+                    <path d={`M ${p.x + p.w / 2 + off - len} ${p.y + p.h / 2 + off} H ${p.x + p.w / 2 + off} V ${p.y + p.h / 2 + off - len}`} pointerEvents="none" />
                   </g>
                 );
               })()}
@@ -1171,25 +1245,52 @@ const InteractiveMindmap = forwardRef(({ chart, onCodeChange, documentId, zoom =
         })}
       </svg>
 
-      {/* === CONTEXT MENU === */}
+      {/* ═══ CONTEXT MENU — Sophisticated SaaS style ═══ */}
       {selectedNodeId && menuMode && (() => {
         const flat = tree ? flattenTree(tree) : [];
         const node = flat.find(n => n.id === selectedNodeId);
         if (!node) return null;
         const isRoot = node.depth === 0;
+        const menuBaseStyle: React.CSSProperties = {
+          left: menuPos.x,
+          top: menuPos.y,
+          transform: `translate(-50%, calc(-100% - 14px)) scale(${Math.sqrt(1 / zoom)})`,
+          transformOrigin: 'bottom center',
+        };
 
         if (menuMode === 'edit') {
           return (
-            <div className="absolute z-[999]" style={{ left: menuPos.x, top: menuPos.y, transform: `translate(-50%, calc(-100% - 12px)) scale(${Math.sqrt(1 / zoom)})`, transformOrigin: 'bottom center' }} onClick={e => e.stopPropagation()}>
-              <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-white/10 rounded-2xl shadow-2xl p-4 mb-2 w-[320px]">
-                <p className="text-[12px] font-bold text-slate-400 dark:text-white/40 mb-3 px-1">Chỉnh sửa nội dung</p>
-                <input autoFocus value={editText} onChange={e => setEditText(e.target.value)}
-                  onKeyDown={e => { if (e.key === 'Enter') doCommitEdit(); if (e.key === 'Escape') { setMenuMode(null); setSelectedNodeId(null); } e.stopPropagation(); }}
-                  className="w-full px-4 py-3 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-white/10 text-base text-slate-900 dark:text-white font-semibold outline-none focus:ring-2 focus:ring-indigo-500/50" />
-                <div className="flex gap-3 mt-4">
-                  <button onClick={doCommitEdit} className="flex-1 py-3 bg-indigo-500 text-white rounded-xl text-xs font-bold hover:bg-indigo-400 active:scale-95 shadow-lg shadow-indigo-500/20">Lưu thay đổi</button>
-                  <button onClick={() => setMenuMode('main')} className="px-5 py-3 bg-slate-100 dark:bg-white/10 text-slate-600 dark:text-white/60 rounded-xl text-xs font-bold">Hủy</button>
+            <div className="absolute z-[999] animate-fade-up" style={menuBaseStyle} onClick={e => e.stopPropagation()}>
+              {/* Arrow pointer */}
+              <div className="flex flex-col items-center">
+                <div
+                  className="w-[300px] rounded-2xl shadow-[0_24px_48px_hsl(222_47%_4%/0.14),0_4px_12px_hsl(222_47%_4%/0.08)] border border-[var(--border-color)] bg-[var(--card-bg)] backdrop-blur-2xl p-4"
+                >
+                  <p className="text-[10px] font-bold text-[var(--muted-light)] uppercase tracking-[0.12em] mb-3 px-1">Chỉnh sửa nội dung</p>
+                  <input
+                    autoFocus
+                    value={editText}
+                    onChange={e => setEditText(e.target.value)}
+                    onKeyDown={e => {
+                      if (e.key === 'Enter') doCommitEdit();
+                      if (e.key === 'Escape') { setMenuMode(null); setSelectedNodeId(null); }
+                      e.stopPropagation();
+                    }}
+                    className="w-full px-4 py-2.5 rounded-xl bg-[var(--surface)] border border-[var(--border-color)] text-[13px] text-[var(--foreground)] font-medium outline-none focus:ring-2 focus:ring-[hsl(239_68%_58%/0.35)] focus:border-[hsl(239_68%_58%/0.5)] transition-all placeholder:text-[var(--muted-light)]"
+                    placeholder="Nhập nội dung…"
+                  />
+                  <div className="flex gap-2 mt-3">
+                    <button
+                      onClick={doCommitEdit}
+                      className="flex-1 py-2.5 bg-[hsl(239_68%_58%)] hover:bg-[hsl(239_62%_50%)] active:scale-95 text-white rounded-xl text-[11px] font-bold shadow-[0_4px_12px_hsl(239_68%_58%/0.30)] transition-all"
+                    >Lưu thay đổi</button>
+                    <button
+                      onClick={() => setMenuMode('main')}
+                      className="px-4 py-2.5 bg-[var(--surface)] hover:bg-[var(--card-bg-hover)] text-[var(--muted)] rounded-xl text-[11px] font-bold transition-all"
+                    >Hủy</button>
+                  </div>
                 </div>
+                <div className="w-3 h-1.5 bg-[var(--card-bg)] border-x border-b border-[var(--border-color)] clip-arrow" style={{ clipPath: 'polygon(0 0, 100% 0, 50% 100%)' }} />
               </div>
             </div>
           );
@@ -1197,39 +1298,90 @@ const InteractiveMindmap = forwardRef(({ chart, onCodeChange, documentId, zoom =
 
         if (menuMode === 'color') {
           return (
-            <div className="absolute z-[999]" style={{ left: menuPos.x, top: menuPos.y, transform: `translate(-50%, calc(-100% - 12px)) scale(${Math.sqrt(1 / zoom)})`, transformOrigin: 'bottom center' }} onClick={e => e.stopPropagation()}>
-              <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-white/10 rounded-2xl shadow-2xl p-4 mb-2">
-                <p className="text-[12px] font-bold text-slate-400 dark:text-white/40 mb-3 px-1">Chọn màu nhánh</p>
-                <div className="grid grid-cols-6 gap-2">
-                  {NODE_COLORS.map(c => (
-                    <button key={c.value} onClick={e => { e.stopPropagation(); doColorChange(c.value); }}
-                      className="w-7 h-7 rounded-lg transition-all hover:scale-125 active:scale-95 shadow-sm"
-                      style={{ backgroundColor: c.value, boxShadow: c.value === node.color ? `0 0 0 2px white, 0 0 0 4px ${c.value}` : 'none' }} title={c.name} />
-                  ))}
+            <div className="absolute z-[999] animate-fade-up" style={menuBaseStyle} onClick={e => e.stopPropagation()}>
+              <div className="flex flex-col items-center">
+                <div className="rounded-2xl shadow-[0_24px_48px_hsl(222_47%_4%/0.14),0_4px_12px_hsl(222_47%_4%/0.08)] border border-[var(--border-color)] bg-[var(--card-bg)] backdrop-blur-2xl p-4">
+                  <p className="text-[10px] font-bold text-[var(--muted-light)] uppercase tracking-[0.12em] mb-3 px-1">Màu nhánh</p>
+                  <div className="grid grid-cols-6 gap-2">
+                    {NODE_COLORS.map(c => (
+                      <button
+                        key={c.value}
+                        onClick={e => { e.stopPropagation(); doColorChange(c.value); }}
+                        title={c.name}
+                        className="w-7 h-7 rounded-lg transition-all duration-150 hover:scale-110 active:scale-90"
+                        style={{
+                          background: c.value,
+                          boxShadow: c.value === node.color
+                            ? `0 0 0 2px var(--card-bg), 0 0 0 3.5px ${c.value}`
+                            : `0 1px 3px hsl(0 0% 0% / 0.15)`
+                        }}
+                      />
+                    ))}
+                  </div>
+                  <button
+                    onClick={e => { e.stopPropagation(); setMenuMode('main'); }}
+                    className="w-full mt-3 py-2 text-[10px] font-bold text-[var(--muted-light)] hover:text-[var(--foreground)] transition-colors"
+                  >← Quay lại</button>
                 </div>
-                <button onClick={e => { e.stopPropagation(); setMenuMode('main'); }} className="w-full mt-3 py-2 text-[11px] font-bold text-slate-400 hover:text-slate-600 dark:text-white/40 transition-colors">← Quay lại</button>
+                <div className="w-3 h-1.5 bg-[var(--card-bg)] border-x border-b border-[var(--border-color)]" style={{ clipPath: 'polygon(0 0, 100% 0, 50% 100%)' }} />
               </div>
             </div>
           );
         }
 
+        // Main toolbar menu
         return (
-          <div className="absolute z-[999]" style={{ left: menuPos.x, top: menuPos.y, transform: `translate(-50%, calc(-100% - 12px)) scale(${Math.sqrt(1 / zoom)})`, transformOrigin: 'bottom center' }} onClick={e => e.stopPropagation()}>
-            <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-white/10 rounded-xl shadow-2xl p-2.5 mb-4 flex items-center gap-1">
-              <button onClick={e => { e.stopPropagation(); doStartEdit(); }} className="p-2 rounded-lg text-slate-600 dark:text-white/70 hover:bg-slate-100 dark:hover:bg-white/10 transition-all active:scale-90" title="Sửa nội dung">
-                <span className="material-symbols-outlined" style={{ fontSize: '22px' }}>edit</span>
-              </button>
-              <button onClick={e => { e.stopPropagation(); doAddChild(); }} className="p-2 rounded-lg text-slate-600 dark:text-white/70 hover:bg-slate-100 dark:hover:bg-white/10 transition-all active:scale-90" title="Thêm nhánh con">
-                <span className="material-symbols-outlined" style={{ fontSize: '22px' }}>add_circle</span>
-              </button>
-              <button onClick={e => { e.stopPropagation(); setMenuMode('color'); }} className="p-2 rounded-lg text-slate-600 dark:text-white/70 hover:bg-slate-100 dark:hover:bg-white/10 transition-all active:scale-90" title="Đổi màu">
-                <span className="material-symbols-outlined" style={{ color: node.color, fontSize: '22px' }}>palette</span>
-              </button>
-              {!isRoot && (
-                <button onClick={e => { e.stopPropagation(); doDelete(); }} className="p-2 rounded-lg text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10 transition-all active:scale-90" title="Xóa nhánh">
-                  <span className="material-symbols-outlined" style={{ fontSize: '22px' }}>delete</span>
+          <div className="absolute z-[999] animate-fade-up" style={menuBaseStyle} onClick={e => e.stopPropagation()}>
+            <div className="flex flex-col items-center">
+              <div className="rounded-2xl shadow-[0_24px_48px_hsl(222_47%_4%/0.14),0_4px_12px_hsl(222_47%_4%/0.08)] border border-[var(--border-color)] bg-[var(--card-bg)] backdrop-blur-2xl p-1.5 flex items-center gap-0.5">
+                {/* Edit */}
+                <button
+                  onClick={e => { e.stopPropagation(); doStartEdit(); }}
+                  className="group w-9 h-9 flex items-center justify-center rounded-xl text-[var(--muted)] hover:text-[hsl(239_68%_58%)] hover:bg-[hsl(239_68%_58%/0.08)] transition-all active:scale-90"
+                  title="Sửa nội dung"
+                >
+                  <span className="material-symbols-outlined text-[18px]">edit</span>
                 </button>
-              )}
+                {/* Add child */}
+                <button
+                  onClick={e => { e.stopPropagation(); doAddChild(); }}
+                  className="group w-9 h-9 flex items-center justify-center rounded-xl text-[var(--muted)] hover:text-[hsl(158_64%_44%)] hover:bg-[hsl(158_64%_44%/0.08)] transition-all active:scale-90"
+                  title="Thêm nhánh con"
+                >
+                  <span className="material-symbols-outlined text-[18px]">add_circle</span>
+                </button>
+                {/* Divider */}
+                <div className="w-px h-5 bg-[var(--border-color)] mx-0.5" />
+                {/* Color */}
+                <button
+                  onClick={e => { e.stopPropagation(); setMenuMode('color'); }}
+                  className="group w-9 h-9 flex items-center justify-center rounded-xl hover:bg-[hsl(263_70%_62%/0.08)] transition-all active:scale-90"
+                  title="Đổi màu"
+                >
+                  <span
+                    className="material-symbols-outlined text-[18px] transition-colors"
+                    style={{ color: node.color }}
+                  >palette</span>
+                </button>
+                {/* Delete */}
+                {!isRoot && (
+                  <>
+                    <div className="w-px h-5 bg-[var(--border-color)] mx-0.5" />
+                    <button
+                      onClick={e => { e.stopPropagation(); doDelete(); }}
+                      className="group w-9 h-9 flex items-center justify-center rounded-xl text-[var(--muted)] hover:text-[hsl(343_85%_58%)] hover:bg-[hsl(343_85%_58%/0.08)] transition-all active:scale-90"
+                      title="Xóa nhánh"
+                    >
+                      <span className="material-symbols-outlined text-[18px]">delete</span>
+                    </button>
+                  </>
+                )}
+              </div>
+              {/* Caret */}
+              <div
+                className="w-3 h-1.5 bg-[var(--card-bg)] border-x border-b border-[var(--border-color)]"
+                style={{ clipPath: 'polygon(0 0, 100% 0, 50% 100%)' }}
+              />
             </div>
           </div>
         );

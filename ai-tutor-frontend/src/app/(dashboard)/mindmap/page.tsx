@@ -5,27 +5,54 @@ import { MINDMAP_PAGE_TEXTS } from "@/constants/texts";
 
 export default function MindmapListPage() {
   return (
-    <div className="p-5 md:p-10 max-w-[1200px] mx-auto pb-20">
-      <div className="mb-12 text-center max-w-3xl mx-auto">
-        <h1 className="text-4xl md:text-5xl font-black text-slate-900 dark:text-white mb-4 tracking-tight">
+    <div className="p-6 md:p-10 w-full pb-16 space-y-10 relative z-10">
+
+      {/* ── Hero Header ─────────────────────────────────────────── */}
+      <div className="relative text-center space-y-5 max-w-2xl mx-auto">
+        {/* Ambient glow — teal/indigo */}
+        <div className="pointer-events-none absolute inset-x-0 -top-16 -z-10 flex justify-center" aria-hidden>
+          <div className="w-80 h-48 rounded-full blur-3xl opacity-60"
+            style={{ background: "radial-gradient(ellipse, hsl(173 58% 42% / 0.20) 0%, hsl(239 68% 58% / 0.08) 60%, transparent 100%)" }}
+          />
+        </div>
+
+        {/* Eyebrow */}
+        <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-[hsl(173_58%_42%/0.08)] border border-[hsl(173_58%_42%/0.20)] text-[hsl(173_50%_36%)] text-[11px] font-bold">
+          <span className="material-symbols-outlined icon-thin text-[14px]">account_tree</span>
+          Sơ đồ tư duy AI
+        </div>
+
+        <h1 className="font-display text-4xl md:text-[2.75rem] text-[hsl(222_47%_10%)] dark:text-white leading-tight">
           {MINDMAP_PAGE_TEXTS.title}
         </h1>
-        <p className="text-slate-500 dark:text-slate-300 text-lg leading-relaxed font-medium">
+
+        <p className="text-[var(--muted)] text-[14px] max-w-lg mx-auto leading-relaxed">
           {MINDMAP_PAGE_TEXTS.subtitle}
         </p>
       </div>
 
-      <div className="bg-white dark:bg-slate-900/40 backdrop-blur-md rounded-[48px] border border-slate-200 dark:border-white/10 shadow-lg dark:shadow-2xl h-fit max-h-[600px] overflow-hidden flex flex-col transition-colors duration-500">
-        <DocumentTable defaultAction="mindmap" />
-      </div>
+      {/* ── Document Table ──────────────────────────────────────── */}
+      <DocumentTable defaultAction="mindmap" />
 
-      <div className="mt-8 p-12 bg-white dark:bg-slate-900/60 backdrop-blur-xl rounded-[48px] border border-slate-200 dark:border-white/10 flex flex-col items-center text-center shadow-md dark:shadow-2xl relative overflow-hidden group transition-colors duration-500">
-        <div className="absolute inset-0 bg-gradient-to-br from-indigo-500/5 to-purple-500/5 opacity-0 group-hover:opacity-100 transition-opacity duration-700"></div>
-        <div className="w-20 h-20 rounded-[28px] bg-indigo-50 dark:bg-indigo-500/10 text-indigo-500 dark:text-indigo-400 flex items-center justify-center mb-8 border border-indigo-200 dark:border-indigo-500/20 shadow-lg dark:shadow-[0_0_30px_rgba(99,102,241,0.2)] transition-transform group-hover:scale-110 group-hover:rotate-6">
-          <span className="material-symbols-outlined text-[42px]">account_tree</span>
+      {/* ── Hero feature card ───────────────────────────────────── */}
+      <div
+        className="group relative overflow-hidden p-10 rounded-3xl border border-[var(--border-color)] shadow-sm hover:shadow-md hover:border-[hsl(173_58%_42%/0.35)] transition-all duration-300 flex flex-col items-center text-center"
+        style={{ background: "linear-gradient(135deg, hsl(173 58% 42% / 0.07), var(--card-bg) 55%)" }}
+      >
+        {/* Decorative corner blob */}
+        <div className="pointer-events-none absolute top-0 right-0 w-48 h-48 opacity-30"
+          style={{ background: "radial-gradient(circle at top right, hsl(173 58% 42% / 0.25) 0%, transparent 70%)" }}
+          aria-hidden
+        />
+
+        <div className="w-16 h-16 rounded-2xl bg-[hsl(173_58%_42%/0.10)] border border-[hsl(173_58%_42%/0.20)] text-[hsl(173_50%_36%)] flex items-center justify-center mb-6 group-hover:scale-105 transition-transform duration-200 relative z-10">
+          <span className="material-symbols-outlined icon-thin text-[30px]">account_tree</span>
         </div>
-        <h3 className="text-3xl font-black text-slate-900 dark:text-white mb-4 tracking-tight relative z-10">{MINDMAP_PAGE_TEXTS.heroTitle}</h3>
-        <p className="text-slate-500 dark:text-slate-400 max-w-2xl text-base leading-relaxed font-medium relative z-10">
+
+        <h3 className="font-display text-2xl text-[hsl(222_47%_10%)] dark:text-white mb-3 relative z-10">
+          {MINDMAP_PAGE_TEXTS.heroTitle}
+        </h3>
+        <p className="text-[var(--muted)] text-[13px] max-w-md leading-relaxed font-medium relative z-10">
           {MINDMAP_PAGE_TEXTS.heroDesc}
         </p>
       </div>

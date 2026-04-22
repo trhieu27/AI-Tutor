@@ -1,5 +1,6 @@
 from fastapi import APIRouter, HTTPException, Depends, status
 import jwt
+from jwt.exceptions import ExpiredSignatureError, InvalidTokenError
 import random
 import string
 from passlib.context import CryptContext
@@ -24,9 +25,9 @@ async def get_current_user(token: str = Depends(oauth2_scheme)):
         if user_id is None:
             raise HTTPException(status_code=401, detail="Token không hợp lệ")
         return user_id
-    except jwt.ExpiredSignatureError:
+    except ExpiredSignatureError:
         raise HTTPException(status_code=401, detail="Token đã hết hạn")
-    except jwt.JWTError:
+    except InvalidTokenError:
         raise HTTPException(status_code=401, detail="Không thể xác thực danh tính")
 
 # Password hashing
@@ -229,9 +230,9 @@ async def refresh(request: RefreshRequest):
             "access_token": new_access_token,
             "token_type": "bearer"
         }
-    except jwt.ExpiredSignatureError:
+    except ExpiredSignatureError:
         raise HTTPException(status_code=401, detail="Refresh token has expired")
-    except jwt.JWTError:
+    except InvalidTokenError:
         raise HTTPException(status_code=401, detail="Could not validate refresh token")
 
 class GoogleLoginRequest(BaseModel):
