@@ -497,7 +497,9 @@ export const SETTINGS_PAGE_TEXTS = {
     subtitle: "Thông tin cá nhân và ảnh đại diện",
     avatar: {
       label: "Ảnh đại diện",
-      hint: "Kéo thả hoặc click để chọn ảnh\nPNG, JPG, WebP · Tối đa 3MB"
+      hint: "Kéo thả hoặc click để chọn ảnh\nPNG, JPG · Tối đa 3MB",
+      errType: "Chỉ chấp nhận file PNG hoặc JPG.",
+      errSize: "Ảnh không được vượt quá 3MB."
     },
     fields: {
       fullName: "Họ và tên",

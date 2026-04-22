@@ -108,6 +108,16 @@ function ProfileSection({ profile, onRefresh }: { profile: UserProfile; onRefres
   const [dragOver, setDragOver] = useState(false);
 
   const handleAvatar = async (file: File) => {
+    // Validate type
+    if (!["image/png", "image/jpeg"].includes(file.type)) {
+      setMsg({ type: "err", text: T.profile.avatar.errType });
+      return;
+    }
+    // Validate size (3MB)
+    if (file.size > 3 * 1024 * 1024) {
+      setMsg({ type: "err", text: T.profile.avatar.errSize });
+      return;
+    }
     setAvatarLoading(true);
     const fd = new FormData();
     fd.append("file", file);
@@ -180,7 +190,7 @@ function ProfileSection({ profile, onRefresh }: { profile: UserProfile; onRefres
             <span className="material-symbols-outlined text-white" style={{ fontSize: 18 }}>photo_camera</span>
           </div>
         </div>
-        <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={e => e.target.files?.[0] && handleAvatar(e.target.files[0])} />
+        <input ref={fileRef} type="file" accept="image/png,image/jpeg" className="hidden" onChange={e => e.target.files?.[0] && handleAvatar(e.target.files[0])} />
         <div>
           <p className="text-[13px] font-semibold text-[var(--foreground)]">{T.profile.avatar.label}</p>
           <p className="text-[11px] text-[var(--muted)] mt-0.5 leading-relaxed">{T.profile.avatar.hint.split('\n')[0]}<br />{T.profile.avatar.hint.split('\n')[1]}</p>

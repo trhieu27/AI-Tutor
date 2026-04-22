@@ -6,7 +6,7 @@
    @import rules MUST come first (CSS spec / PostCSS requirement)
    ═════════════════════════════════════════════════════════════════════════ */
 
-@import url('https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&family=Lora:ital,wght@0,400..700;1,400..700&family=JetBrains+Mono:wght@400;500;600&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&family=JetBrains+Mono:wght@400;500;600&display=swap');
 @import "tailwindcss";
 
 /* ── 1. TAILWIND v4 @theme BLOCK ──────────────────────────────────────── */
@@ -39,7 +39,7 @@
 
   /* Typography Scale */
   --font-sans:  'Inter', system-ui, sans-serif;
-  --font-serif: 'Lora', Georgia, serif;   /* display headings */
+  --font-serif: 'Inter', system-ui, sans-serif;   /* unified — all Inter */
   --font-mono:  'JetBrains Mono', 'Fira Code', monospace;
 
   /* Motion Curves — Spring Physics */
@@ -468,3 +468,12 @@ h1, h2, h3, h4, h5, h6 {
 .animate-dialog-backdrop { animation: dialog-backdrop-in 0.2s ease both; }
 .animate-dialog-enter    { animation: dialog-enter 0.28s cubic-bezier(0.34, 1.56, 0.64, 1) both; }
 .animate-jumping-dot     { animation: jumping-dot 1s ease-in-out infinite; }
+
+/* ── Custom Scrollbar ─────────────────────────────────────────────────── */
+.custom-scrollbar::-webkit-scrollbar         { width: 4px; }
+.custom-scrollbar::-webkit-scrollbar-track   { background: transparent; }
+.custom-scrollbar::-webkit-scrollbar-thumb   { background: #E5E7EB; border-radius: 4px; }
+.custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #D1D5DB; }
+
+.dark .custom-scrollbar::-webkit-scrollbar-thumb       { background: rgba(255,255,255,0.06); }
+.dark .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.10); }
