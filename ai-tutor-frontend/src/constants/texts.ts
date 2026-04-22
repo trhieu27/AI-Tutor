@@ -481,3 +481,68 @@ export const HELP_PAGE_TEXTS = {
     }
   }
 };
+
+export const SETTINGS_PAGE_TEXTS = {
+  page: {
+    title: "Cài đặt",
+    subtitle: "Quản lý tài khoản, bảo mật và trải nghiệm"
+  },
+  nav: {
+    profile:    { label: "Hồ sơ",    icon: "person" },
+    security:   { label: "Bảo mật",  icon: "lock" },
+    appearance: { label: "Giao diện", icon: "palette" }
+  },
+  profile: {
+    title: "Hồ sơ cá nhân",
+    subtitle: "Thông tin cá nhân và ảnh đại diện",
+    avatar: {
+      label: "Ảnh đại diện",
+      hint: "Kéo thả hoặc click để chọn ảnh\nPNG, JPG, WebP · Tối đa 3MB"
+    },
+    fields: {
+      fullName: "Họ và tên",
+      studentId: "MSSV",
+      email: "Email",
+      bio: "Giới thiệu",
+      bioPlaceholder: "Bạn đang học gì...",
+      bioMaxChars: (n: number, max: number) => `${n}/${max}`
+    },
+    save: "Lưu thay đổi",
+    saving: "Đang lưu...",
+    success: "Đã lưu thay đổi",
+    avatarSuccess: "Ảnh đại diện đã cập nhật"
+  },
+  security: {
+    title: "Bảo mật tài khoản",
+    subtitle: "Quản lý mật khẩu và xác thực",
+    changePassword: {
+      title: "Đổi mật khẩu",
+      current: "Mật khẩu hiện tại",
+      newPw: "Mật khẩu mới",
+      confirm: "Xác nhận mật khẩu mới",
+      submit: "Cập nhật mật khẩu",
+      submitting: "Đang cập nhật...",
+      success: "Mật khẩu đã cập nhật",
+      errors: {
+        mismatch: "Mật khẩu mới không khớp",
+        tooShort: "Mật khẩu phải ít nhất 8 ký tự",
+        wrongCurrent: "Mật khẩu hiện tại không đúng"
+      }
+    },
+    strength: {
+      weak:   "Yếu",
+      medium: "Trung bình",
+      fair:   "Khá",
+      strong: "Mạnh"
+    }
+  },
+  appearance: {
+    title: "Giao diện",
+    subtitle: "Chọn chế độ hiển thị phù hợp",
+    light: { label: "Sáng", icon: "light_mode", id: "light" },
+    dark:  { label: "Tối",  icon: "dark_mode",  id: "dark"  }
+  },
+  loading: {
+    error: "Không thể tải thông tin. Vui lòng thử lại."
+  }
+};

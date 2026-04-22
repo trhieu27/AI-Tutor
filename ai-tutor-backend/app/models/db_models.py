@@ -10,12 +10,28 @@ class DocumentStatus(str, Enum):
     READY = "READY"
     FAILED = "FAILED"
 
+class UserSession(BaseModel):
+    id: str = Field(default_factory=lambda: str(uuid4()))
+    user_id: str
+    user_agent: str = ""
+    ip_address: str = ""
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    last_active: datetime = Field(default_factory=datetime.utcnow)
+
+class UserPreferences(BaseModel):
+    email_notifications: bool = True
+    ai_response_detail: str = "balanced"  # "concise" | "balanced" | "detailed"
+
 class User(BaseModel):
     id: str = Field(default_factory=lambda: str(uuid4()))
     student_id: str
     full_name: str
     email: str
     hashed_password: str
+    avatar_url: Optional[str] = None
+    bio: Optional[str] = None
+    is_pro: bool = False
+    preferences: UserPreferences = Field(default_factory=UserPreferences)
     created_at: datetime = Field(default_factory=datetime.utcnow)
 
 class Document(BaseModel):
