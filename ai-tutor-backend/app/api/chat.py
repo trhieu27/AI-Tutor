@@ -60,20 +60,45 @@ async def chat_with_document(
         if not session_data:
              raise HTTPException(status_code=404, detail="Phiên chat không tồn tại")
     
-    # 3. Get history from the session document
+    # 3. Xây dựng context window theo tier
+    user = await db.users.find_one({"id": current_user_id})
+    is_pro = bool(user.get("is_pro")) if user else False
+
     history_msgs = session_data.get("messages", [])
-    chat_history = [{"role": m["role"], "content": m["content"]} for m in history_msgs]
+
+    if is_pro:
+        # Pro: toàn bộ lịch sử, không giới hạn
+        context_msgs = history_msgs
+        MAX_CHAR_PER_MSG = 4000   # giới hạn mềm per message
+    else:
+        # Free: chỉ 6 tin nhắn cuối (3 lượt hỏi-đáp) và giới hạn ký tự
+        context_msgs  = history_msgs[-6:]
+        MAX_CHAR_PER_MSG = 800    # cắt tin nhắn dài để tránh spam context
+
+    chat_history = [
+        {"role": m["role"], "content": m["content"][:MAX_CHAR_PER_MSG]}
+        for m in context_msgs
+    ]
 
     try:
-        # 4. Ask RAG Engine
+        # 4. Gi\u1edbi h\u1ea1n \u0111\u1ed9 d\u00e0i c\u00e2u h\u1ecfi theo tier
+        question_text = request.question
+        if not is_pro and len(question_text) > 600:
+            raise HTTPException(
+                status_code=400,
+                detail=f"T\u00e0i kho\u1ea3n mi\u1ec5n ph\u00ed gi\u1edbi h\u1ea1n c\u00e2u h\u1ecfi t\u1ed1i \u0111a 600 k\u00fd t\u1ef1 ({len(question_text)} \u0111\u00e3 nh\u1eadp). "
+                       f"N\u00e2ng c\u1ea5p Pro \u0111\u1ec3 h\u1ecfi kh\u00f4ng gi\u1edbi h\u1ea1n."
+            )
+
+        # 5. Ask RAG Engine
         rag_response = await ask_question(
-            question=request.question,
+            question=question_text,
             collection_name=doc["chroma_collection_id"],
             document_id=document_id,
             chat_history=chat_history,
             is_cancelled=fastapi_request.is_disconnected
         )
-        answer = rag_response.get("answer", "Xin lỗi, tôi không tìm được câu trả lời.")
+        answer = rag_response.get("answer", "Xin l\u1ed7i, t\u00f4i kh\u00f4ng t\u00ecm \u0111\u01b0\u1ee3c c\u00e2u tr\u1ea3 l\u1eddi.")
         sources = rag_response.get("sources", [])
 
         # 5. Create message objects

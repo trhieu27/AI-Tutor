@@ -17,9 +17,13 @@ from app.api.auth import get_current_user
 # ── Tunable limits ────────────────────────────────────────────────────────────
 
 FREE_LIMITS = {
-    "documents":     3,   # tổng số tài liệu (không reset theo ngày)
-    "chat_messages": 30,  # tin nhắn chat / ngày
-    "ai_features":   10,  # quiz + mindmap + summary + study_questions / ngày
+    "documents":        3,    # tổng số tài liệu (không reset theo ngày)
+    "chat_messages":    30,   # tin nhắn chat / ngày
+    "ai_features":      10,   # quiz + mindmap + summary + study_questions / ngày
+    # Context window (không ghi usage_logs — áp dụng mỗi request)
+    "context_messages": 6,    # số tin nhắn lịch sử gửi lên AI (3 lượt)
+    "question_chars":   600,  # ký tự tối đa mỗi câu hỏi
+    "msg_chars":        800,  # ký tự tối đa mỗi tin nhắn lịch sử
 }
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
