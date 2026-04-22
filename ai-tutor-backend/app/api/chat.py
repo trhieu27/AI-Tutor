@@ -23,6 +23,7 @@ from app.rag.rag_engine import (
     generate_study_questions
 )
 from app.api.auth import get_current_user
+from app.api.quota import require_chat_quota, require_ai_quota
 
 router = APIRouter(prefix="/chat", tags=["Chat"])
 
@@ -34,7 +35,7 @@ async def chat_with_document(
     request: AskRequest,
     fastapi_request: Request,
     db: AsyncIOMotorDatabase = Depends(get_db),
-    current_user_id: str = Depends(get_current_user)
+    current_user_id: str = Depends(require_chat_quota()),
 ):
     """Ask a question using MongoDB and RAG."""
     # 1. Verify document exists
@@ -119,7 +120,8 @@ async def chat_with_document(
         raise HTTPException(status_code=500, detail="Hệ thống đang bận hoặc gặp lỗi xử lý. Vui lòng thử lại sau nhé.")
 
 @router.get("/{document_id}/summarize")
-async def get_summary(document_id: str, request: Request, db: AsyncIOMotorDatabase = Depends(get_db)):
+async def get_summary(document_id: str, request: Request, db: AsyncIOMotorDatabase = Depends(get_db),
+    current_user_id: str = Depends(require_ai_quota())):
     doc = await db.documents.find_one({"id": document_id})
     if not doc or not doc.get("chroma_collection_id"):
         raise HTTPException(status_code=404, detail="Tài liệu chưa sẵn sàng")
@@ -145,6 +147,7 @@ async def get_document_quiz(
     document_id: str,
     request: Request,
     db: AsyncIOMotorDatabase = Depends(get_db),
+    current_user_id: str = Depends(require_ai_quota()),
     force: bool = False
 ):
     doc = await db.documents.find_one({"id": document_id})
@@ -155,7 +158,7 @@ async def get_document_quiz(
     if force:
         await db.documents.update_one({"id": document_id}, {"$unset": {"quiz": ""}})
     elif doc.get("quiz"):
-        # Trả cache nếu không force
+        # Trả cache nếu không force — KHÔNG tốn quota
         async def stream_cached():
             import json
             yield json.dumps(doc["quiz"])
@@ -189,6 +192,7 @@ async def get_document_mindmap(
     document_id: str, 
     request: Request, 
     db: AsyncIOMotorDatabase = Depends(get_db),
+    current_user_id: str = Depends(require_ai_quota()),
     force: bool = False
 ):
     doc = await db.documents.find_one({"id": document_id})
@@ -248,7 +252,8 @@ async def update_document_mindmap(
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.get("/{document_id}/study-questions")
-async def get_study_questions(document_id: str, request: Request, db: AsyncIOMotorDatabase = Depends(get_db)):
+async def get_study_questions(document_id: str, request: Request, db: AsyncIOMotorDatabase = Depends(get_db),
+    current_user_id: str = Depends(require_ai_quota())):
     doc = await db.documents.find_one({"id": document_id})
     if not doc or not doc.get("chroma_collection_id"):
         raise HTTPException(status_code=404, detail="Tài liệu chưa sẵn sàng")
