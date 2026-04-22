@@ -7,7 +7,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.core.config import get_settings
 from app.core.database import init_db, close_db
-from app.api import documents, chat, auth
+from app.api import documents, chat, auth, users
 
 logger = logging.getLogger(__name__)
 settings = get_settings()
@@ -62,6 +62,7 @@ async def log_requests(request, call_next):
 app.include_router(auth.router, prefix="/api/v1")
 app.include_router(documents.router, prefix="/api/v1")
 app.include_router(chat.router, prefix="/api/v1")
+app.include_router(users.router, prefix="/api/v1")
 
 
 @app.get("/")

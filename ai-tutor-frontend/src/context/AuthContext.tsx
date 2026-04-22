@@ -16,6 +16,8 @@ interface AuthContextType {
   register: (fullName: string, email: string, password: string) => Promise<void>;
   logout: () => void;
   isAuthenticated: boolean;
+  /** Cập nhật một phần thông tin user (avatar, tên...) mà không cần login lại */
+  updateUser: (patch: Partial<{ full_name: string; avatarUrl: string; isPro: boolean }>) => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -34,7 +36,8 @@ const createUserInstance = (userData: any): User | null => {
         userData.full_name,
         userData.email,
         userData.student_id,
-        userData.avatarUrl
+        userData.avatarUrl ?? userData.avatar_url,  // backend trả avatar_url
+        userData.is_pro ?? userData.isPro ?? false
       );
     }
     return userData;
@@ -149,6 +152,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     window.location.replace('/login');
   }, []);
 
+  /** Patch user state + localStorage với data mới (avatar, tên...) */
+  const updateUser = useCallback((patch: Partial<{ full_name: string; avatarUrl: string; isPro: boolean }>) => {
+    setUser(prev => {
+      if (!prev) return prev;
+      const updated = Object.assign(Object.create(Object.getPrototypeOf(prev)), prev, patch);
+      // Persist vào localStorage để reload vẫn giữ
+      try {
+        const stored = localStorage.getItem('user');
+        if (stored) {
+          const raw = JSON.parse(stored);
+          localStorage.setItem('user', JSON.stringify({ ...raw, ...patch }));
+        }
+      } catch {}
+      return updated;
+    });
+  }, []);
+
   const googleLogin = async (token: string) => {
     setIsLoading(true);
     setError(null);
@@ -177,8 +197,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     googleLogin,
     register,
     logout,
+    updateUser,
     isAuthenticated: !!user,
-  }), [user, isLoading, isInitialLoading, error, logout]);
+  }), [user, isLoading, isInitialLoading, error, logout, updateUser]);
 
   return (
     <AuthContext.Provider value={contextValue}>

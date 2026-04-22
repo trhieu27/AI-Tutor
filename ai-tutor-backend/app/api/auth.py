@@ -1,4 +1,4 @@
-from fastapi import APIRouter, HTTPException, Depends, status
+from fastapi import APIRouter, HTTPException, Depends, status, Request
 import jwt
 from jwt.exceptions import ExpiredSignatureError, InvalidTokenError
 import random
@@ -6,6 +6,7 @@ import string
 from passlib.context import CryptContext
 from datetime import datetime, timedelta
 from typing import Optional
+from uuid import uuid4
 from app.models.db_models import User
 from app.core.database import get_db
 from app.core.config import get_settings
@@ -113,7 +114,7 @@ async def register(request: RegisterRequest, db = Depends(get_db)):
     }
 
 @router.post("/login")
-async def login(request: LoginRequest, db = Depends(get_db)):
+async def login(request: LoginRequest, fastapi_request: Request, db = Depends(get_db)):
     limiter = RateLimiter(db)
     
     # 1. Kiểm tra xem có đang bị khóa không
@@ -128,9 +129,22 @@ async def login(request: LoginRequest, db = Depends(get_db)):
     
     # 3. Đăng nhập thành công -> Reset bộ đếm
     await limiter.reset(request.email)
+
+    # 4. Record session (IP + User-Agent)
+    session_id = str(uuid4())
+    ua = fastapi_request.headers.get("user-agent", "")[:300]
+    ip = fastapi_request.client.host if fastapi_request.client else ""
+    await db.user_sessions.insert_one({
+        "id": session_id,
+        "user_id": user["id"],
+        "user_agent": ua,
+        "ip_address": ip,
+        "created_at": datetime.utcnow(),
+        "last_active": datetime.utcnow(),
+    })
     
     # Generate tokens
-    token_data = {"sub": user["id"], "email": user["email"]}
+    token_data = {"sub": user["id"], "email": user["email"], "sid": session_id}
     access_token = create_access_token(token_data)
     refresh_token = create_refresh_token(token_data)
     
@@ -139,10 +153,12 @@ async def login(request: LoginRequest, db = Depends(get_db)):
         "refresh_token": refresh_token,
         "token_type": "bearer",
         "user": {
-            "id": user["id"],
-            "full_name": user["full_name"],
-            "email": user["email"],
-            "student_id": user["student_id"]
+            "id":         user["id"],
+            "full_name":  user["full_name"],
+            "email":      user["email"],
+            "student_id": user["student_id"],
+            "avatar_url": user.get("avatar_url"),
+            "is_pro":     user.get("is_pro", False),
         }
     }
 
