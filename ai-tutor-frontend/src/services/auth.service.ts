@@ -55,7 +55,7 @@ class AuthService {
       }
 
       return {
-        user: new Student(data.user.id, data.user.full_name, data.user.email, data.user.student_id),
+        user: new Student(data.user.id, data.user.full_name, data.user.email, data.user.student_id, undefined, data.user.is_pro ?? false),
         accessToken: data.access_token,
         refreshToken: data.refresh_token,
       };
@@ -92,7 +92,7 @@ class AuthService {
       }
 
       return {
-        user: new Student(data.user.id, data.user.full_name, data.user.email, data.user.student_id),
+        user: new Student(data.user.id, data.user.full_name, data.user.email, data.user.student_id, undefined, data.user.is_pro ?? false),
         accessToken: data.access_token,
         refreshToken: data.refresh_token,
       };
@@ -137,7 +137,7 @@ class AuthService {
       }
 
       return {
-        user: new Student(data.user.id, data.user.full_name, data.user.email, data.user.student_id),
+        user: new Student(data.user.id, data.user.full_name, data.user.email, data.user.student_id, undefined, data.user.is_pro ?? false),
         accessToken: data.access_token,
         refreshToken: data.refresh_token,
       };
@@ -247,7 +247,8 @@ class AuthService {
         userData.full_name,
         userData.email,
         userData.student_id,
-        userData.avatarUrl
+        userData.avatarUrl,
+        userData.is_pro ?? false
       );
 
       localStorage.setItem('user', JSON.stringify(user));

@@ -141,13 +141,21 @@ async def get_summary(document_id: str, request: Request, db: AsyncIOMotorDataba
     return StreamingResponse(generate_and_cache(), media_type="text/plain")
 
 @router.get("/{document_id}/quiz")
-async def get_document_quiz(document_id: str, request: Request, db: AsyncIOMotorDatabase = Depends(get_db)):
+async def get_document_quiz(
+    document_id: str,
+    request: Request,
+    db: AsyncIOMotorDatabase = Depends(get_db),
+    force: bool = False
+):
     doc = await db.documents.find_one({"id": document_id})
     if not doc or not doc.get("chroma_collection_id"):
         raise HTTPException(status_code=404, detail="Tài liệu chưa sẵn sàng")
     
-    # Cache check
-    if doc.get("quiz"):
+    # Force: xóa cache cũ để AI tạo bộ câu hỏi mới
+    if force:
+        await db.documents.update_one({"id": document_id}, {"$unset": {"quiz": ""}})
+    elif doc.get("quiz"):
+        # Trả cache nếu không force
         async def stream_cached():
             import json
             yield json.dumps(doc["quiz"])
@@ -162,7 +170,6 @@ async def get_document_quiz(document_id: str, request: Request, db: AsyncIOMotor
         
         if full_text.strip():
             try:
-                # Basic cleaning of markdown if present
                 clean_json = full_text.strip()
                 if "```json" in clean_json:
                     clean_json = clean_json.split("```json")[1].split("```")[0]

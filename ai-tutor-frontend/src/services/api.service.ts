@@ -110,23 +110,42 @@ export async function uploadDocument(file: File): Promise<DocumentResponse> {
   console.log(`Uploading file: ${file.name} (Sanitized as: ${sanitizedName})`);
 
   const formData = new FormData();
-  // Truyền file cùng với tên đã được làm sạch
   formData.append("file", file, sanitizedName);
 
-  const res = await authFetch(`${API_BASE}/documents/upload`, {
-    method: "POST",
-    body: formData,
-  });
+  // AbortController timeout 60s — tránh treo mãi
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 60_000);
+
+  let res: Response;
+  try {
+    res = await authFetch(`${API_BASE}/documents/upload`, {
+      method: "POST",
+      body: formData,
+      signal: controller.signal,
+    });
+  } catch (err: any) {
+    clearTimeout(timeoutId);
+    if (err.name === 'AbortError') throw new Error("Upload timeout — file quá lớn hoặc kết nối chậm");
+    throw new Error("Không thể kết nối tới máy chủ. Vui lòng thử lại.");
+  }
+  clearTimeout(timeoutId);
 
   if (!res.ok) {
-    let errorDetail = "Upload thất bại";
+    // Đọc body CHỄ MỘT LẦN bằng text(), sau đó thử parse JSON — tránh “body stream already read”
+    let errorDetail = `Upload thất bại (HTTP ${res.status})`;
     try {
-      const errorData = await res.json();
-      errorDetail = errorData.detail || errorDetail;
-      console.error("Upload Error Detail:", errorData);
-    } catch (e) {
-      const text = await res.text();
-      console.error("Upload Error (Raw Text):", text);
+      const rawText = await res.text();
+      if (rawText) {
+        try {
+          const errorData = JSON.parse(rawText);
+          errorDetail = errorData.detail || errorData.message || errorDetail;
+        } catch {
+          if (rawText.length < 300) errorDetail = rawText;
+        }
+        console.error("Upload Error:", rawText);
+      }
+    } catch {
+      console.error("Upload Error: could not read response body");
     }
     throw new Error(errorDetail);
   }
@@ -266,9 +285,11 @@ export async function fetchDocumentSummary(documentId: string, signal?: AbortSig
 export async function fetchDocumentQuizStream(
   documentId: string,
   onChunk: (chunk: string) => void,
+  force = false,
   signal?: AbortSignal
 ): Promise<void> {
-  const res = await authFetch(`${API_BASE}/chat/${documentId}/quiz`, {
+  const url = `${API_BASE}/chat/${documentId}/quiz${force ? "?force=true" : ""}`;
+  const res = await authFetch(url, {
     headers: { ...getAuthHeaders() },
     signal
   });

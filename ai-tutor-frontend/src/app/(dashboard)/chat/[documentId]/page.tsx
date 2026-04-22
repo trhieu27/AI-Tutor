@@ -87,6 +87,12 @@ export default function ChatPage() {
       }
     };
     loadInitialData();
+
+    // Cleanup: hủy tất cả stream khi rời trang
+    return () => {
+      abortControllerRef.current?.abort();
+      if (typewriterIntervalRef.current) clearInterval(typewriterIntervalRef.current);
+    };
   }, [documentId]);
 
   const loadSession = async (sessionId: string) => {
@@ -275,6 +281,7 @@ export default function ChatPage() {
           accumulated += chunk;
           // For now, only parse at the end, but we could try to find objects here
         },
+        false,
         controller.signal
       );
       

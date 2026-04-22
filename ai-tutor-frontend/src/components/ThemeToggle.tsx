@@ -7,34 +7,43 @@ export function ThemeToggle() {
   const { theme, setTheme } = useTheme();
   const [mounted, setMounted] = React.useState(false);
 
-  // Avoid hydration mismatch
-  React.useEffect(() => {
-    setMounted(true);
-  }, []);
+  React.useEffect(() => { setMounted(true); }, []);
 
-  if (!mounted) {
-    return <div className="w-10 h-10" />;
-  }
+  if (!mounted) return <div className="w-9 h-9" />;
+
+  const isDark = theme === 'dark';
 
   return (
     <button
-      onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
-      className="w-10 h-10 flex items-center justify-center rounded-xl bg-slate-100 dark:bg-white/5 text-slate-500 dark:text-indigo-400 hover:bg-slate-200 dark:hover:bg-indigo-500/10 transition-all active:scale-95 group relative overflow-hidden"
+      onClick={() => setTheme(isDark ? "light" : "dark")}
+      className={`w-9 h-9 flex items-center justify-center rounded-xl transition-all duration-250 active:scale-90 relative overflow-hidden group ${
+        isDark
+          ? 'bg-[hsl(239_68%_58%/0.10)] text-[hsl(239_68%_68%)] hover:bg-[hsl(239_68%_58%/0.15)]'
+          : 'bg-[var(--surface)] text-[hsl(38_92%_50%)] hover:bg-[var(--card-bg-hover)]'
+      }`}
       aria-label="Toggle theme"
+      title={isDark ? 'Chuyển sang sáng' : 'Chuyển sang tối'}
     >
-      <div className="relative w-6 h-6 flex items-center justify-center">
-        {/* Sun Icon */}
-        <span className={`material-symbols-outlined absolute transition-all duration-500 transform ${theme === 'dark' ? 'scale-0 rotate-90 opacity-0' : 'scale-100 rotate-0 opacity-100'}`}>
+      <div className="relative w-5 h-5 flex items-center justify-center">
+        {/* Sun */}
+        <span
+          className={`material-symbols-outlined absolute text-[18px] transition-all duration-300 ${
+            isDark ? 'scale-0 rotate-90 opacity-0' : 'scale-100 rotate-0 opacity-100'
+          }`}
+          style={{ fontVariationSettings: "'FILL' 1, 'wght' 300, 'GRAD' 0, 'opsz' 24" }}
+        >
           light_mode
         </span>
-        {/* Moon Icon */}
-        <span className={`material-symbols-outlined absolute transition-all duration-500 transform ${theme === 'light' ? 'scale-0 -rotate-90 opacity-0' : 'scale-100 rotate-0 opacity-100'}`}>
+        {/* Moon */}
+        <span
+          className={`material-symbols-outlined absolute text-[18px] transition-all duration-300 ${
+            isDark ? 'scale-100 rotate-0 opacity-100' : 'scale-0 -rotate-90 opacity-0'
+          }`}
+          style={{ fontVariationSettings: "'FILL' 1, 'wght' 300, 'GRAD' 0, 'opsz' 24" }}
+        >
           dark_mode
         </span>
       </div>
-      
-      {/* Subtle background glow */}
-      <div className={`absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none ${theme === 'dark' ? 'bg-indigo-500/10' : 'bg-amber-500/10'}`}></div>
     </button>
   );
 }
