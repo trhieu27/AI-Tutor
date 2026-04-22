@@ -51,64 +51,104 @@ const getStoredUser = (): User | null => {
   if (typeof window === 'undefined') return null;
   try {
     const raw = localStorage.getItem('user');
-    return raw ? createUserInstance(JSON.parse(raw)) : null;
+    if (!raw) return null;
+    const meta = JSON.parse(raw);
+    // Avatar đƣợc lƣu riêng để tránh QuotaExceededError
+    const avatar = localStorage.getItem('user_avatar') ?? meta.avatar_url ?? meta.avatarUrl;
+    return createUserInstance({ ...meta, avatar_url: avatar });
   } catch (e) {
     return null;
   }
 };
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [user, setUser] = useState<User | null>(null);
-  const [isInitialLoading, setIsInitialLoading] = useState(true);
+  // Đọc user từ localStorage NGAY lần render đầu — không cần đợi useEffect
+  const [user, setUser] = useState<User | null>(() => {
+    if (typeof window === 'undefined') return null;
+    return getStoredUser();
+  });
+  // isInitialLoading = false ngay nếu đã có dữ liệu, true nếu cần fetch
+  const [isInitialLoading, setIsInitialLoading] = useState<boolean>(() => {
+    if (typeof window === 'undefined') return true;
+    const hasStoredUser = !!getStoredUser();
+    const hasToken = !!localStorage.getItem('access_token');
+    // Nếu đã có user trong LS → không loading
+    // Nếu có token nhưng chưa có user → cần fetch (loading)
+    // Nếu không có gì → không loading (guest)
+    return hasToken && !hasStoredUser;
+  });
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const pathname = usePathname();
 
-  const syncFromStorage = useCallback(() => {
+  /**
+   * Sync theo 2 pha:
+   * 1. LS cache — hiện ngầy (không flash)
+   * 2. Backend /users/me — luôn verify (quan trọng cho đa thiết bị)
+   */
+  const syncFromStorage = useCallback(async () => {
     if (typeof window === 'undefined') return;
-    const isClient = typeof window !== 'undefined';
-    const storedUser = getStoredUser();
     const hasToken = !!localStorage.getItem('access_token');
 
-    if (storedUser) {
-      setUser(storedUser);
-      setIsInitialLoading(false);
-    } else if (!hasToken) {
+    if (!hasToken) {
+      // Không có token — guest, kết thúc ngay
       setUser(null);
+      setIsInitialLoading(false);
+      return;
+    }
+
+    // Pha 1: hiện cache ngầy (nếu có)
+    const cached = getStoredUser();
+    if (cached) {
+      setUser(cached);
+      setIsInitialLoading(false);
+    }
+
+    // Pha 2: luôn fetch từ backend — cập nhật avatar, is_pro, full_name mới nhất
+    try {
+      const freshUser = await authService.getCurrentUser();
+      if (freshUser) {
+        setUser(freshUser);
+      } else if (!cached) {
+        // Token hết hạn hoặc bị thu hồi
+        setUser(null);
+      }
+    } catch {
+      // Lỗi mạng — tiếp tục dùng cache nếu có
+    } finally {
       setIsInitialLoading(false);
     }
   }, []);
 
-  // 2. Kiểm tra với Backend (ĐÃ TẮT THEO YÊU CẦU)
-  const revalidateAuth = useCallback(async () => {
-    // Chúng ta chỉ dựa vào LocalStorage để tối ưu tốc độ và tránh lỗi 404
-    setIsInitialLoading(false);
-  }, []);
-
-  // Effect tổng quản lý việc đồng bộ khi Mount, Chuyển trang (pathname) và Browser Events
+  // Effect tổng quản lý sync — bao gồm bfcache (back/forward)
   useEffect(() => {
-    const handleSync = () => {
-      syncFromStorage();
-      revalidateAuth();
+    const handleSync = () => { syncFromStorage(); };
+    const handlePageShow = (e: PageTransitionEvent) => { handleSync(); };
+    const handleStorage = (e: StorageEvent) => {
+      if (e.key === 'user' || e.key === 'access_token' || e.key === 'user_avatar') handleSync();
+    };
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible') handleSync();
     };
 
     // Chạy khi mount hoặc pathname thay đổi
     handleSync();
 
-    // Lắng nghe các sự kiện trình duyệt
-    window.addEventListener('pageshow', handleSync);
+    window.addEventListener('pageshow', handlePageShow);
     window.addEventListener('popstate', handleSync);
-    window.addEventListener('storage', (e) => {
-      if (e.key === 'user' || e.key === 'access_token') handleSync();
-    });
+    window.addEventListener('storage', handleStorage);
     window.addEventListener('focus', handleSync);
+    document.addEventListener('visibilitychange', handleVisibility);
 
     return () => {
-      window.removeEventListener('pageshow', handleSync);
+      window.removeEventListener('pageshow', handlePageShow);
       window.removeEventListener('popstate', handleSync);
+      window.removeEventListener('storage', handleStorage);
+      window.removeEventListener('focus', handleSync);
+      document.removeEventListener('visibilitychange', handleVisibility);
     };
-  }, [pathname, syncFromStorage, revalidateAuth]);
+  }, [pathname, syncFromStorage]);
 
   const login = async (email: string, password: string) => {
     setIsLoading(true);
@@ -157,12 +197,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setUser(prev => {
       if (!prev) return prev;
       const updated = Object.assign(Object.create(Object.getPrototypeOf(prev)), prev, patch);
-      // Persist vào localStorage để reload vẫn giữ
+      // Persist metadata (không có avatar) vào'user', avatar vào 'user_avatar'
       try {
         const stored = localStorage.getItem('user');
         if (stored) {
-          const raw = JSON.parse(stored);
-          localStorage.setItem('user', JSON.stringify({ ...raw, ...patch }));
+          const { avatarUrl: _av, ...meta } = JSON.parse(stored);
+          const { avatarUrl: newAvatar, ...metaPatch } = patch as any;
+          localStorage.setItem('user', JSON.stringify({ ...meta, ...metaPatch }));
+          if (newAvatar !== undefined) {
+            try {
+              localStorage.setItem('user_avatar', newAvatar);
+            } catch {
+              localStorage.removeItem('user_avatar');
+            }
+          }
         }
       } catch {}
       return updated;

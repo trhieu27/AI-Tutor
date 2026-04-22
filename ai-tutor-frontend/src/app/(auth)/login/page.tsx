@@ -15,7 +15,7 @@ export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [localError, setLocalError] = useState('');
   
-  const { user, login, googleLogin: loginWithGoogle, isLoading, isInitialLoading, error: authError } = useAuth();
+  const { user, login, googleLogin: loginWithGoogle, isLoading, error: authError } = useAuth();
   const router = useRouter();
   
   const [mounted, setMounted] = useState(false);
@@ -38,13 +38,6 @@ export default function LoginPage() {
     }
   }, []);
 
-  // 2. Chuyển hướng nếu đã đăng nhập thành công
-  useEffect(() => {
-    if (user && !isInitialLoading) {
-      console.log("[LoginPage] User detected, redirecting to home...");
-      router.replace('/');
-    }
-  }, [user, isInitialLoading, router]);
 
   // 3. Quản lý bộ đếm khóa (Lockout)
   useEffect(() => {
@@ -71,7 +64,7 @@ export default function LoginPage() {
     setLocalError('');
     try {
       await login(email, password);
-      // Không cần router.push ở đây, useEffect số 2 sẽ lo việc chuyển hướng
+      router.replace('/');
     } catch (err: any) {
       const newAttempts = failedAttempts + 1;
       setFailedAttempts(newAttempts);
@@ -92,6 +85,7 @@ export default function LoginPage() {
       setLocalError('');
       try {
         await loginWithGoogle(tokenResponse.access_token);
+        router.replace('/');
       } catch (err: any) {
         setLocalError(err.message || AUTH_TEXTS.GOOGLE.ERROR);
       }
