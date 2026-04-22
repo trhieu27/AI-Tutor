@@ -12,6 +12,7 @@ from app.models.schemas import DocumentResponse
 from app.rag import rag_engine
 
 from app.api.auth import get_current_user
+from app.api.quota import require_doc_quota
 
 router = APIRouter(prefix="/documents", tags=["Documents"])
 settings = get_settings()
@@ -61,7 +62,7 @@ async def upload_document(
     background_tasks: BackgroundTasks,
     file: UploadFile = File(...),
     db: AsyncIOMotorDatabase = Depends(get_db),
-    current_user_id: str = Depends(get_current_user)
+    current_user_id: str = Depends(require_doc_quota()),
 ):
     """Upload a PDF/DOC file and process it in the background using MongoDB."""
     suffix = Path(file.filename or "").suffix.lower()
