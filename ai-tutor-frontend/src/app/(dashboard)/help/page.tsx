@@ -3,14 +3,9 @@
 import React, { useState, useRef, useEffect, useCallback } from "react";
 import { HELP_PAGE_TEXTS } from "@/constants/texts";
 
+import { authFetch } from "@/services/api.service";
+
 const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8081/api/v1";
-const authFetch = (url: string, opts: RequestInit = {}) => {
-  const token = typeof window !== "undefined" ? localStorage.getItem("access_token") : "";
-  return fetch(url, {
-    ...opts,
-    headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json", ...(opts.headers as Record<string, string> || {}) },
-  });
-};
 
 type TabId = "faq" | "guide" | "contact";
 

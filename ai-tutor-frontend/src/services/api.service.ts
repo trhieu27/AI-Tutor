@@ -12,7 +12,7 @@ const getAuthHeaders = (): HeadersInit => {
 };
 
 // Wrapper cho fetch hỗ trợ tự động refresh token
-async function authFetch(url: string, options: RequestInit = {}): Promise<Response> {
+export async function authFetch(url: string, options: RequestInit = {}): Promise<Response> {
   const headers = {
     ...options.headers,
     ...getAuthHeaders(),

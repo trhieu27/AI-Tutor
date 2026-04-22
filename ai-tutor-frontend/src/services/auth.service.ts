@@ -19,6 +19,32 @@ class AuthService {
     document.cookie = `${name}=;expires=Thu, 01 Jan 1970 00:00:00 UTC;path=/;`;
   }
 
+  /**
+   * Lưu user vào localStorage theo 2 key:
+   * - 'user': metadata nhỏ (không có avatar_url) → không bao giờ vượt quota
+   * - 'user_avatar': base64 string (riêng, try-catch nếu quá lớn)
+   */
+  private persistUser(rawUser: any): void {
+    if (typeof window === 'undefined') return;
+    try {
+      const { avatar_url, avatarUrl, ...meta } = rawUser;
+      localStorage.setItem('user', JSON.stringify(meta));
+      // Lưu avatar riêng — bỏ qua nếu quota vượt giới hạn
+      const avatar = avatar_url ?? avatarUrl;
+      if (avatar) {
+        try {
+          localStorage.setItem('user_avatar', avatar);
+        } catch {
+          localStorage.removeItem('user_avatar'); // xóa nếu không đủ chỗ
+        }
+      } else {
+        localStorage.removeItem('user_avatar');
+      }
+    } catch (e) {
+      console.warn('[AuthService] Failed to persist user to localStorage', e);
+    }
+  }
+
   public static getInstance(): AuthService {
     if (!AuthService.instance) {
       AuthService.instance = new AuthService();
@@ -30,9 +56,7 @@ class AuthService {
     try {
       const response = await fetch(`${this.baseUrl}/login`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, password }),
       });
 
@@ -43,19 +67,16 @@ class AuthService {
 
       const data = await response.json();
 
-      // Save tokens to localStorage and cookies
       if (typeof window !== 'undefined') {
         localStorage.setItem('access_token', data.access_token);
         localStorage.setItem('refresh_token', data.refresh_token);
-        localStorage.setItem('user', JSON.stringify(data.user));
-
-        // Cookies for middleware (7 days)
+        this.persistUser(data.user);
         this.setCookie('access_token', data.access_token, 7);
         this.setCookie('refresh_token', data.refresh_token, 7);
       }
 
       return {
-        user: new Student(data.user.id, data.user.full_name, data.user.email, data.user.student_id, undefined, data.user.is_pro ?? false),
+        user: new Student(data.user.id, data.user.full_name, data.user.email, data.user.student_id, data.user.avatar_url, data.user.is_pro ?? false),
         accessToken: data.access_token,
         refreshToken: data.refresh_token,
       };
@@ -69,9 +90,7 @@ class AuthService {
     try {
       const response = await fetch(`${this.baseUrl}/google-login`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ token }),
       });
 
@@ -85,14 +104,13 @@ class AuthService {
       if (typeof window !== 'undefined') {
         localStorage.setItem('access_token', data.access_token);
         localStorage.setItem('refresh_token', data.refresh_token);
-        localStorage.setItem('user', JSON.stringify(data.user));
-
+        this.persistUser(data.user);
         this.setCookie('access_token', data.access_token, 7);
         this.setCookie('refresh_token', data.refresh_token, 7);
       }
 
       return {
-        user: new Student(data.user.id, data.user.full_name, data.user.email, data.user.student_id, undefined, data.user.is_pro ?? false),
+        user: new Student(data.user.id, data.user.full_name, data.user.email, data.user.student_id, data.user.avatar_url, data.user.is_pro ?? false),
         accessToken: data.access_token,
         refreshToken: data.refresh_token,
       };
@@ -108,15 +126,8 @@ class AuthService {
 
       const response = await fetch(`${this.baseUrl}/register`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          student_id: student_id,
-          full_name: name,
-          email,
-          password
-        }),
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ student_id, full_name: name, email, password }),
       });
 
       if (!response.ok) {
@@ -126,18 +137,16 @@ class AuthService {
 
       const data = await response.json();
 
-      // Save tokens
       if (typeof window !== 'undefined') {
         localStorage.setItem('access_token', data.access_token);
         localStorage.setItem('refresh_token', data.refresh_token);
-        localStorage.setItem('user', JSON.stringify(data.user));
-
+        this.persistUser(data.user);
         this.setCookie('access_token', data.access_token, 7);
         this.setCookie('refresh_token', data.refresh_token, 7);
       }
 
       return {
-        user: new Student(data.user.id, data.user.full_name, data.user.email, data.user.student_id, undefined, data.user.is_pro ?? false),
+        user: new Student(data.user.id, data.user.full_name, data.user.email, data.user.student_id, data.user.avatar_url, data.user.is_pro ?? false),
         accessToken: data.access_token,
         refreshToken: data.refresh_token,
       };
@@ -154,9 +163,7 @@ class AuthService {
 
       const response = await fetch(`${this.baseUrl}/refresh`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ refresh_token: refreshToken }),
       });
 
@@ -180,6 +187,7 @@ class AuthService {
       localStorage.removeItem('access_token');
       localStorage.removeItem('refresh_token');
       localStorage.removeItem('user');
+      localStorage.removeItem('user_avatar');
       this.deleteCookie('access_token');
       this.deleteCookie('refresh_token');
     }
@@ -227,10 +235,8 @@ class AuthService {
       const accessToken = localStorage.getItem('access_token');
       if (!accessToken) return null;
 
-      const response = await fetch(`${this.baseUrl}/me`, {
-        headers: {
-          'Authorization': `Bearer ${accessToken}`,
-        },
+      const response = await fetch(`${this.baseUrl}/users/me`, {
+        headers: { 'Authorization': `Bearer ${accessToken}` },
       });
 
       if (!response.ok) {
@@ -242,17 +248,15 @@ class AuthService {
       }
 
       const userData = await response.json();
-      const user = new Student(
+      this.persistUser(userData);
+      return new Student(
         userData.id,
         userData.full_name,
         userData.email,
         userData.student_id,
-        userData.avatarUrl,
+        userData.avatar_url ?? userData.avatarUrl,
         userData.is_pro ?? false
       );
-
-      localStorage.setItem('user', JSON.stringify(user));
-      return user;
     } catch (error) {
       console.error('Get current user error:', error);
       return null;

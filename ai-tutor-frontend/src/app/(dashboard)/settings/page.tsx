@@ -25,20 +25,10 @@ interface Session {
   created_at: string;
   last_active: string;
 }
+import { authFetch } from "@/services/api.service";
 
-/* ── Config ───────────────────────────────────────────────────────────────── */
 const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8081/api/v1";
-const authFetch = (url: string, opts: RequestInit = {}) => {
-  const token = typeof window !== "undefined" ? localStorage.getItem("access_token") : "";
-  return fetch(url, {
-    ...opts,
-    headers: {
-      Authorization: `Bearer ${token}`,
-      "Content-Type": "application/json",
-      ...(opts.headers as Record<string, string> || {}),
-    },
-  });
-};
+
 
 /* ── Utilities ────────────────────────────────────────────────────────────── */
 function parseUA(ua: string) {
@@ -122,10 +112,8 @@ function ProfileSection({ profile, onRefresh }: { profile: UserProfile; onRefres
     const fd = new FormData();
     fd.append("file", file);
     try {
-      const token = localStorage.getItem("access_token");
-      const res = await fetch(`${API}/users/avatar`, {
+      const res = await authFetch(`${API}/users/avatar`, {
         method: "POST",
-        headers: { Authorization: `Bearer ${token}` },
         body: fd,
       });
       if (!res.ok) throw new Error((await res.json()).detail);

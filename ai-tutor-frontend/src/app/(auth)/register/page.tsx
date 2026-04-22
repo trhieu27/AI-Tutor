@@ -18,7 +18,7 @@ export default function RegisterPage() {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [localError, setLocalError] = useState('');
   
-  const { user, register, googleLogin: loginWithGoogle, isLoading, isInitialLoading, error: authError } = useAuth();
+  const { user, register, googleLogin: loginWithGoogle, isLoading, error: authError } = useAuth();
   const router = useRouter();
   const [mounted, setMounted] = useState(false);
 
@@ -26,12 +26,6 @@ export default function RegisterPage() {
     setMounted(true);
   }, []);
 
-  // Chuyển hướng nếu đã đăng nhập thành công
-  useEffect(() => {
-    if (user && !isInitialLoading) {
-      router.replace('/');
-    }
-  }, [user, isInitialLoading, router]);
 
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -44,6 +38,7 @@ export default function RegisterPage() {
 
     try {
       await register(name, email, password);
+      router.replace('/');
     } catch (err: any) {
       setLocalError(err?.message || AUTH_TEXTS.REGISTER.REGISTER_ERROR);
     }
@@ -54,6 +49,7 @@ export default function RegisterPage() {
       setLocalError('');
       try {
         await loginWithGoogle(tokenResponse.access_token);
+        router.replace('/');
       } catch (err: any) {
         setLocalError(err.message || AUTH_TEXTS.GOOGLE.ERROR);
       }

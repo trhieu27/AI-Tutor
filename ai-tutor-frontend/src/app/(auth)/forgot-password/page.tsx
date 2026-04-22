@@ -3,7 +3,6 @@
 import Link from 'next/link';
 import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
-import { useAuth } from '@/context/AuthContext';
 import { AUTH_TEXTS } from '@/constants/texts';
 import AuthBranding from '@/components/AuthBranding';
 import { authService } from '@/services/auth.service';
@@ -28,16 +27,9 @@ export default function ForgotPasswordPage() {
   const [failedOtpAttempts, setFailedOtpAttempts] = useState(0);
   const [otpLockoutTimer, setOtpLockoutTimer] = useState(0);
 
-  const { user, isInitialLoading } = useAuth();
   const router = useRouter();
   const inputRefs = useRef<(HTMLInputElement | null)[]>([]);
 
-  useEffect(() => {
-    if (user && !isInitialLoading) {
-      router.refresh();
-      router.replace('/');
-    }
-  }, [user, isInitialLoading, router]);
 
   // Load OTP lockout state from localStorage
   useEffect(() => {
@@ -169,7 +161,6 @@ export default function ForgotPasswordPage() {
     }
   };
 
-  if (user && !isInitialLoading) return null;
 
   const renderContent = () => {
     switch (step) {
