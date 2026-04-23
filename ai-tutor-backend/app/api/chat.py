@@ -1,14 +1,16 @@
-from fastapi import APIRouter, Depends, HTTPException, Request
-from fastapi.responses import StreamingResponse
 import re
 import json
 import logging
 import asyncio
+from datetime import datetime
 from uuid import uuid4
 
-logger = logging.getLogger(__name__)
-from datetime import datetime
+from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi.responses import StreamingResponse
 from motor.motor_asyncio import AsyncIOMotorDatabase
+from langchain_core.messages import HumanMessage, AIMessage
+
+logger = logging.getLogger(__name__)
 
 from app.core.database import get_db
 from app.models.db_models import ChatSession, ChatMessage
@@ -25,28 +27,30 @@ from app.api.quota import require_chat_quota, require_ai_quota, FREE_LIMITS
 
 router = APIRouter(prefix="/chat", tags=["Chat"])
 
-# ── Prompt injection guard ─────────────────────────────────────────────────────
-_INJECTION_PATTERNS = [
-    r"ignore (all |previous |above )?instructions?",
-    r"forget (everything|all|your instructions?)",
-    r"(reveal|output|print|show|display) (the |your )?(system |original )?prompt",
-    r"you are now",
-    r"act as (a |an )?(different|new)",
-    r"jailbreak",
-    r"DAN mode",
-]
+# ── Prompt injection guard ────────────────────────────────────────────────────
+
+_INJECTION_PATTERNS = re.compile(
+    r"ignore (all |previous |above )?instructions?"
+    r"|forget (everything|all|your instructions?)"
+    r"|(reveal|output|print|show|display) (the |your )?(system |original )?prompt"
+    r"|you are now"
+    r"|act as (a |an )?(different|new)"
+    r"|jailbreak"
+    r"|DAN mode",
+    re.IGNORECASE,
+)
 
 def sanitize_question(text: str) -> str:
-    """Strip control chars and block common prompt-injection patterns."""
-    lower = text.lower()
-    for pattern in _INJECTION_PATTERNS:
-        if re.search(pattern, lower):
-            raise HTTPException(
-                status_code=400,
-                detail="Câu hỏi chứa nội dung không hợp lệ. Vui lòng đặt lại câu hỏi."
-            )
-    # Strip ASCII control characters (except tab/newline)
-    return re.sub(r"[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]", "", text).strip()
+    """Strip control chars và block prompt injection patterns."""
+    # Strip non-printable control characters
+    cleaned = re.sub(r'[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]', '', text).strip()
+    if _INJECTION_PATTERNS.search(cleaned):
+        raise HTTPException(
+            status_code=400,
+            detail="Câu hỏi chứa nội dung không hợp lệ. Vui lòng đặt câu hỏi khác."
+        )
+    return cleaned
+
 
 
 @router.post("/{document_id}/ask", response_model=AskResponse)
@@ -96,12 +100,12 @@ async def chat_with_document(
         MAX_CHAR_PER_MSG = FREE_LIMITS["msg_chars"]
 
     chat_history = [
-        {"role": m["role"], "content": m["content"][:MAX_CHAR_PER_MSG]}
+        (HumanMessage(content=m["content"][:MAX_CHAR_PER_MSG]) if m["role"] == "user" else AIMessage(content=m["content"][:MAX_CHAR_PER_MSG]))
         for m in context_msgs
     ]
 
     try:
-        # 4. Sanitize + validate câu hỏi
+        # 4. Sanitize + kiểm tra độ dài câu hỏi
         question_text = sanitize_question(request.question)
         if not is_pro and len(question_text) > FREE_LIMITS["question_chars"]:
             raise HTTPException(

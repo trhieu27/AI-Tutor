@@ -37,8 +37,12 @@ class Settings(BaseSettings):
 
 
 
-    # CORS
-    CORS_ORIGINS: list[str] = ["*"]
+    # CORS — thêm domain production vào đây khi deploy
+    CORS_ORIGINS: list[str] = [
+        "http://localhost:3000",
+        "http://localhost:3001",
+        "http://127.0.0.1:3000",
+    ]
 
     class Config:
         env_file = ".env"

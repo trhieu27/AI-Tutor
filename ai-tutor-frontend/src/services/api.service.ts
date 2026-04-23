@@ -400,3 +400,25 @@ export async function fetchDocumentStudyQuestions(documentId: string, signal?: A
     .map(l => l.replace(/^\d+\.\s*/, "").trim())
     .filter(l => l.length > 5);
 }
+
+// ─── Quota API ─────────────────────────────────────────────────────────────────
+
+export interface QuotaUsage {
+  documents: number;
+  chat_messages: number;
+  ai_features: number;
+}
+
+export interface QuotaResponse {
+  is_pro: boolean;
+  limits: Record<string, number> | null;
+  usage: QuotaUsage | null;
+}
+
+export async function fetchQuota(): Promise<QuotaResponse> {
+  const res = await authFetch(`${API_BASE}/quota/me`, {
+    headers: { ...getAuthHeaders() },
+  });
+  if (!res.ok) throw new Error("Không thể tải thông tin quota");
+  return res.json();
+}

@@ -18,9 +18,11 @@ import {
   fetchDocumentQuiz,
   fetchDocumentStudyQuestions,
   deleteChatSession,
+  fetchQuota,
   DocumentResponse,
   ChatSessionResponse,
   MessageResponse,
+  QuotaResponse,
 } from "@/services/api.service";
 import { CHAT_TEXTS } from "@/constants/texts";
 
@@ -46,9 +48,9 @@ export default function ChatPage() {
   const [studyQuestions, setStudyQuestions] = useState<string[] | null>(null);
   const [isStudyQuestionsLoading, setIsStudyQuestionsLoading] = useState(false);
   const [showModal, setShowModal] = useState<"summary" | "quiz" | "mindmap" | "questions" | null>(null);
-  const [chatUsed, setChatUsed] = useState<number | null>(null);
-  const [chatLimit, setChatLimit] = useState<number>(30);
-  const [isProUser, setIsProUser] = useState<boolean>(false);
+  const [quota, setQuota] = useState<QuotaResponse | null>(null);
+  // ID của tin nhắn AI đang stream (để render blink cursor)
+  const [streamingMsgId, setStreamingMsgId] = useState<string | null>(null);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
@@ -72,6 +74,8 @@ export default function ChatPage() {
         if (initialAction === "quiz") handleGetQuiz();
         else if (initialAction === "summary") handleGetSummary();
         else if (initialAction === "questions") handleGetStudyQuestions();
+        // Load quota
+        fetchQuota().then(setQuota).catch(() => {});
       } catch (error) {
         console.error("Error loading chat data:", error);
       }
@@ -82,22 +86,6 @@ export default function ChatPage() {
       if (typewriterIntervalRef.current) clearInterval(typewriterIntervalRef.current);
     };
   }, [documentId]);
-
-  // Load quota info once on mount
-  useEffect(() => {
-    import("@/services/api.service").then(({ authFetch }) => {
-      authFetch("/api/v1/quota/me")
-        .then(r => r.json())
-        .then(data => {
-          setIsProUser(data.is_pro);
-          if (!data.is_pro && data.usage) {
-            setChatUsed(data.usage.chat_messages);
-            setChatLimit(data.limits?.chat_messages ?? 30);
-          }
-        })
-        .catch(() => {});
-    });
-  }, []);
 
   const loadSession = async (sessionId: string) => {
     try {
@@ -132,10 +120,9 @@ export default function ChatPage() {
         const updatedSessions = await fetchChatSessions(documentId);
         setSessions(updatedSessions);
       }
-      // Update quota counter optimistically
-      setChatUsed(prev => prev !== null ? prev + 1 : null);
       const fullContent = response.message.content;
       const assistantId = response.message.id;
+      setStreamingMsgId(assistantId);
       setMessages((prev) => [...prev, { ...response.message, content: "" }]);
       let currentIdx = 0;
       const interval = setInterval(() => {
@@ -174,8 +161,11 @@ export default function ChatPage() {
       clearInterval(typewriterIntervalRef.current);
       typewriterIntervalRef.current = null;
     }
+    setStreamingMsgId(null);
     setIsLoading(false);
     abortControllerRef.current = null;
+    // Refresh quota sau khi AI trả lời xong
+    fetchQuota().then(setQuota).catch(() => {});
   };
 
   const handleCancel = () => {
@@ -370,7 +360,7 @@ export default function ChatPage() {
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 w-full max-w-lg">
                 {CHAT_TEXTS.WELCOME.SUGGESTIONS.map((q) => (
                   <button key={q} onClick={() => setInput(q)}
-                    className="p-3 text-left text-[12px] text-[#374151] dark:text-white/55 bg-[#F9FAFB] dark:bg-white/[0.03] border border-[#E5E7EB] dark:border-white/[0.07] rounded-xl hover:border-[#9CA3AF] dark:hover:border-white/20 hover:bg-[#F3F4F6] dark:hover:bg-white/[0.06] hover:-translate-y-0.5 hover:shadow-md transition-all duration-200 font-medium leading-snug">
+                    className="p-3 text-left text-[12px] text-[#374151] dark:text-white/55 bg-[#F9FAFB] dark:bg-white/[0.03] border border-[#E5E7EB] dark:border-white/[0.07] rounded-xl hover:border-[#9CA3AF] dark:hover:border-white/20 hover:bg-[#F3F4F6] dark:hover:bg-white/[0.06] hover:-translate-y-0.5 hover:shadow-sm transition-all duration-200 font-medium leading-snug">
                     {q}
                   </button>
                 ))}
@@ -418,9 +408,9 @@ export default function ChatPage() {
                           prose-ul:my-2 prose-ol:my-2 prose-li:my-0.5
                           prose-table:text-[12px] prose-th:font-semibold prose-th:text-[#1F2937] dark:prose-th:text-white prose-td:text-[#374151] dark:prose-td:text-white/65 prose-table:border-collapse prose-th:border prose-th:border-[#E5E7EB] dark:prose-th:border-white/[0.08] prose-td:border prose-td:border-[#F3F4F6] dark:prose-td:border-white/[0.05] prose-th:px-3 prose-td:px-3">
                           <ReactMarkdown>{msg.content}</ReactMarkdown>
-                          {/* Blinking cursor while streaming */}
-                          {isLoading && msg.id === messages[messages.length - 1]?.id && (
-                            <span className="inline-block w-[2px] h-[1em] bg-current ml-0.5 align-middle opacity-75 animate-pulse" />
+                          {/* Blink cursor khi đang stream */}
+                          {streamingMsgId === msg.id && (
+                            <span className="inline-block w-0.5 h-[1em] bg-current ml-0.5 align-middle animate-[blink_0.9s_ease-in-out_infinite]" />
                           )}
                         </div>
                       ) : (
@@ -499,7 +489,7 @@ export default function ChatPage() {
                       : "bg-[#F3F4F6] dark:bg-white/[0.04] text-[#D1D5DB] dark:text-white/15 cursor-not-allowed"
                 }`}
               >
-                <span className="material-symbols-outlined text-[18px] transition-transform">
+                <span className={`material-symbols-outlined text-[18px] ${isLoading ? "animate-pulse" : ""}`}>
                   {isLoading ? "stop_circle" : "arrow_upward"}
                 </span>
               </button>
@@ -515,24 +505,21 @@ export default function ChatPage() {
                 {input.length}/600
               </span>
             </div>
-
-            {/* Quota progress bar — only for free users */}
-            {!isProUser && chatUsed !== null && (
+            {/* Quota progress bar — chỉ hiện cho Free user */}
+            {quota && !quota.is_pro && quota.usage && quota.limits && (
               <div className="flex items-center gap-2 mt-2 px-0.5">
                 <div className="flex-1 h-0.5 bg-[#F3F4F6] dark:bg-white/[0.05] rounded-full overflow-hidden">
                   <div
                     className={`h-full rounded-full transition-all duration-500 ${
-                      chatUsed / chatLimit > 0.8
+                      quota.usage.chat_messages / quota.limits.chat_messages > 0.8
                         ? "bg-gradient-to-r from-amber-400 to-red-400"
                         : "bg-gradient-to-r from-blue-400 to-violet-400"
                     }`}
-                    style={{ width: `${Math.min((chatUsed / chatLimit) * 100, 100)}%` }}
+                    style={{ width: `${Math.min((quota.usage.chat_messages / quota.limits.chat_messages) * 100, 100)}%` }}
                   />
                 </div>
-                <span className={`text-[10px] font-medium tabular-nums shrink-0 ${
-                  chatUsed / chatLimit > 0.8 ? "text-amber-400" : "text-[#9CA3AF] dark:text-white/20"
-                }`}>
-                  {chatLimit - chatUsed} lượt còn lại
+                <span className="text-[10px] text-[#9CA3AF] dark:text-white/20 tabular-nums shrink-0">
+                  {quota.limits.chat_messages - quota.usage.chat_messages} lượt còn lại
                 </span>
               </div>
             )}
