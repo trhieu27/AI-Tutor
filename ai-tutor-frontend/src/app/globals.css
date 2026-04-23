@@ -469,6 +469,12 @@ h1, h2, h3, h4, h5, h6 {
 .animate-dialog-enter    { animation: dialog-enter 0.28s cubic-bezier(0.34, 1.56, 0.64, 1) both; }
 .animate-jumping-dot     { animation: jumping-dot 1s ease-in-out infinite; }
 
+/* Streaming cursor blink */
+@keyframes blink {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0; }
+}
+
 /* ── Custom Scrollbar ─────────────────────────────────────────────────── */
 .custom-scrollbar::-webkit-scrollbar         { width: 4px; }
 .custom-scrollbar::-webkit-scrollbar-track   { background: transparent; }

@@ -1,13 +1,13 @@
 import os
 import re
+import json
 import logging
 import asyncio
-import json
-import fitz  # PyMuPDF
-import docx2txt
 from functools import lru_cache
 from typing import List, Tuple, Dict, Any, Optional
 
+import fitz  # PyMuPDF
+import docx2txt
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_google_genai import GoogleGenerativeAIEmbeddings, ChatGoogleGenerativeAI
 from langchain_chroma import Chroma
@@ -31,15 +31,6 @@ from app.rag.texts import (
 
 logger = logging.getLogger(__name__)
 
-def _extract_text(content: Any) -> str:
-    """Helper to extract plain text from LLM response which could be str or list of dicts."""
-    if isinstance(content, str):
-        return content
-    if isinstance(content, list):
-        return "".join([part.get("text", "") if isinstance(part, dict) else str(part) for part in content])
-    return str(content)
-
-
 settings = get_settings()
 
 # Ensure directories exist
@@ -47,9 +38,10 @@ os.makedirs(settings.CHROMA_PERSIST_DIR, exist_ok=True)
 os.makedirs(settings.UPLOAD_DIR, exist_ok=True)
 
 
+# ── Singleton LLM & Embeddings (thread-safe via lru_cache) ───────────────────
+
 @lru_cache(maxsize=1)
-def get_embeddings() -> "GoogleGenerativeAIEmbeddings":
-    """Singleton embedding model — thread-safe via lru_cache."""
+def get_embeddings() -> GoogleGenerativeAIEmbeddings:
     return GoogleGenerativeAIEmbeddings(
         model="models/gemini-embedding-001",
         google_api_key=get_settings().GEMINI_API_KEY,
@@ -57,24 +49,46 @@ def get_embeddings() -> "GoogleGenerativeAIEmbeddings":
 
 
 @lru_cache(maxsize=1)
-def get_llm() -> "ChatGoogleGenerativeAI":
-    """Singleton LLM — thread-safe via lru_cache."""
+def get_llm() -> ChatGoogleGenerativeAI:
     return ChatGoogleGenerativeAI(
         model="gemini-flash-latest",
         google_api_key=get_settings().GEMINI_API_KEY,
         temperature=0.2,
-        transport="rest",  # REST ổn định hơn gRPC trong môi trường dev
+        transport="rest",
     )
 
+
+# ── Helpers ───────────────────────────────────────────────────────────────────
+
+def _extract_text(content: Any) -> str:
+    """Extract plain text from LLM response (str or list of dicts)."""
+    if isinstance(content, str):
+        return content
+    if isinstance(content, list):
+        return "".join([
+            part.get("text", "") if isinstance(part, dict) else str(part)
+            for part in content
+        ])
+    return str(content)
+
+
+def _stream_chunk_text(chunk) -> str:
+    """Extract text from a streaming LLM chunk."""
+    content = chunk.content
+    if isinstance(content, list):
+        return "".join([
+            part.get("text", "") if isinstance(part, dict) else str(part)
+            for part in content
+        ])
+    return str(content)
+
+
+# ── Document Ingestion ────────────────────────────────────────────────────────
 
 def extract_text_from_pdf(file_path: str) -> tuple[list[str], int]:
     """Extract text from PDF, return (list of page texts, page_count)."""
     doc = fitz.open(file_path)
-    pages = []
-    for page in doc:
-        text = page.get_text()
-        if text.strip():
-            pages.append(text)
+    pages = [page.get_text() for page in doc if page.get_text().strip()]
     page_count = len(doc)
     doc.close()
     return pages, page_count
@@ -82,27 +96,17 @@ def extract_text_from_pdf(file_path: str) -> tuple[list[str], int]:
 
 def extract_text_from_docx(file_path: str) -> tuple[list[str], int]:
     """Extract text from DOCX, return (list containing whole text, page_count estimate)."""
-    import docx2txt
     text = docx2txt.process(file_path)
     if not text.strip():
         return [], 0
-    # DOCX doesn't have native pages in text extraction, 
-    # treat as one large page or split by rough length
-    pages = [text]
-    # Estimate pages based on word count
     page_count = (len(text.split()) // 500) + 1
-    return pages, page_count
+    return [text], page_count
 
 
 async def ingest_document(file_path: str, document_id: str) -> tuple[str, int]:
-    """
-    Process a document file async.
-    """
-    import asyncio
-    
+    """Process a document file async."""
     suffix = os.path.splitext(file_path)[1].lower()
-    
-    # Run text extraction in a thread to avoid blocking loop
+
     if suffix == ".pdf":
         pages, page_count = await asyncio.to_thread(extract_text_from_pdf, file_path)
     elif suffix in [".docx", ".doc"]:
@@ -113,7 +117,6 @@ async def ingest_document(file_path: str, document_id: str) -> tuple[str, int]:
     if not pages:
         raise ValueError("Không thể trích xuất văn bản từ tài liệu.")
 
-    # Split text into chunks with metadata
     splitter = RecursiveCharacterTextSplitter(
         chunk_size=1000,
         chunk_overlap=200,
@@ -123,17 +126,14 @@ async def ingest_document(file_path: str, document_id: str) -> tuple[str, int]:
     chunks = []
     chunk_metadatas = []
     for i, page_text in enumerate(pages, 1):
-        text_chunks = splitter.split_text(page_text)
-        for chunk in text_chunks:
+        for chunk in splitter.split_text(page_text):
             chunks.append(chunk)
             chunk_metadatas.append({"document_id": document_id, "page": i})
 
-    # Create a unique collection name per document
     collection_name = f"doc_{document_id.replace('-', '_')}"
 
-    # Store in ChromaDB - This is blocking, run in thread
     embeddings = get_embeddings()
-    
+
     def _create_chroma():
         return Chroma.from_texts(
             texts=chunks,
@@ -142,43 +142,33 @@ async def ingest_document(file_path: str, document_id: str) -> tuple[str, int]:
             collection_name=collection_name,
             persist_directory=settings.CHROMA_PERSIST_DIR,
         )
-    
+
     await asyncio.to_thread(_create_chroma)
     return collection_name, page_count
 
 
 def get_vectorstore(collection_name: str) -> Chroma:
     """Load an existing ChromaDB collection."""
-    embeddings = get_embeddings()
     return Chroma(
         collection_name=collection_name,
-        embedding_function=embeddings,
+        embedding_function=get_embeddings(),
         persist_directory=settings.CHROMA_PERSIST_DIR,
     )
 
 
-def build_lc_history(messages: list[dict]) -> list:
-    """Convert pre-processed chat_history dicts to LangChain message objects.
-    NOTE: Filtering/truncation is already handled in chat.py per user tier.
-    """
-    history = []
-    for msg in messages:
-        if msg["role"] == "user":
-            history.append(HumanMessage(content=msg["content"]))
-        else:
-            history.append(AIMessage(content=msg["content"]))
-    return history
-
+# ── RAG Core ──────────────────────────────────────────────────────────────────
 
 async def ask_question(
     question: str,
     collection_name: str,
     document_id: str,
-    chat_history: list[dict],
+    chat_history: list,       # Already LangChain HumanMessage/AIMessage objects from chat.py
     is_cancelled=None,
 ) -> dict:
     """
     Ask a question using RAG with LCEL.
+    chat_history is expected to be a list of LangChain message objects,
+    already filtered and truncated by chat.py according to user tier.
     Returns {'answer': str, 'sources': list[dict]}
     """
     try:
@@ -186,35 +176,27 @@ async def ask_question(
         retrieved_docs = await vectorstore.asimilarity_search(question, k=5)
 
         llm = get_llm()
-
-        # Build prompt
         prompt = ChatPromptTemplate.from_messages([
             ("system", SYSTEM_TEMPLATE_CHAT),
             MessagesPlaceholder(variable_name="chat_history"),
             ("human", "{question}"),
         ])
 
-        # Format context
         context_text = "\n\n---\n\n".join([doc.page_content for doc in retrieved_docs])
 
-        # Convert pre-processed history dicts to LangChain objects
-        lc_history = build_lc_history(chat_history)
-
-        # Create chain using LCEL
         chain = prompt | llm | StrOutputParser()
 
-        # Final check before calling AI
         if is_cancelled and await is_cancelled():
-            logger.info("⏹️ Connection disconnected! Aborting AI call.")
+            logger.info("⏹️ Connection disconnected before AI call.")
             raise asyncio.CancelledError()
 
         answer = await chain.ainvoke({
             "context": context_text,
-            "chat_history": lc_history,
+            "chat_history": chat_history,
             "question": question,
         })
-        
-        # Format sources
+
+        # Deduplicate sources
         sources = []
         seen = set()
         for doc in retrieved_docs:
@@ -232,66 +214,53 @@ async def ask_question(
         return {"answer": answer, "sources": sources[:3]}
 
     except Exception as e:
-        # Raise the exception so the API layer can handle it with proper HTTP codes
         raise e
 
+
+# ── Streaming Generators ──────────────────────────────────────────────────────
 
 async def summarize_document_stream(collection_name: str, is_cancelled=None):
     """Stream a comprehensive summary of the document."""
     try:
         vectorstore = await asyncio.to_thread(get_vectorstore, collection_name)
-        docs = await vectorstore.asimilarity_search(QUERY_SUMMARIZE, k=10) 
+        docs = await vectorstore.asimilarity_search(QUERY_SUMMARIZE, k=10)
         if not docs:
             yield "Không tìm thấy nội dung để tóm tắt."
             return
 
         context = "\n\n".join([doc.page_content for doc in docs])
-        llm = get_llm()
         prompt = PROMPT_SUMMARIZE.replace("{context}", context)
-        
-        async for chunk in llm.astream(prompt):
+
+        async for chunk in get_llm().astream(prompt):
             if is_cancelled and await is_cancelled():
                 logger.info("⏹️ Summary stream aborted by user.")
                 break
-            # Extract text content from the chunk
-            content = chunk.content
-            if isinstance(content, list):
-                text = "".join([part.get("text", "") if isinstance(part, dict) else str(part) for part in content])
-                yield text
-            else:
-                yield str(content)
-                
+            yield _stream_chunk_text(chunk)
+
     except Exception as e:
-        logger.error(f"Summarize Stream Error: {str(e)}")
+        logger.error(f"Summarize Stream Error: {e}")
         yield "\n\nHệ thống đang bận hoặc gặp lỗi xử lý. Vui lòng thử lại sau."
 
 
 async def generate_quiz_stream(collection_name: str, is_cancelled=None):
-    """
-    Stream quiz questions one by one or in chunks.
-    For simplicity, we'll stream the raw text and let frontend parse it.
-    """
+    """Stream quiz JSON from the document."""
     try:
         vectorstore = await asyncio.to_thread(get_vectorstore, collection_name)
         docs = await vectorstore.asimilarity_search(QUERY_QUIZ, k=10)
         context = "\n\n".join([doc.page_content for doc in docs])
-        
-        llm = get_llm()
+
         prompt = PROMPT_QUIZ.replace("{context}", context)
         prompt += "\n\nYÊU CẦU quan trọng: Hãy trả về dữ liệu dưới dạng JSON array của các câu hỏi. Bắt đầu bằng [ và kết thúc bằng ]."
 
-        async for chunk in llm.astream(prompt):
+        async for chunk in get_llm().astream(prompt):
             if is_cancelled and await is_cancelled():
                 break
-            content = chunk.content
-            if isinstance(content, list):
-                yield "".join([part.get("text", "") if isinstance(part, dict) else str(part) for part in content])
-            else:
-                yield str(content)
-                
+            yield _stream_chunk_text(chunk)
+
     except Exception as e:
-        logger.error(f"Quiz Stream Error: {str(e)}")
-        yield "[]"  # Yield empty array so it fails gracefully
+        logger.error(f"Quiz Stream Error: {e}")
+        yield "[]"
+
 
 async def generate_mindmap_stream(collection_name: str, is_cancelled=None):
     """Stream a Mermaid.js mindmap string."""
@@ -299,22 +268,18 @@ async def generate_mindmap_stream(collection_name: str, is_cancelled=None):
         vectorstore = await asyncio.to_thread(get_vectorstore, collection_name)
         docs = await vectorstore.asimilarity_search(QUERY_MINDMAP, k=10)
         context = "\n\n".join([doc.page_content for doc in docs])
-        
-        llm = get_llm()
+
         prompt = PROMPT_MINDMAP.replace("{context}", context)
 
-        async for chunk in llm.astream(prompt):
+        async for chunk in get_llm().astream(prompt):
             if is_cancelled and await is_cancelled():
                 break
-            content = chunk.content
-            if isinstance(content, list):
-                yield "".join([part.get("text", "") if isinstance(part, dict) else str(part) for part in content])
-            else:
-                yield str(content)
-                
+            yield _stream_chunk_text(chunk)
+
     except Exception as e:
-        logger.error(f"Mindmap Stream Error: {str(e)}")
+        logger.error(f"Mindmap Stream Error: {e}")
         yield "Hệ thống đang bận hoặc gặp lỗi xử lý. Vui lòng thử lại sau giây lát hoặc kiểm tra lượt dùng AI."
+
 
 async def generate_study_questions_stream(collection_name: str, is_cancelled=None):
     """Stream open-ended study questions."""
@@ -322,19 +287,14 @@ async def generate_study_questions_stream(collection_name: str, is_cancelled=Non
         vectorstore = await asyncio.to_thread(get_vectorstore, collection_name)
         docs = await vectorstore.asimilarity_search(QUERY_STUDY_QUESTIONS, k=15)
         context = "\n\n".join([doc.page_content for doc in docs])
-        
-        llm = get_llm()
+
         prompt = PROMPT_STUDY_QUESTIONS.replace("{context}", context)
 
-        async for chunk in llm.astream(prompt):
+        async for chunk in get_llm().astream(prompt):
             if is_cancelled and await is_cancelled():
                 break
-            content = chunk.content
-            if isinstance(content, list):
-                yield "".join([part.get("text", "") if isinstance(part, dict) else str(part) for part in content])
-            else:
-                yield str(content)
-                
+            yield _stream_chunk_text(chunk)
+
     except Exception as e:
-        logger.error(f"Study Questions Stream Error: {str(e)}")
+        logger.error(f"Study Questions Stream Error: {e}")
         yield "\n\nHệ thống đang bận hoặc gặp lỗi xử lý. Vui lòng thử lại sau."
