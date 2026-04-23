@@ -456,7 +456,6 @@ export default function ChatPage() {
                   rows={1}
                   maxLength={600}
                   placeholder={CHAT_TEXTS.INPUT.PLACEHOLDER}
-                  disabled={isLoading}
                   className="flex-1 bg-transparent text-[#1F2937] dark:text-white/85 py-3.5 pl-3 pr-4 focus:outline-none text-[13px] font-medium placeholder:text-[#D1D5DB] dark:placeholder:text-white/15 resize-none overflow-y-auto leading-relaxed"
                   style={{ minHeight: "52px", maxHeight: "120px" }}
                 />
@@ -466,11 +465,13 @@ export default function ChatPage() {
               <button
                 type={isLoading ? "button" : "submit"}
                 onClick={isLoading ? handleCancel : undefined}
-                disabled={!input.trim() && !isLoading}
+                disabled={!isLoading && !input.trim()}
                 className={`shrink-0 mb-1 w-9 h-9 rounded-xl flex items-center justify-center transition-all ${
-                  input.trim() || isLoading
-                    ? "bg-[#1F2937] dark:bg-white/90 text-white dark:text-[#0A0A0B] hover:opacity-75 active:scale-95"
-                    : "bg-[#F3F4F6] dark:bg-white/[0.04] text-[#D1D5DB] dark:text-white/15 cursor-not-allowed"
+                  isLoading
+                    ? "bg-red-500/90 dark:bg-red-500/80 text-white hover:opacity-80 active:scale-95"
+                    : input.trim()
+                      ? "bg-[#1F2937] dark:bg-white/90 text-white dark:text-[#0A0A0B] hover:opacity-75 active:scale-95"
+                      : "bg-[#F3F4F6] dark:bg-white/[0.04] text-[#D1D5DB] dark:text-white/15 cursor-not-allowed"
                 }`}
               >
                 <span className="material-symbols-outlined text-[18px]">

@@ -13,17 +13,14 @@ from app.core.database import get_db
 from app.models.db_models import ChatSession, ChatMessage
 from app.models.schemas import AskRequest, AskResponse, MessageResponse, ChatSessionResponse, ChatSessionDetail
 from app.rag.rag_engine import (
-    ask_question, 
-    summarize_document_stream, 
-    generate_quiz_stream, 
-    generate_mindmap_stream, 
+    ask_question,
+    summarize_document_stream,
+    generate_quiz_stream,
+    generate_mindmap_stream,
     generate_study_questions_stream,
-    generate_quiz, 
-    generate_mindmap, 
-    generate_study_questions
 )
 from app.api.auth import get_current_user
-from app.api.quota import require_chat_quota, require_ai_quota
+from app.api.quota import require_chat_quota, require_ai_quota, FREE_LIMITS
 
 router = APIRouter(prefix="/chat", tags=["Chat"])
 
@@ -69,11 +66,11 @@ async def chat_with_document(
     if is_pro:
         # Pro: toàn bộ lịch sử, không giới hạn
         context_msgs = history_msgs
-        MAX_CHAR_PER_MSG = 4000   # giới hạn mềm per message
+        MAX_CHAR_PER_MSG = 4000   # giới hạn mềm per message cho Pro
     else:
-        # Free: chỉ 6 tin nhắn cuối (3 lượt hỏi-đáp) và giới hạn ký tự
-        context_msgs  = history_msgs[-6:]
-        MAX_CHAR_PER_MSG = 800    # cắt tin nhắn dài để tránh spam context
+        # Free: giới hạn theo FREE_LIMITS
+        context_msgs  = history_msgs[-FREE_LIMITS["context_messages"]:]
+        MAX_CHAR_PER_MSG = FREE_LIMITS["msg_chars"]
 
     chat_history = [
         {"role": m["role"], "content": m["content"][:MAX_CHAR_PER_MSG]}
@@ -83,11 +80,11 @@ async def chat_with_document(
     try:
         # 4. Gi\u1edbi h\u1ea1n \u0111\u1ed9 d\u00e0i c\u00e2u h\u1ecfi theo tier
         question_text = request.question
-        if not is_pro and len(question_text) > 600:
+        if not is_pro and len(question_text) > FREE_LIMITS["question_chars"]:
             raise HTTPException(
                 status_code=400,
-                detail=f"T\u00e0i kho\u1ea3n mi\u1ec5n ph\u00ed gi\u1edbi h\u1ea1n c\u00e2u h\u1ecfi t\u1ed1i \u0111a 600 k\u00fd t\u1ef1 ({len(question_text)} \u0111\u00e3 nh\u1eadp). "
-                       f"N\u00e2ng c\u1ea5p Pro \u0111\u1ec3 h\u1ecfi kh\u00f4ng gi\u1edbi h\u1ea1n."
+                detail=f"Tài khoản miễn phí giới hạn câu hỏi tối đa {FREE_LIMITS['question_chars']} ký tự ({len(question_text)} đã nhập). "
+                       f"Nâng cấp Pro để hỏi không giới hạn."
             )
 
         # 5. Ask RAG Engine
