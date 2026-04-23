@@ -1,5 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import StreamingResponse
+import re
 import json
 import logging
 import asyncio
@@ -24,6 +25,28 @@ from app.api.quota import require_chat_quota, require_ai_quota, FREE_LIMITS
 
 router = APIRouter(prefix="/chat", tags=["Chat"])
 
+# ── Prompt injection guard ─────────────────────────────────────────────────────
+_INJECTION_PATTERNS = [
+    r"ignore (all |previous |above )?instructions?",
+    r"forget (everything|all|your instructions?)",
+    r"(reveal|output|print|show|display) (the |your )?(system |original )?prompt",
+    r"you are now",
+    r"act as (a |an )?(different|new)",
+    r"jailbreak",
+    r"DAN mode",
+]
+
+def sanitize_question(text: str) -> str:
+    """Strip control chars and block common prompt-injection patterns."""
+    lower = text.lower()
+    for pattern in _INJECTION_PATTERNS:
+        if re.search(pattern, lower):
+            raise HTTPException(
+                status_code=400,
+                detail="Câu hỏi chứa nội dung không hợp lệ. Vui lòng đặt lại câu hỏi."
+            )
+    # Strip ASCII control characters (except tab/newline)
+    return re.sub(r"[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]", "", text).strip()
 
 
 @router.post("/{document_id}/ask", response_model=AskResponse)
@@ -78,8 +101,8 @@ async def chat_with_document(
     ]
 
     try:
-        # 4. Gi\u1edbi h\u1ea1n \u0111\u1ed9 d\u00e0i c\u00e2u h\u1ecfi theo tier
-        question_text = request.question
+        # 4. Sanitize + validate câu hỏi
+        question_text = sanitize_question(request.question)
         if not is_pro and len(question_text) > FREE_LIMITS["question_chars"]:
             raise HTTPException(
                 status_code=400,

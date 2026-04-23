@@ -1,10 +1,11 @@
 import os
-import json
 import re
 import logging
 import asyncio
+import json
 import fitz  # PyMuPDF
 import docx2txt
+from functools import lru_cache
 from typing import List, Tuple, Dict, Any, Optional
 
 from langchain_text_splitters import RecursiveCharacterTextSplitter
@@ -46,28 +47,24 @@ os.makedirs(settings.CHROMA_PERSIST_DIR, exist_ok=True)
 os.makedirs(settings.UPLOAD_DIR, exist_ok=True)
 
 
-_embeddings = None
-_llm = None
-
-def get_embeddings():
-    global _embeddings
-    if _embeddings is None:
-        _embeddings = GoogleGenerativeAIEmbeddings(
-            model="models/gemini-embedding-001",
-            google_api_key=settings.GEMINI_API_KEY,
-        )
-    return _embeddings
+@lru_cache(maxsize=1)
+def get_embeddings() -> "GoogleGenerativeAIEmbeddings":
+    """Singleton embedding model — thread-safe via lru_cache."""
+    return GoogleGenerativeAIEmbeddings(
+        model="models/gemini-embedding-001",
+        google_api_key=get_settings().GEMINI_API_KEY,
+    )
 
 
-def get_llm():
-    global _llm
-    if _llm is None:
-        _llm = ChatGoogleGenerativeAI(
-            model="gemini-flash-latest",
-            google_api_key=settings.GEMINI_API_KEY,
-            temperature=0.2,
-        )
-    return _llm
+@lru_cache(maxsize=1)
+def get_llm() -> "ChatGoogleGenerativeAI":
+    """Singleton LLM — thread-safe via lru_cache."""
+    return ChatGoogleGenerativeAI(
+        model="gemini-flash-latest",
+        google_api_key=get_settings().GEMINI_API_KEY,
+        temperature=0.2,
+        transport="rest",  # REST ổn định hơn gRPC trong môi trường dev
+    )
 
 
 def extract_text_from_pdf(file_path: str) -> tuple[list[str], int]:
@@ -160,11 +157,12 @@ def get_vectorstore(collection_name: str) -> Chroma:
     )
 
 
-def build_chat_history(messages: list[dict]) -> list:
-    """Convert stored messages to LangChain message format, limiting to last 6 messages."""
+def build_lc_history(messages: list[dict]) -> list:
+    """Convert pre-processed chat_history dicts to LangChain message objects.
+    NOTE: Filtering/truncation is already handled in chat.py per user tier.
+    """
     history = []
-    # Only take last 6 messages to save memory and context window
-    for msg in messages[-6:]:
+    for msg in messages:
         if msg["role"] == "user":
             history.append(HumanMessage(content=msg["content"]))
         else:
@@ -183,15 +181,9 @@ async def ask_question(
     Ask a question using RAG with LCEL.
     Returns {'answer': str, 'sources': list[dict]}
     """
-    import asyncio
-    import gc
     try:
         vectorstore = await asyncio.to_thread(get_vectorstore, collection_name)
         retrieved_docs = await vectorstore.asimilarity_search(question, k=5)
-        
-        # Free memory reference to vectorstore early if possible
-        # (Though we still need it for context, but we can call gc)
-        gc.collect() 
 
         llm = get_llm()
 
@@ -205,8 +197,8 @@ async def ask_question(
         # Format context
         context_text = "\n\n---\n\n".join([doc.page_content for doc in retrieved_docs])
 
-        # Build LangChain history
-        lc_history = build_chat_history(chat_history)
+        # Convert pre-processed history dicts to LangChain objects
+        lc_history = build_lc_history(chat_history)
 
         # Create chain using LCEL
         chain = prompt | llm | StrOutputParser()
@@ -346,112 +338,3 @@ async def generate_study_questions_stream(collection_name: str, is_cancelled=Non
     except Exception as e:
         logger.error(f"Study Questions Stream Error: {str(e)}")
         yield "\n\nHệ thống đang bận hoặc gặp lỗi xử lý. Vui lòng thử lại sau."
-
-async def generate_quiz(collection_name: str, is_cancelled=None) -> list[dict]:
-    """Generate multiple choice questions from the document."""
-    try:
-        vectorstore = await asyncio.to_thread(get_vectorstore, collection_name)
-        # Search for key concepts across the whole document
-        docs = await vectorstore.asimilarity_search(QUERY_QUIZ, k=50)
-        context = "\n\n".join([doc.page_content for doc in docs])
-        
-        if not context.strip():
-            return []
-
-        llm = get_llm()
-        prompt = PROMPT_QUIZ.replace("{context}", context)
-        # Tell LLM to generate enough questions for the whole content
-        prompt += "\n\nYÊU CẦU: Hãy tạo số lượng câu hỏi phù hợp (từ 10-30 câu) để bao quát toàn bộ các nội dung quan trọng có trong văn bản trên."
-
-        if is_cancelled and await is_cancelled():
-            raise asyncio.CancelledError()
-
-        response = await llm.ainvoke(prompt)
-        content = _extract_text(response.content).strip()
-        
-        # Use regex to find the first JSON-like array []
-        import re
-        import json
-        json_match = re.search(r'\[\s*\{.*\}\s*\]', content, re.DOTALL)
-        if json_match:
-            content = json_match.group(0)
-        else:
-            # Fallback for simple cleaning
-            if "```json" in content:
-                content = content.split("```json")[1].split("```")[0].strip()
-            elif "```" in content:
-                content = content.split("```")[1].split("```")[0].strip()
-        
-        quiz_data = json.loads(content)
-        logger.info(f"Successfully generated {len(quiz_data)} questions")
-        return quiz_data if isinstance(quiz_data, list) else []
-        
-    except Exception as e:
-        logging.error(f"ERROR in generate_quiz: {str(e)}")
-        raise e
-
-
-async def generate_mindmap(collection_name: str, is_cancelled=None) -> str:
-    """Generate a Mermaid.js mindmap string of the document."""
-    try:
-        vectorstore = await asyncio.to_thread(get_vectorstore, collection_name)
-        docs = await vectorstore.asimilarity_search(QUERY_MINDMAP, k=10)
-        context = "\n\n".join([doc.page_content for doc in docs])
-        
-        llm = get_llm()
-        prompt = PROMPT_MINDMAP.replace("{context}", context)
-
-        if is_cancelled and await is_cancelled():
-            raise asyncio.CancelledError()
-
-        response = await llm.ainvoke(prompt)
-        content = _extract_text(response.content).strip()
-        # Cleaner way to extract mermaid block
-        import re
-        content = _extract_text(response.content).strip()
-        
-        # Look for mindmap block
-        mm_match = re.search(r'(mindmap[\s\S]*?)(?:```|$)', content)
-        if mm_match:
-            content = mm_match.group(1).strip()
-        else:
-            # Fallback for code blocks
-            if "```" in content:
-                content = content.split("```")[1]
-                if content.startswith("mermaid"):
-                    content = content[7:]
-        
-        # Final safety check: ensure the word mindmap is there
-        if "mindmap" not in content.lower():
-            content = "mindmap\n" + content
-        
-        # Clean up common AI artifacts
-        content = content.replace("**", "").replace("*", "")
-        
-        return content.strip()
-    except Exception as e:
-        print(f"🔥 ERROR in generate_mindmap: {str(e)}")
-        raise e
-
-
-async def generate_study_questions(collection_name: str, is_cancelled=None) -> list[str]:
-    """Generate 10 open-ended study questions for the document."""
-    try:
-        vectorstore = await asyncio.to_thread(get_vectorstore, collection_name)
-        docs = await vectorstore.asimilarity_search(QUERY_STUDY_QUESTIONS, k=15)
-        context = "\n\n".join([doc.page_content for doc in docs])
-        
-        llm = get_llm()
-        prompt = PROMPT_STUDY_QUESTIONS.replace("{context}", context)
-
-        if is_cancelled and await is_cancelled():
-            raise asyncio.CancelledError()
-
-        response = await llm.ainvoke(prompt)
-        content = _extract_text(response.content).strip()
-        lines = content.split('\n')
-        questions = [line.strip().lstrip('0123456789.- ').strip('"') for line in lines if '?' in line]
-        return questions[:10]
-    except Exception as e:
-        print(f"🔥 ERROR in generate_study_questions: {str(e)}")
-        raise e
