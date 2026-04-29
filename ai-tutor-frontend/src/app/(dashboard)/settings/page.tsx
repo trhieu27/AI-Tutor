@@ -3,7 +3,7 @@
 import { useState, useCallback, useEffect } from "react";
 import { useTheme } from "next-themes";
 import { useAuth } from "@/context/AuthContext";
-import { SETTINGS_PAGE_TEXTS as T } from "@/constants/texts";
+import { SETTINGS_PAGE_TEXTS as T, QUOTA_TEXTS } from "@/constants/texts";
 
 /* ── Types ────────────────────────────────────────────────────────────────── */
 interface UserProfile {
@@ -435,12 +435,100 @@ function PreferencesSection({ profile, onRefresh }: { profile: UserProfile; onRe
 }
 
 /* ══════════════════════════════════════════════════════════════════════════ */
+/*  UPGRADE SECTION                                                           */
+/* ══════════════════════════════════════════════════════════════════════════ */
+function UpgradeSection({ profile, onRefresh }: { profile: UserProfile; onRefresh: () => void }) {
+  const { updateUser } = useAuth();
+  const [activating, setActivating] = useState(false);
+  const [msg, setMsg] = useState<{ type: "ok" | "err"; text: string } | null>(null);
+  const isPro = profile.is_pro;
+  const U = QUOTA_TEXTS.upgrade;
+
+  const handleUpgrade = async () => {
+    setActivating(true); setMsg(null);
+    try {
+      const res = await authFetch(`${API}/users/upgrade-pro`, { method: "PUT" });
+      if (!res.ok) throw new Error((await res.json()).detail);
+      updateUser({ isPro: true });
+      setMsg({ type: "ok", text: U.successMsg });
+      onRefresh();
+    } catch (e: any) {
+      setMsg({ type: "err", text: e.message });
+    } finally { setActivating(false); }
+  };
+
+  return (
+    <div className="space-y-8">
+      <div>
+        <h2 className="font-display text-[22px] font-semibold text-[var(--foreground)] tracking-tight">{U.title}</h2>
+        <p className="text-[13px] text-[var(--muted)] mt-0.5">{U.subtitle}</p>
+      </div>
+
+      {/* Current plan badge */}
+      <div className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-[var(--surface)] border border-[var(--border-color)]">
+        <span className="text-[11px] font-semibold text-[var(--muted)] uppercase tracking-wider">{U.currentPlan}:</span>
+        {isPro ? (
+          <span className="px-2.5 py-0.5 rounded-lg bg-gradient-to-r from-[hsl(239_68%_58%)] to-[hsl(263_70%_62%)] text-white text-[11px] font-bold">{U.proPlan}</span>
+        ) : (
+          <span className="px-2.5 py-0.5 rounded-lg bg-[var(--border-color)] text-[var(--foreground)] text-[11px] font-bold">{U.freePlan}</span>
+        )}
+      </div>
+
+      {/* Feature comparison */}
+      <div className="max-w-md">
+        <div className="rounded-2xl border border-[var(--border-color)] overflow-hidden">
+          {/* Header */}
+          <div className="grid grid-cols-3 gap-0 bg-[var(--surface)] border-b border-[var(--border-color)]">
+            <div className="px-4 py-3 text-[11px] font-bold text-[var(--muted)] uppercase tracking-wider">Tính năng</div>
+            <div className="px-4 py-3 text-[11px] font-bold text-[var(--muted)] uppercase tracking-wider text-center">{U.freePlan}</div>
+            <div className="px-4 py-3 text-[11px] font-bold text-[hsl(239_55%_50%)] uppercase tracking-wider text-center">{U.proPlan}</div>
+          </div>
+          {/* Rows */}
+          {U.features.map((f, i) => (
+            <div key={i} className="grid grid-cols-3 gap-0 border-b border-[var(--border-color)] last:border-0">
+              <div className="px-4 py-3.5 flex items-center gap-2">
+                <span className="material-symbols-outlined text-[16px] text-[var(--muted)]">{f.icon}</span>
+                <span className="text-[12px] font-medium text-[var(--foreground)]">{f.text}</span>
+              </div>
+              <div className="px-4 py-3.5 text-center text-[12px] text-[var(--muted)] font-medium flex items-center justify-center">{f.free}</div>
+              <div className="px-4 py-3.5 text-center text-[12px] text-[hsl(158_64%_44%)] font-semibold flex items-center justify-center gap-1">
+                <span className="material-symbols-outlined text-[14px]">check_circle</span>
+                {f.pro}
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Action */}
+      <div className="flex items-center gap-4">
+        {isPro ? (
+          <div className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-[hsl(158_64%_44%/0.08)] border border-[hsl(158_64%_44%/0.20)]">
+            <span className="material-symbols-outlined text-[16px] text-[hsl(158_64%_44%)]">verified</span>
+            <span className="text-[13px] font-semibold text-[hsl(158_64%_44%)]">{U.alreadyPro}</span>
+          </div>
+        ) : (
+          <button
+            onClick={handleUpgrade} disabled={activating}
+            className="px-6 py-2.5 rounded-xl bg-gradient-to-r from-[hsl(239_68%_58%)] to-[hsl(263_70%_62%)] text-white text-[13px] font-semibold hover:opacity-90 active:scale-[0.98] transition-all disabled:opacity-50 shadow-[0_4px_16px_hsl(239_68%_58%/0.3)]"
+          >
+            {activating ? U.activating : U.activateBtn}
+          </button>
+        )}
+        <Msg msg={msg} />
+      </div>
+    </div>
+  );
+}
+
+/* ══════════════════════════════════════════════════════════════════════════ */
 /*  MAIN PAGE                                                                 */
 /* ══════════════════════════════════════════════════════════════════════════ */
 const NAV = [
   { id: "profile",    label: T.nav.profile.label,    icon: T.nav.profile.icon },
   { id: "security",   label: T.nav.security.label,   icon: T.nav.security.icon },
   { id: "appearance", label: T.nav.appearance.label,  icon: T.nav.appearance.icon },
+  { id: "upgrade",    label: QUOTA_TEXTS.upgrade.title, icon: "diamond" },
 ] as const;
 type Tab = typeof NAV[number]["id"];
 
@@ -505,6 +593,7 @@ export default function SettingsPage() {
                 {tab === "profile"    && <ProfileSection     profile={profile} onRefresh={fetchProfile} />}
                 {tab === "security"   && <SecuritySection />}
                 {tab === "appearance" && <AppearanceSection />}
+                {tab === "upgrade"    && <UpgradeSection profile={profile} onRefresh={fetchProfile} />}
               </div>
             )}
           </div>

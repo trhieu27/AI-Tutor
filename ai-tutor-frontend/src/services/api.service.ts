@@ -2,6 +2,15 @@ import { authService } from './auth.service';
 
 const API_BASE = "/api/v1";
 
+/** Custom error class for quota exceeded (HTTP 429) */
+export class QuotaError extends Error {
+  status = 429;
+  constructor(message: string) {
+    super(message);
+    this.name = 'QuotaError';
+  }
+}
+
 // Helper để lấy token
 const getAuthHeaders = (): HeadersInit => {
   if (typeof window !== 'undefined') {
@@ -258,7 +267,13 @@ export async function fetchDocumentSummaryStream(
     signal
   });
 
-  if (!res.ok) throw new Error("Không thể tạo bản tóm tắt");
+  if (!res.ok) {
+    if (res.status === 429) {
+      const err = await res.json().catch(() => ({}));
+      throw new QuotaError(err.detail || 'Quota exceeded');
+    }
+    throw new Error("Không thể tạo bản tóm tắt");
+  }
 
   const reader = res.body?.getReader();
   const decoder = new TextDecoder();
@@ -293,7 +308,13 @@ export async function fetchDocumentQuizStream(
     headers: { ...getAuthHeaders() },
     signal
   });
-  if (!res.ok) throw new Error("Không thể tạo bài kiểm tra");
+  if (!res.ok) {
+    if (res.status === 429) {
+      const err = await res.json().catch(() => ({}));
+      throw new QuotaError(err.detail || 'Quota exceeded');
+    }
+    throw new Error("Không thể tạo bài kiểm tra");
+  }
   const reader = res.body?.getReader();
   const decoder = new TextDecoder();
   if (reader) {
@@ -332,7 +353,13 @@ export async function fetchDocumentMindmapStream(
     headers: { ...getAuthHeaders() },
     signal
   });
-  if (!res.ok) throw new Error("Không thể tạo sơ đồ tư duy");
+  if (!res.ok) {
+    if (res.status === 429) {
+      const err = await res.json().catch(() => ({}));
+      throw new QuotaError(err.detail || 'Quota exceeded');
+    }
+    throw new Error("Không thể tạo sơ đồ tư duy");
+  }
   const reader = res.body?.getReader();
   const decoder = new TextDecoder();
   if (reader) {
@@ -377,7 +404,13 @@ export async function fetchDocumentStudyQuestionsStream(
     headers: { ...getAuthHeaders() },
     signal
   });
-  if (!res.ok) throw new Error("Không thể tạo câu hỏi ôn tập");
+  if (!res.ok) {
+    if (res.status === 429) {
+      const err = await res.json().catch(() => ({}));
+      throw new QuotaError(err.detail || 'Quota exceeded');
+    }
+    throw new Error("Không thể tạo câu hỏi ôn tập");
+  }
   const reader = res.body?.getReader();
   const decoder = new TextDecoder();
   if (reader) {

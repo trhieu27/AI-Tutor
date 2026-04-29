@@ -338,6 +338,34 @@ export const ERROR_MESSAGES = {
   CANCELLED: "Tác vụ đã được hủy theo yêu cầu của người dùng."
 };
 
+export const QUOTA_TEXTS = {
+  exceeded: {
+    title: "Đã hết lượt sử dụng",
+    chat: "Bạn đã dùng hết lượt chat miễn phí hôm nay.",
+    ai: "Bạn đã dùng hết lượt tạo nội dung AI miễn phí hôm nay.",
+    desc: "Nâng cấp Pro để sử dụng không giới hạn hoặc quay lại vào ngày mai.",
+    upgradeBtn: "Nâng cấp Pro",
+    laterBtn: "Để sau",
+  },
+  upgrade: {
+    title: "Nâng cấp Pro",
+    subtitle: "Mở khóa toàn bộ sức mạnh AI Tutor",
+    currentPlan: "Gói hiện tại",
+    freePlan: "Miễn phí",
+    proPlan: "Pro",
+    proBadge: "Đang sử dụng",
+    features: [
+      { icon: "chat", text: "Chat không giới hạn", free: "30 tin/ngày", pro: "Không giới hạn" },
+      { icon: "auto_awesome", text: "Tạo nội dung AI", free: "10 lượt/ngày", pro: "Không giới hạn" },
+      { icon: "upload_file", text: "Tài liệu", free: "Tối đa 3 file", pro: "Không giới hạn" },
+    ],
+    activateBtn: "Kích hoạt Pro",
+    activating: "Đang kích hoạt...",
+    successMsg: "Chúc mừng! Bạn đã nâng cấp thành công lên Pro 🎉",
+    alreadyPro: "Bạn đang sử dụng gói Pro",
+  },
+};
+
 export const QUIZ_PAGE_TEXTS = {
   header: {
     badge: "Kiểm tra trắc nghiệm",
