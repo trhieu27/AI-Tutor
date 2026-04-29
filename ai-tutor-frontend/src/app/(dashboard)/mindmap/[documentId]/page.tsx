@@ -2,10 +2,10 @@
 
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { fetchDocument, fetchDocumentMindmap, fetchDocumentMindmapStream, DocumentResponse } from "@/services/api.service";
+import { fetchDocument, fetchDocumentMindmap, fetchDocumentMindmapStream, QuotaError, DocumentResponse } from "@/services/api.service";
 import InteractiveMindmap from "@/components/InteractiveMindmap";
 import ConfirmDialog from "@/components/ConfirmDialog";
-import { MINDMAP_PAGE_TEXTS } from "@/constants/texts";
+import { MINDMAP_PAGE_TEXTS, QUOTA_TEXTS } from "@/constants/texts";
 
 export default function InteractiveMindmapPage() {
   const params = useParams();
@@ -28,6 +28,7 @@ export default function InteractiveMindmapPage() {
   const [showResetConfirm, setShowResetConfirm] = useState(false);
   const isStreamingRef = useRef(false);
   const abortRef = useRef<AbortController | null>(null);
+  const [quotaExceeded, setQuotaExceeded] = useState(false);
 
   const syncToDB = useCallback(async (code: string) => {
     try {
@@ -159,6 +160,11 @@ export default function InteractiveMindmapPage() {
     } catch (error: any) {
       if (error.name === 'AbortError') return;
       if (!isActive()) return;
+      if (error instanceof QuotaError) {
+        setQuotaExceeded(true);
+        setIsLoading(false);
+        return;
+      }
       console.error("Error loading mindmap:", error);
     } finally {
       if (isActive()) {
@@ -393,7 +399,32 @@ export default function InteractiveMindmapPage() {
               : 'transform 0.25s cubic-bezier(0.19, 1, 0.22, 1)'
           }}
         >
-          {isLoading ? (
+          {quotaExceeded ? (
+            <div className="flex flex-col items-center gap-6 bg-[var(--surface-overlay)] backdrop-blur-xl px-14 py-10 rounded-[28px] border border-[var(--border-color)] shadow-[0_8px_32px_hsl(222_47%_4%/0.08)] pointer-events-auto">
+              <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-amber-400/20 to-orange-400/20 flex items-center justify-center border border-amber-400/20">
+                <span className="material-symbols-outlined text-[28px] text-amber-500">bolt</span>
+              </div>
+              <div className="text-center space-y-1.5">
+                <p className="text-[13px] font-bold text-[var(--foreground)]">{QUOTA_TEXTS.exceeded.title}</p>
+                <p className="text-[11px] text-[var(--muted)] font-medium">{QUOTA_TEXTS.exceeded.ai}</p>
+                <p className="text-[10px] text-[var(--muted-light)]">{QUOTA_TEXTS.exceeded.desc}</p>
+              </div>
+              <div className="flex gap-3">
+                <button
+                  onClick={() => router.push("/settings")}
+                  className="px-5 py-2 rounded-xl bg-gradient-to-r from-[hsl(239_68%_58%)] to-[hsl(263_70%_62%)] text-white text-[12px] font-bold hover:opacity-90 transition-all active:scale-95 shadow-[0_4px_16px_hsl(239_68%_58%/0.3)]"
+                >
+                  {QUOTA_TEXTS.exceeded.upgradeBtn}
+                </button>
+                <button
+                  onClick={() => router.back()}
+                  className="px-5 py-2 rounded-xl bg-[var(--surface)] border border-[var(--border-color)] text-[var(--muted)] text-[12px] font-bold hover:bg-[var(--card-bg)] transition-all active:scale-95"
+                >
+                  {QUOTA_TEXTS.exceeded.laterBtn}
+                </button>
+              </div>
+            </div>
+          ) : isLoading ? (
             <div className="flex flex-col items-center gap-6 bg-[var(--surface-overlay)] backdrop-blur-xl px-14 py-10 rounded-[28px] border border-[var(--border-color)] shadow-[0_8px_32px_hsl(222_47%_4%/0.08)]">
               {/* Icon AI với glow */}
               <div className="relative">
