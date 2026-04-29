@@ -113,6 +113,21 @@ async def change_password(
     )
     return {"message": "Mật khẩu đã được cập nhật thành công"}
 
+# ── PUT /users/upgrade-pro ────────────────────────────────────────────────────
+
+@router.put("/upgrade-pro")
+async def upgrade_to_pro(
+    db: AsyncIOMotorDatabase = Depends(get_db),
+    current_user_id: str = Depends(get_current_user),
+):
+    """Nâng cấp tài khoản lên Pro."""
+    await db.users.update_one(
+        {"id": current_user_id},
+        {"$set": {"is_pro": True, "updated_at": datetime.utcnow()}}
+    )
+    user = await db.users.find_one({"id": current_user_id})
+    return _serialize_user(user)
+
 
 
 # ── PUT /users/preferences ────────────────────────────────────────────────────

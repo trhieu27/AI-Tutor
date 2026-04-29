@@ -19,12 +19,13 @@ import {
   fetchDocumentStudyQuestions,
   deleteChatSession,
   fetchQuota,
+  QuotaError,
   DocumentResponse,
   ChatSessionResponse,
   MessageResponse,
   QuotaResponse,
 } from "@/services/api.service";
-import { CHAT_TEXTS } from "@/constants/texts";
+import { CHAT_TEXTS, QUOTA_TEXTS } from "@/constants/texts";
 
 export default function ChatPage() {
   const params = useParams();
@@ -49,8 +50,8 @@ export default function ChatPage() {
   const [isStudyQuestionsLoading, setIsStudyQuestionsLoading] = useState(false);
   const [showModal, setShowModal] = useState<"summary" | "quiz" | "mindmap" | "questions" | null>(null);
   const [quota, setQuota] = useState<QuotaResponse | null>(null);
-  // ID của tin nhắn AI đang stream (để render blink cursor)
   const [streamingMsgId, setStreamingMsgId] = useState<string | null>(null);
+  const [quotaExceeded, setQuotaExceeded] = useState(false);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
@@ -209,6 +210,7 @@ export default function ChatPage() {
       await fetchDocumentSummaryStream(documentId, (chunk) => { setIsSummaryLoading(false); setSummary((prev) => (prev || "") + chunk); }, controller.signal);
     } catch (error: any) {
       if (error.name === "AbortError") return;
+      if (error instanceof QuotaError) { setQuotaExceeded(true); setShowModal(null); return; }
       setSummary((prev) => (prev || "") + "\n\n_Dừng tóm tắt._");
     } finally { setIsSummaryLoading(false); abortControllerRef.current = null; }
   };
@@ -231,6 +233,7 @@ export default function ChatPage() {
       }
     } catch (error: any) {
       if (error.name === "AbortError") return;
+      if (error instanceof QuotaError) { setQuotaExceeded(true); setShowModal(null); return; }
     } finally { setIsQuizLoading(false); abortControllerRef.current = null; }
   };
 
@@ -247,6 +250,7 @@ export default function ChatPage() {
       }, controller.signal);
     } catch (error: any) {
       if (error.name === "AbortError") return;
+      if (error instanceof QuotaError) { setQuotaExceeded(true); setShowModal(null); return; }
     } finally { setIsStudyQuestionsLoading(false); abortControllerRef.current = null; }
   };
 
@@ -669,6 +673,45 @@ export default function ChatPage() {
                   {CHAT_TEXTS.MODALS.BUTTONS.DOWNLOAD_SUMMARY}
                 </button>
               )}
+            </div>
+          </div>
+        </div>
+      )}
+      {/* ── Quota Exceeded Modal ──────────────────────────────────── */}
+      {quotaExceeded && (
+        <div
+          className="fixed inset-0 z-[300] flex items-center justify-center p-4 bg-black/[0.12] dark:bg-black/60 backdrop-blur-[4px] animate-in fade-in duration-150"
+          onClick={() => setQuotaExceeded(false)}
+        >
+          <div
+            className="bg-white dark:bg-[#111113] w-full max-w-sm rounded-2xl border border-[#E5E7EB] dark:border-white/[0.08] shadow-[0_20px_60px_rgba(0,0,0,0.15)] dark:shadow-[0_20px_60px_rgba(0,0,0,0.6)] p-8 text-center animate-in zoom-in-95 duration-200"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-amber-400/20 to-orange-400/20 dark:from-amber-500/10 dark:to-orange-500/10 flex items-center justify-center mx-auto mb-5">
+              <span className="material-symbols-outlined text-[28px] text-amber-500">bolt</span>
+            </div>
+            <h3 className="text-[16px] font-semibold text-[#1F2937] dark:text-white tracking-[-0.02em]">
+              {QUOTA_TEXTS.exceeded.title}
+            </h3>
+            <p className="text-[13px] text-[#6B7280] dark:text-white/40 mt-2 leading-relaxed">
+              {QUOTA_TEXTS.exceeded.ai}
+            </p>
+            <p className="text-[12px] text-[#9CA3AF] dark:text-white/25 mt-1">
+              {QUOTA_TEXTS.exceeded.desc}
+            </p>
+            <div className="flex flex-col gap-2 mt-6">
+              <button
+                onClick={() => { setQuotaExceeded(false); router.push("/settings"); }}
+                className="w-full py-2.5 rounded-xl bg-gradient-to-r from-[hsl(239_68%_58%)] to-[hsl(263_70%_62%)] text-white text-[13px] font-semibold hover:opacity-90 active:scale-[0.98] transition-all shadow-[0_4px_16px_hsl(239_68%_58%/0.3)]"
+              >
+                {QUOTA_TEXTS.exceeded.upgradeBtn}
+              </button>
+              <button
+                onClick={() => setQuotaExceeded(false)}
+                className="w-full py-2.5 rounded-xl text-[13px] font-medium text-[#6B7280] dark:text-white/35 hover:bg-[#F3F4F6] dark:hover:bg-white/[0.05] transition-all"
+              >
+                {QUOTA_TEXTS.exceeded.laterBtn}
+              </button>
             </div>
           </div>
         </div>
