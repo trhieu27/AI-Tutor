@@ -28,7 +28,6 @@ class User(BaseModel):
     full_name: str
     email: str
     hashed_password: str
-    avatar_url: Optional[str] = None
     bio: Optional[str] = None
     is_pro: bool = False
     preferences: UserPreferences = Field(default_factory=UserPreferences)

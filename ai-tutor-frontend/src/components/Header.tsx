@@ -154,17 +154,9 @@ export default function Header({ onMenuClick }: HeaderProps) {
               onClick={() => setShowUserMenu(!showUserMenu)}
               className="flex items-center gap-2.5 p-1.5 pr-3 rounded-xl hover:bg-[var(--surface)] transition-all active:scale-95"
             >
-              {user.avatarUrl ? (
-                <img
-                  src={user.avatarUrl}
-                  alt={user.full_name}
-                  className="w-8 h-8 rounded-lg object-cover shadow-[0_2px_8px_hsl(239_68%_58%/0.25)]"
-                />
-              ) : (
-                <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-[hsl(239_68%_58%)] to-[hsl(263_70%_62%)] flex items-center justify-center text-white font-bold text-[13px] shadow-[0_2px_8px_hsl(239_68%_58%/0.35)]">
-                  {(user.full_name?.[0] || 'U').toUpperCase()}
-                </div>
-              )}
+              <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-[hsl(239_68%_58%)] to-[hsl(263_70%_62%)] flex items-center justify-center text-white font-bold text-[13px] shadow-[0_2px_8px_hsl(239_68%_58%/0.35)]">
+                {(user.full_name?.[0] || 'U').toUpperCase()}
+              </div>
               <div className="flex flex-col items-start hidden sm:flex">
                 <p className="text-[12px] font-semibold text-[var(--foreground)] leading-none">{user.full_name || HEADER_TEXTS.user.defaultName}</p>
                 {user.isPro ? (

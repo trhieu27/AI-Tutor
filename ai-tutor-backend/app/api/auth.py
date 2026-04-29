@@ -157,7 +157,6 @@ async def login(request: LoginRequest, fastapi_request: Request, db = Depends(ge
             "full_name":  user["full_name"],
             "email":      user["email"],
             "student_id": user["student_id"],
-            "avatar_url": user.get("avatar_url"),
             "is_pro":     user.get("is_pro", False),
         }
     }

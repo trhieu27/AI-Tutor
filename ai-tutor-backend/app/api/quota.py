@@ -140,6 +140,27 @@ def require_ai_quota():
     return _check
 
 
+async def check_and_record_ai_quota(user_id: str, db: AsyncIOMotorDatabase):
+    """
+    Kiểm tra + ghi quota AI thủ công.
+    Gọi BÊN TRONG endpoint, SAU KHI đã kiểm tra cache.
+    Chỉ tốn quota khi thực sự cần AI tạo mới nội dung.
+    """
+    user = await _get_user(user_id, db)
+    if user.get("is_pro"):
+        return  # Pro → không giới hạn
+
+    used = await _usage_today(user_id, "ai_features", db)
+    limit = FREE_LIMITS["ai_features"]
+    if used >= limit:
+        raise HTTPException(
+            status_code=429,
+            detail=f"Bạn đã dùng hết {limit} lần tạo nội dung AI miễn phí hôm nay. "
+                   f"Nâng cấp Pro hoặc quay lại vào ngày mai."
+        )
+    await _record_usage(user_id, "ai_features", db)
+
+
 # ── Endpoint để frontend lấy usage hiện tại ──────────────────────────────────
 
 from fastapi import APIRouter
