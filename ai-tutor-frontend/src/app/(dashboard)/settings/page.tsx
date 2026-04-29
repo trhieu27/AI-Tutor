@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { useTheme } from "next-themes";
 import { useAuth } from "@/context/AuthContext";
 import { SETTINGS_PAGE_TEXTS as T } from "@/constants/texts";
@@ -11,7 +11,6 @@ interface UserProfile {
   full_name: string;
   email: string;
   student_id: string;
-  avatar_url?: string;
   bio?: string;
   is_pro?: boolean;
   preferences?: { email_notifications: boolean; ai_response_detail: string };
@@ -92,40 +91,7 @@ function ProfileSection({ profile, onRefresh }: { profile: UserProfile; onRefres
   const [name, setName] = useState(profile.full_name);
   const [bio, setBio] = useState(profile.bio ?? "");
   const [saving, setSaving] = useState(false);
-  const [avatarLoading, setAvatarLoading] = useState(false);
   const [msg, setMsg] = useState<{ type: "ok" | "err"; text: string } | null>(null);
-  const fileRef = useRef<HTMLInputElement>(null);
-  const [dragOver, setDragOver] = useState(false);
-
-  const handleAvatar = async (file: File) => {
-    // Validate type
-    if (!["image/png", "image/jpeg"].includes(file.type)) {
-      setMsg({ type: "err", text: T.profile.avatar.errType });
-      return;
-    }
-    // Validate size (3MB)
-    if (file.size > 3 * 1024 * 1024) {
-      setMsg({ type: "err", text: T.profile.avatar.errSize });
-      return;
-    }
-    setAvatarLoading(true);
-    const fd = new FormData();
-    fd.append("file", file);
-    try {
-      const res = await authFetch(`${API}/users/avatar`, {
-        method: "POST",
-        body: fd,
-      });
-      if (!res.ok) throw new Error((await res.json()).detail);
-      const data = await res.json();
-      // Cập nhật Header ngay lập tức
-      updateUser({ avatarUrl: data.avatar_url });
-      await onRefresh();
-      setMsg({ type: "ok", text: T.profile.avatarSuccess });
-    } catch (e: any) {
-      setMsg({ type: "err", text: e.message });
-    } finally { setAvatarLoading(false); }
-  };
 
   const save = async () => {
     setSaving(true); setMsg(null);
@@ -154,34 +120,14 @@ function ProfileSection({ profile, onRefresh }: { profile: UserProfile; onRefres
         <p className="text-[13px] text-[var(--muted)] mt-0.5">{T.profile.subtitle}</p>
       </div>
 
-      {/* Avatar drag-drop */}
+      {/* Avatar — initial letter */}
       <div className="flex items-center gap-6">
-        <div
-          className={`relative w-20 h-20 rounded-2xl overflow-hidden border-2 cursor-pointer group transition-all ${dragOver ? "border-[hsl(239_68%_58%)] scale-105" : "border-[var(--border-color)]"}`}
-          onClick={() => fileRef.current?.click()}
-          onDragOver={e => { e.preventDefault(); setDragOver(true); }}
-          onDragLeave={() => setDragOver(false)}
-          onDrop={e => { e.preventDefault(); setDragOver(false); const f = e.dataTransfer.files[0]; if (f) handleAvatar(f); }}
-        >
-          {avatarLoading ? (
-            <div className="w-full h-full bg-[var(--surface)] flex items-center justify-center">
-              <div className="w-5 h-5 border-2 border-[var(--border-color)] border-t-[hsl(239_68%_58%)] rounded-full animate-spin" />
-            </div>
-          ) : profile.avatar_url ? (
-            <img src={profile.avatar_url} alt="avatar" className="w-full h-full object-cover" />
-          ) : (
-            <div className="w-full h-full bg-gradient-to-br from-[hsl(239_68%_58%)] to-[hsl(263_70%_62%)] flex items-center justify-center text-white text-2xl font-bold">
-              {profile.full_name?.[0]?.toUpperCase() ?? "?"}
-            </div>
-          )}
-          <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-all flex items-center justify-center">
-            <span className="material-symbols-outlined text-white" style={{ fontSize: 18 }}>photo_camera</span>
-          </div>
+        <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-[hsl(239_68%_58%)] to-[hsl(263_70%_62%)] flex items-center justify-center text-white text-2xl font-bold shadow-[0_4px_16px_hsl(239_68%_58%/0.30)]">
+          {profile.full_name?.[0]?.toUpperCase() ?? "?"}
         </div>
-        <input ref={fileRef} type="file" accept="image/png,image/jpeg" className="hidden" onChange={e => e.target.files?.[0] && handleAvatar(e.target.files[0])} />
         <div>
-          <p className="text-[13px] font-semibold text-[var(--foreground)]">{T.profile.avatar.label}</p>
-          <p className="text-[11px] text-[var(--muted)] mt-0.5 leading-relaxed">{T.profile.avatar.hint.split('\n')[0]}<br />{T.profile.avatar.hint.split('\n')[1]}</p>
+          <p className="text-[13px] font-semibold text-[var(--foreground)]">{profile.full_name}</p>
+          <p className="text-[11px] text-[var(--muted)] mt-0.5">{profile.email}</p>
         </div>
       </div>
 

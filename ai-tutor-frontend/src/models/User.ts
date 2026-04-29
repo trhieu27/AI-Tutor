@@ -11,7 +11,6 @@ export abstract class User {
     public role: UserRole,
     public isPro: boolean = false,
     public student_id?: string,
-    public avatarUrl?: string,
     public createdAt: Date = new Date()
   ) { }
 
@@ -21,7 +20,6 @@ export abstract class User {
       name: this.full_name,
       email: this.email,
       role: this.role,
-      avatarUrl: this.avatarUrl,
     };
   }
 
@@ -34,13 +32,12 @@ export class Student extends User {
     full_name: string,
     email: string,
     student_id?: string,
-    avatarUrl?: string,
     public isPro_flag: boolean = false,
     public totalDocumentsUploaded: number = 0,
     public totalQuizzesTaken: number = 0,
     public lastActive: Date = new Date()
   ) {
-    super(id, full_name, email, UserRole.STUDENT, isPro_flag, student_id, avatarUrl);
+    super(id, full_name, email, UserRole.STUDENT, isPro_flag, student_id);
   }
 
   getDashboardUrl(): string {
@@ -60,10 +57,9 @@ export class Admin extends User {
     id: string,
     full_name: string,
     email: string,
-    avatarUrl?: string,
     public permissions: string[] = ['ALL']
   ) {
-    super(id, full_name, email, UserRole.ADMIN, undefined, avatarUrl);
+    super(id, full_name, email, UserRole.ADMIN);
   }
 
   getDashboardUrl(): string {

@@ -16,8 +16,8 @@ interface AuthContextType {
   register: (fullName: string, email: string, password: string) => Promise<void>;
   logout: () => void;
   isAuthenticated: boolean;
-  /** Cập nhật một phần thông tin user (avatar, tên...) mà không cần login lại */
-  updateUser: (patch: Partial<{ full_name: string; avatarUrl: string; isPro: boolean }>) => void;
+  /** Cập nhật một phần thông tin user (tên...) mà không cần login lại */
+  updateUser: (patch: Partial<{ full_name: string; isPro: boolean }>) => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -36,7 +36,6 @@ const createUserInstance = (userData: any): User | null => {
         userData.full_name,
         userData.email,
         userData.student_id,
-        userData.avatarUrl ?? userData.avatar_url,  // backend trả avatar_url
         userData.is_pro ?? userData.isPro ?? false
       );
     }
@@ -53,9 +52,7 @@ const getStoredUser = (): User | null => {
     const raw = localStorage.getItem('user');
     if (!raw) return null;
     const meta = JSON.parse(raw);
-    // Avatar đƣợc lƣu riêng để tránh QuotaExceededError
-    const avatar = localStorage.getItem('user_avatar') ?? meta.avatar_url ?? meta.avatarUrl;
-    return createUserInstance({ ...meta, avatar_url: avatar });
+    return createUserInstance(meta);
   } catch (e) {
     return null;
   }
@@ -105,7 +102,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setIsInitialLoading(false);
     }
 
-    // Pha 2: luôn fetch từ backend — cập nhật avatar, is_pro, full_name mới nhất
+    // Pha 2: luôn fetch từ backend — cập nhật is_pro, full_name mới nhất
     try {
       const freshUser = await authService.getCurrentUser();
       if (freshUser) {
@@ -126,7 +123,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const handleSync = () => { syncFromStorage(); };
     const handlePageShow = (e: PageTransitionEvent) => { handleSync(); };
     const handleStorage = (e: StorageEvent) => {
-      if (e.key === 'user' || e.key === 'access_token' || e.key === 'user_avatar') handleSync();
+      if (e.key === 'user' || e.key === 'access_token') handleSync();
     };
     const handleVisibility = () => {
       if (document.visibilityState === 'visible') handleSync();
@@ -192,25 +189,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     window.location.replace('/login');
   }, []);
 
-  /** Patch user state + localStorage với data mới (avatar, tên...) */
-  const updateUser = useCallback((patch: Partial<{ full_name: string; avatarUrl: string; isPro: boolean }>) => {
+  /** Patch user state + localStorage với data mới (tên...) */
+  const updateUser = useCallback((patch: Partial<{ full_name: string; isPro: boolean }>) => {
     setUser(prev => {
       if (!prev) return prev;
       const updated = Object.assign(Object.create(Object.getPrototypeOf(prev)), prev, patch);
-      // Persist metadata (không có avatar) vào'user', avatar vào 'user_avatar'
       try {
         const stored = localStorage.getItem('user');
         if (stored) {
-          const { avatarUrl: _av, ...meta } = JSON.parse(stored);
-          const { avatarUrl: newAvatar, ...metaPatch } = patch as any;
-          localStorage.setItem('user', JSON.stringify({ ...meta, ...metaPatch }));
-          if (newAvatar !== undefined) {
-            try {
-              localStorage.setItem('user_avatar', newAvatar);
-            } catch {
-              localStorage.removeItem('user_avatar');
-            }
-          }
+          const meta = JSON.parse(stored);
+          localStorage.setItem('user', JSON.stringify({ ...meta, ...patch }));
         }
       } catch {}
       return updated;

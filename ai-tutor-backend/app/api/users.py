@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, Request, UploadFile, File
+from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import JSONResponse
 from motor.motor_asyncio import AsyncIOMotorDatabase
 from pydantic import BaseModel
@@ -6,7 +6,6 @@ from passlib.context import CryptContext
 from datetime import datetime
 from typing import Optional
 from uuid import uuid4
-import base64
 import logging
 
 from app.core.database import get_db
@@ -45,7 +44,7 @@ def _serialize_user(user: dict) -> dict:
         "student_id":        user.get("student_id", ""),
         "full_name":         user.get("full_name", ""),
         "email":             user.get("email", ""),
-        "avatar_url":        user.get("avatar_url"),
+
         "bio":               user.get("bio"),
         "is_pro":            user.get("is_pro", False),
         "preferences":       user.get("preferences", {"email_notifications": True, "ai_response_detail": "balanced"}),
@@ -114,32 +113,7 @@ async def change_password(
     )
     return {"message": "Mật khẩu đã được cập nhật thành công"}
 
-# ── POST /users/avatar ────────────────────────────────────────────────────────
 
-@router.post("/avatar")
-async def upload_avatar(
-    file: UploadFile = File(...),
-    db: AsyncIOMotorDatabase = Depends(get_db),
-    current_user_id: str = Depends(get_current_user),
-):
-    # Validate type
-    allowed = {"image/jpeg", "image/png", "image/webp", "image/gif"}
-    if file.content_type not in allowed:
-        raise HTTPException(status_code=400, detail="Chỉ chấp nhận ảnh JPEG, PNG, WebP")
-
-    content = await file.read()
-    if len(content) > 3 * 1024 * 1024:  # 3MB
-        raise HTTPException(status_code=400, detail="Ảnh không được vượt quá 3MB")
-
-    # Encode as base64 data URL (no external storage needed)
-    b64 = base64.b64encode(content).decode("utf-8")
-    data_url = f"data:{file.content_type};base64,{b64}"
-
-    await db.users.update_one(
-        {"id": current_user_id},
-        {"$set": {"avatar_url": data_url, "updated_at": datetime.utcnow()}}
-    )
-    return {"avatar_url": data_url}
 
 # ── PUT /users/preferences ────────────────────────────────────────────────────
 

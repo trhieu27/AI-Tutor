@@ -20,26 +20,12 @@ class AuthService {
   }
 
   /**
-   * Lưu user vào localStorage theo 2 key:
-   * - 'user': metadata nhỏ (không có avatar_url) → không bao giờ vượt quota
-   * - 'user_avatar': base64 string (riêng, try-catch nếu quá lớn)
+   * Lưu user metadata vào localStorage.
    */
   private persistUser(rawUser: any): void {
     if (typeof window === 'undefined') return;
     try {
-      const { avatar_url, avatarUrl, ...meta } = rawUser;
-      localStorage.setItem('user', JSON.stringify(meta));
-      // Lưu avatar riêng — bỏ qua nếu quota vượt giới hạn
-      const avatar = avatar_url ?? avatarUrl;
-      if (avatar) {
-        try {
-          localStorage.setItem('user_avatar', avatar);
-        } catch {
-          localStorage.removeItem('user_avatar'); // xóa nếu không đủ chỗ
-        }
-      } else {
-        localStorage.removeItem('user_avatar');
-      }
+      localStorage.setItem('user', JSON.stringify(rawUser));
     } catch (e) {
       console.warn('[AuthService] Failed to persist user to localStorage', e);
     }
@@ -76,7 +62,7 @@ class AuthService {
       }
 
       return {
-        user: new Student(data.user.id, data.user.full_name, data.user.email, data.user.student_id, data.user.avatar_url, data.user.is_pro ?? false),
+        user: new Student(data.user.id, data.user.full_name, data.user.email, data.user.student_id, data.user.is_pro ?? false),
         accessToken: data.access_token,
         refreshToken: data.refresh_token,
       };
@@ -110,7 +96,7 @@ class AuthService {
       }
 
       return {
-        user: new Student(data.user.id, data.user.full_name, data.user.email, data.user.student_id, data.user.avatar_url, data.user.is_pro ?? false),
+        user: new Student(data.user.id, data.user.full_name, data.user.email, data.user.student_id, data.user.is_pro ?? false),
         accessToken: data.access_token,
         refreshToken: data.refresh_token,
       };
@@ -146,7 +132,7 @@ class AuthService {
       }
 
       return {
-        user: new Student(data.user.id, data.user.full_name, data.user.email, data.user.student_id, data.user.avatar_url, data.user.is_pro ?? false),
+        user: new Student(data.user.id, data.user.full_name, data.user.email, data.user.student_id, data.user.is_pro ?? false),
         accessToken: data.access_token,
         refreshToken: data.refresh_token,
       };
@@ -254,7 +240,6 @@ class AuthService {
         userData.full_name,
         userData.email,
         userData.student_id,
-        userData.avatar_url ?? userData.avatarUrl,
         userData.is_pro ?? false
       );
     } catch (error) {

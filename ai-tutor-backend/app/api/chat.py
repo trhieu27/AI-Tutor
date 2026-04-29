@@ -23,7 +23,7 @@ from app.rag.rag_engine import (
     generate_study_questions_stream,
 )
 from app.api.auth import get_current_user
-from app.api.quota import require_chat_quota, require_ai_quota, FREE_LIMITS
+from app.api.quota import require_chat_quota, require_ai_quota, check_and_record_ai_quota, FREE_LIMITS
 
 router = APIRouter(prefix="/chat", tags=["Chat"])
 
@@ -170,17 +170,20 @@ async def chat_with_document(
 
 @router.get("/{document_id}/summarize")
 async def get_summary(document_id: str, request: Request, db: AsyncIOMotorDatabase = Depends(get_db),
-    current_user_id: str = Depends(require_ai_quota())):
+    current_user_id: str = Depends(get_current_user)):
     doc = await db.documents.find_one({"id": document_id})
     if not doc or not doc.get("chroma_collection_id"):
         raise HTTPException(status_code=404, detail="Tài liệu chưa sẵn sàng")
     
-    # Cache check
+    # Cache check — không tốn quota
     if doc.get("summary"):
         async def stream_cached():
             yield doc["summary"]
         return StreamingResponse(stream_cached(), media_type="text/plain")
     
+    # Cache miss — kiểm tra quota trước khi gọi AI
+    await check_and_record_ai_quota(current_user_id, db)
+
     async def generate_and_cache():
         full_text = ""
         async for chunk in summarize_document_stream(doc["chroma_collection_id"], is_cancelled=request.is_disconnected):
@@ -196,7 +199,7 @@ async def get_document_quiz(
     document_id: str,
     request: Request,
     db: AsyncIOMotorDatabase = Depends(get_db),
-    current_user_id: str = Depends(require_ai_quota()),
+    current_user_id: str = Depends(get_current_user),
     force: bool = False
 ):
     doc = await db.documents.find_one({"id": document_id})
@@ -213,6 +216,9 @@ async def get_document_quiz(
             yield json.dumps(doc["quiz"])
         return StreamingResponse(stream_cached(), media_type="application/json")
     
+    # Cache miss — kiểm tra quota trước khi gọi AI
+    await check_and_record_ai_quota(current_user_id, db)
+
     async def generate_and_cache():
         yield " " # Prime stream
         full_text = ""
@@ -241,7 +247,7 @@ async def get_document_mindmap(
     document_id: str, 
     request: Request, 
     db: AsyncIOMotorDatabase = Depends(get_db),
-    current_user_id: str = Depends(require_ai_quota()),
+    current_user_id: str = Depends(get_current_user),
     force: bool = False
 ):
     doc = await db.documents.find_one({"id": document_id})
@@ -257,12 +263,16 @@ async def get_document_mindmap(
             yield doc["mindmap"]
         return StreamingResponse(stream_cached(), media_type="text/plain")
     
+    # Cache miss — kiểm tra quota trước khi gọi AI
+    await check_and_record_ai_quota(current_user_id, db)
+
     async def generate_and_cache():
         yield " " # Prime stream
         full_text = ""
         async for chunk in generate_mindmap_stream(doc["chroma_collection_id"], is_cancelled=request.is_disconnected):
             full_text += chunk
             yield chunk
+        print(f"\n===== MINDMAP RESULT =====\n{full_text}\n===== END MINDMAP =====\n")
         if full_text.strip():
             await db.documents.update_one({"id": document_id}, {"$set": {"mindmap": full_text}})
 
@@ -302,17 +312,20 @@ async def update_document_mindmap(
 
 @router.get("/{document_id}/study-questions")
 async def get_study_questions(document_id: str, request: Request, db: AsyncIOMotorDatabase = Depends(get_db),
-    current_user_id: str = Depends(require_ai_quota())):
+    current_user_id: str = Depends(get_current_user)):
     doc = await db.documents.find_one({"id": document_id})
     if not doc or not doc.get("chroma_collection_id"):
         raise HTTPException(status_code=404, detail="Tài liệu chưa sẵn sàng")
     
-    # Cache check
+    # Cache check — không tốn quota
     if doc.get("study_questions"):
         async def stream_cached():
             yield "\n".join(doc["study_questions"])
         return StreamingResponse(stream_cached(), media_type="text/plain")
     
+    # Cache miss — kiểm tra quota trước khi gọi AI
+    await check_and_record_ai_quota(current_user_id, db)
+
     async def generate_and_cache():
         yield " " # Prime stream
         full_text = ""
