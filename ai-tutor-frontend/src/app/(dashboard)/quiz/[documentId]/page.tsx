@@ -6,9 +6,10 @@ import {
   fetchDocument,
   fetchDocumentQuiz,
   fetchDocumentQuizStream,
+  QuotaError,
   DocumentResponse
 } from "@/services/api.service";
-import { QUIZ_PAGE_TEXTS } from "@/constants/texts";
+import { QUIZ_PAGE_TEXTS, QUOTA_TEXTS } from "@/constants/texts";
 import ConfirmDialog from "@/components/ConfirmDialog";
 
 interface QuizItem {
@@ -27,6 +28,7 @@ export default function InteractiveQuizPage() {
   const [quiz, setQuiz] = useState<QuizItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [quotaExceeded, setQuotaExceeded] = useState(false);
 
   // User performance state
   const [userAnswers, setUserAnswers] = useState<Record<number, number>>({});
@@ -96,6 +98,10 @@ export default function InteractiveQuizPage() {
     } catch (err: any) {
       if (err?.name === "AbortError") return; // bị huỷ chủ động — không cập nhật UI
       if (!isActive()) return;
+      if (err instanceof QuotaError) {
+        setQuotaExceeded(true);
+        return;
+      }
       console.error(err);
       setError("Đã xảy ra lỗi khi tải bài kiểm tra.");
     } finally {
@@ -169,6 +175,34 @@ export default function InteractiveQuizPage() {
               />
             ))}
           </div>
+        </div>
+      </div>
+    );
+  }
+
+  /* ── Quota exceeded state ───────────────────────────────── */
+  if (quotaExceeded) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[80vh] p-8 text-center">
+        <div className="w-20 h-20 bg-gradient-to-br from-amber-400/20 to-orange-400/20 rounded-3xl flex items-center justify-center mb-6 border border-amber-400/20">
+          <span className="material-symbols-outlined text-[36px] text-amber-500">bolt</span>
+        </div>
+        <h2 className="text-xl font-bold text-[var(--foreground)] mb-2">{QUOTA_TEXTS.exceeded.title}</h2>
+        <p className="text-[var(--muted)] text-[13px] mb-1">{QUOTA_TEXTS.exceeded.ai}</p>
+        <p className="text-[var(--muted-light)] text-[12px] mb-6">{QUOTA_TEXTS.exceeded.desc}</p>
+        <div className="flex items-center gap-3">
+          <button
+            onClick={() => router.push("/settings")}
+            className="px-6 py-2.5 rounded-xl bg-gradient-to-r from-[hsl(239_68%_58%)] to-[hsl(263_70%_62%)] text-white text-[13px] font-bold hover:opacity-90 transition-all active:scale-95 shadow-[0_4px_16px_hsl(239_68%_58%/0.3)]"
+          >
+            {QUOTA_TEXTS.exceeded.upgradeBtn}
+          </button>
+          <button
+            onClick={() => router.back()}
+            className="px-5 py-2.5 rounded-xl bg-[var(--surface)] text-[var(--muted)] text-[13px] font-bold border border-[var(--border-color)] hover:bg-[var(--card-bg)] transition-all active:scale-95"
+          >
+            {QUIZ_PAGE_TEXTS.status.error.back}
+          </button>
         </div>
       </div>
     );
