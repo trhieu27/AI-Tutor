@@ -96,7 +96,7 @@ export default function LoginPage() {
   const displayError = localError || authError;
 
   return (
-    <div className="h-screen flex w-full font-sans bg-white overflow-hidden">
+    <div className="min-h-[100dvh] flex w-full font-sans bg-white">
       <AuthBranding />
 
       <div className="w-full lg:w-1/2 flex flex-col justify-center items-center py-12 px-6 sm:px-12 relative overflow-y-auto h-full">

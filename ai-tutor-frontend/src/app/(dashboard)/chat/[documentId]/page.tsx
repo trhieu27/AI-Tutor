@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 import MermaidChart from "@/components/MermaidChart";
 
 import {
@@ -40,7 +41,12 @@ export default function ChatPage() {
   const [messages, setMessages] = useState<MessageResponse[]>([]);
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
-  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+
+  // Desktop: mở history mặc định
+  useEffect(() => {
+    if (window.innerWidth >= 1024) setIsSidebarOpen(true);
+  }, []);
 
   const [summary, setSummary] = useState<string | null>(null);
   const [isSummaryLoading, setIsSummaryLoading] = useState(false);
@@ -51,16 +57,35 @@ export default function ChatPage() {
   const [showModal, setShowModal] = useState<"summary" | "quiz" | "mindmap" | "questions" | null>(null);
   const [quota, setQuota] = useState<QuotaResponse | null>(null);
   const [streamingMsgId, setStreamingMsgId] = useState<string | null>(null);
-  const [quotaExceeded, setQuotaExceeded] = useState(false);
+  const [quotaExceeded, setQuotaExceeded] = useState<"chat" | "ai" | null>(null);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
   const typewriterIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
-  const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  const messagesContainerRef = useRef<HTMLDivElement>(null);
+  const [isAtBottom, setIsAtBottom] = useState(true);
+
+  const scrollToBottom = (force = false) => {
+    const container = messagesContainerRef.current;
+    if (!container) return;
+    if (force || isAtBottom) {
+      container.scrollTo({ top: container.scrollHeight, behavior: 'smooth' });
+    }
   };
+
+  // Track whether user is near bottom
+  useEffect(() => {
+    const container = messagesContainerRef.current;
+    if (!container) return;
+    const handleScroll = () => {
+      const { scrollTop, scrollHeight, clientHeight } = container;
+      setIsAtBottom(scrollHeight - scrollTop - clientHeight < 100);
+    };
+    container.addEventListener('scroll', handleScroll, { passive: true });
+    return () => container.removeEventListener('scroll', handleScroll);
+  }, []);
 
   useEffect(() => { scrollToBottom(); }, [messages]);
 
@@ -93,6 +118,8 @@ export default function ChatPage() {
       const detail = await fetchSessionDetail(sessionId);
       setMessages(detail.messages);
       setCurrentSessionId(sessionId);
+      // Ẩn sidebar khi chọn session trên mobile
+      if (window.innerWidth < 1024) setIsSidebarOpen(false);
     } catch (error) {
       console.error("Error loading session:", error);
     }
@@ -111,6 +138,9 @@ export default function ChatPage() {
     setMessages((prev) => [...prev, userMessage]);
     setInput("");
     if (textareaRef.current) textareaRef.current.style.height = "auto";
+    // Force scroll to bottom when user sends a message
+    setIsAtBottom(true);
+    setTimeout(() => scrollToBottom(true), 50);
     setIsLoading(true);
     const controller = new AbortController();
     abortControllerRef.current = controller;
@@ -137,7 +167,8 @@ export default function ChatPage() {
             return prev;
           });
           currentIdx++;
-          scrollToBottom();
+          // Only auto-scroll during typewriter if user is near bottom
+          if (isAtBottom) scrollToBottom();
         } else {
           stopTypewriter();
         }
@@ -145,6 +176,14 @@ export default function ChatPage() {
       typewriterIntervalRef.current = interval;
     } catch (error: any) {
       if (error.name === "AbortError") return;
+      if (error instanceof QuotaError) {
+        // Remove the user's unanswered message & show upgrade modal
+        setMessages((prev) => prev.slice(0, -1));
+        setQuotaExceeded("chat");
+        setIsLoading(false);
+        abortControllerRef.current = null;
+        return;
+      }
       setMessages((prev) => [...prev, {
         id: (Date.now() + 1).toString(),
         session_id: currentSessionId || "",
@@ -192,7 +231,12 @@ export default function ChatPage() {
     }
   };
 
-  const startNewChat = () => { setCurrentSessionId(null); setMessages([]); };
+  const startNewChat = () => {
+    setCurrentSessionId(null);
+    setMessages([]);
+    // Ẩn sidebar khi tạo chat mới trên mobile
+    if (window.innerWidth < 1024) setIsSidebarOpen(false);
+  };
 
   const handleDeleteSession = async (sessionId: string) => {
     if (!confirm("Xóa phiên thảo luận này?")) return;
@@ -210,7 +254,7 @@ export default function ChatPage() {
       await fetchDocumentSummaryStream(documentId, (chunk) => { setIsSummaryLoading(false); setSummary((prev) => (prev || "") + chunk); }, controller.signal);
     } catch (error: any) {
       if (error.name === "AbortError") return;
-      if (error instanceof QuotaError) { setQuotaExceeded(true); setShowModal(null); return; }
+      if (error instanceof QuotaError) { setQuotaExceeded("ai"); setShowModal(null); return; }
       setSummary((prev) => (prev || "") + "\n\n_Dừng tóm tắt._");
     } finally { setIsSummaryLoading(false); abortControllerRef.current = null; }
   };
@@ -233,7 +277,7 @@ export default function ChatPage() {
       }
     } catch (error: any) {
       if (error.name === "AbortError") return;
-      if (error instanceof QuotaError) { setQuotaExceeded(true); setShowModal(null); return; }
+      if (error instanceof QuotaError) { setQuotaExceeded("ai"); setShowModal(null); return; }
     } finally { setIsQuizLoading(false); abortControllerRef.current = null; }
   };
 
@@ -250,17 +294,29 @@ export default function ChatPage() {
       }, controller.signal);
     } catch (error: any) {
       if (error.name === "AbortError") return;
-      if (error instanceof QuotaError) { setQuotaExceeded(true); setShowModal(null); return; }
+      if (error instanceof QuotaError) { setQuotaExceeded("ai"); setShowModal(null); return; }
     } finally { setIsStudyQuestionsLoading(false); abortControllerRef.current = null; }
   };
 
   /* ── Render ─────────────────────────────────────────────────────────────── */
   return (
-    <div className="flex h-[calc(100vh-64px)] overflow-hidden font-sans bg-white dark:bg-[#0A0A0B]">
+    <div className="flex h-full overflow-hidden font-sans bg-white dark:bg-[#0A0A0B] relative">
+
+      {/* Mobile backdrop overlay */}
+      {isSidebarOpen && (
+        <div
+          className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[65] lg:hidden"
+          onClick={() => setIsSidebarOpen(false)}
+        />
+      )}
 
       {/* ── Sidebar ──────────────────────────────────────────────────── */}
       <aside
-        className={`shrink-0 flex flex-col h-full z-30 border-r border-[#F3F4F6] dark:border-white/[0.06] bg-[#FAFAFA] dark:bg-[#111113] transition-all duration-300 ease-[cubic-bezier(0.23,1,0.32,1)] overflow-hidden ${isSidebarOpen ? "w-60" : "w-0 border-0"}`}
+        className={`flex flex-col z-[70] border-r border-[#F3F4F6] dark:border-white/[0.06] bg-[#FAFAFA] dark:bg-[#111113] transition-all duration-300 ease-[cubic-bezier(0.23,1,0.32,1)] overflow-hidden
+          fixed inset-y-0 left-0 w-[260px] h-full
+          ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'}
+          lg:relative lg:inset-y-auto lg:left-auto lg:translate-x-0 lg:shrink-0 lg:h-full
+          ${isSidebarOpen ? 'lg:w-60' : 'lg:w-0 lg:border-0'}`}
       >
         <div className="px-4 py-3.5 border-b border-[#F3F4F6] dark:border-white/[0.06] flex items-center justify-between shrink-0">
           <span className="text-[11px] font-semibold text-[#9CA3AF] dark:text-white/25 uppercase tracking-[0.08em]">
@@ -301,7 +357,7 @@ export default function ChatPage() {
       </aside>
 
       {/* ── Main ─────────────────────────────────────────────────────── */}
-      <main className="flex-1 flex flex-col h-full min-w-0 bg-white dark:bg-[#0A0A0B]">
+      <main className="flex-1 flex flex-col h-full min-w-0 bg-white dark:bg-[#0A0A0B] relative">
 
         {/* Header */}
         <header className="h-14 border-b border-[#F3F4F6] dark:border-white/[0.06] flex items-center justify-between px-5 shrink-0">
@@ -319,7 +375,7 @@ export default function ChatPage() {
                 {docData?.file_name || CHAT_TEXTS.HEADER.LOADING_DOC}
               </h1>
               {docData && (
-                <p className="text-[11px] text-[#9CA3AF] dark:text-white/25">
+                <p className="hidden sm:block text-[11px] text-[#9CA3AF] dark:text-white/25 whitespace-nowrap">
                   {docData.file_size_mb?.toFixed?.(1) ?? "—"} MB · {docData.page_count} trang
                 </p>
               )}
@@ -334,16 +390,16 @@ export default function ChatPage() {
               { onClick: () => router.push(`/mindmap/${documentId}`), icon: "hub", label: CHAT_TEXTS.HEADER.ACTIONS.MINDMAP },
             ].map((btn, i) => (
               <button key={i} onClick={btn.onClick} title={btn.label}
-                className="flex items-center gap-1.5 px-3 h-8 rounded-lg text-[12px] font-medium text-[#6B7280] dark:text-white/35 hover:bg-[#F3F4F6] dark:hover:bg-white/[0.05] hover:text-[#1F2937] dark:hover:text-white transition-all">
+                className="flex items-center gap-1.5 px-2.5 h-8 rounded-lg text-[12px] font-medium text-[#6B7280] dark:text-white/35 hover:bg-[#F3F4F6] dark:hover:bg-white/[0.05] hover:text-[#1F2937] dark:hover:text-white transition-all">
                 <span className="material-symbols-outlined text-[16px]">{btn.icon}</span>
-                <span className="hidden md:inline">{btn.label}</span>
+                <span className="hidden sm:inline text-[11.5px]">{btn.label}</span>
               </button>
             ))}
           </div>
         </header>
 
         {/* Messages */}
-        <div className="flex-1 overflow-y-auto custom-scrollbar">
+        <div ref={messagesContainerRef} className="flex-1 overflow-y-auto custom-scrollbar relative">
           <div className="max-w-2xl mx-auto px-6 md:px-4 py-10">
 
           {messages.length === 0 ? (
@@ -411,7 +467,7 @@ export default function ChatPage() {
                           prose-li:text-[13.5px] prose-li:text-[#374151] dark:prose-li:text-white/65 prose-li:leading-[1.7]
                           prose-ul:my-2 prose-ol:my-2 prose-li:my-0.5
                           prose-table:text-[12px] prose-th:font-semibold prose-th:text-[#1F2937] dark:prose-th:text-white prose-td:text-[#374151] dark:prose-td:text-white/65 prose-table:border-collapse prose-th:border prose-th:border-[#E5E7EB] dark:prose-th:border-white/[0.08] prose-td:border prose-td:border-[#F3F4F6] dark:prose-td:border-white/[0.05] prose-th:px-3 prose-td:px-3">
-                          <ReactMarkdown>{msg.content}</ReactMarkdown>
+                          <ReactMarkdown remarkPlugins={[remarkGfm]}>{msg.content}</ReactMarkdown>
                           {/* Blink cursor khi đang stream */}
                           {streamingMsgId === msg.id && (
                             <span className="inline-block w-0.5 h-[1em] bg-current ml-0.5 align-middle animate-[blink_0.9s_ease-in-out_infinite]" />
@@ -445,10 +501,23 @@ export default function ChatPage() {
             </div>
           )}
           </div>
+
+          {/* Scroll to bottom — sticky inside scroll container */}
+          {!isAtBottom && (
+            <div className="sticky bottom-4 z-20 flex justify-end pr-5 pointer-events-none">
+              <button
+                onClick={() => scrollToBottom(true)}
+                className="pointer-events-auto w-9 h-9 rounded-full bg-white dark:bg-[#1C1C1E] border border-[#E5E7EB] dark:border-white/[0.1] shadow-lg flex items-center justify-center text-[#6B7280] dark:text-white/50 hover:text-[#1F2937] dark:hover:text-white hover:shadow-xl transition-all active:scale-90 animate-in fade-in slide-in-from-bottom-2 duration-200"
+              >
+                <span className="material-symbols-outlined text-[18px]">keyboard_arrow_down</span>
+              </button>
+            </div>
+          )}
         </div>
 
+
         {/* Input bar */}
-        <div className="px-5 md:px-10 py-4 border-t border-[#F3F4F6] dark:border-white/[0.06] shrink-0">
+        <div className="px-5 md:px-10 py-4 pb-6 border-t border-[#F3F4F6] dark:border-white/[0.06] shrink-0">
           <div className="max-w-2xl mx-auto">
             <form onSubmit={handleSendMessage} className="flex items-end gap-2 group">
 
@@ -473,7 +542,7 @@ export default function ChatPage() {
                     }
                   }}
                   rows={1}
-                  maxLength={600}
+                  maxLength={quota?.is_pro ? undefined : 600}
                   placeholder={CHAT_TEXTS.INPUT.PLACEHOLDER}
                   className="flex-1 bg-transparent text-[#1F2937] dark:text-white/85 py-3.5 pl-3 pr-4 focus:outline-none text-[13px] font-medium placeholder:text-[#D1D5DB] dark:placeholder:text-white/15 resize-none overflow-y-auto leading-relaxed"
                   style={{ minHeight: "52px", maxHeight: "120px" }}
@@ -501,13 +570,15 @@ export default function ChatPage() {
 
             <div className="flex items-center justify-between mt-1.5 px-0.5">
               <p className="text-[11px] text-[#9CA3AF] dark:text-white/20 font-medium">{CHAT_TEXTS.INPUT.DISCLAIMER}</p>
-              <span className={`text-[11px] font-medium tabular-nums transition-colors ${
-                input.length > 540
-                  ? input.length >= 600 ? "text-red-400" : "text-amber-400"
-                  : "text-[#D1D5DB] dark:text-white/15"
-              }`}>
-                {input.length}/600
-              </span>
+              {!quota?.is_pro && (
+                <span className={`text-[11px] font-medium tabular-nums transition-colors ${
+                  input.length > 540
+                    ? input.length >= 600 ? "text-red-400" : "text-amber-400"
+                    : "text-[#D1D5DB] dark:text-white/15"
+                }`}>
+                  {input.length}/600
+                </span>
+              )}
             </div>
             {/* Quota progress bar — chỉ hiện cho Free user */}
             {quota && !quota.is_pro && quota.usage && quota.limits && (
@@ -538,7 +609,7 @@ export default function ChatPage() {
           onClick={() => { setShowModal(null); handleCancel(); }}
         >
           <div
-            className="bg-white dark:bg-[#111113] w-full max-w-3xl max-h-[88vh] rounded-2xl border border-[#E5E7EB] dark:border-white/[0.07] shadow-[0_12px_48px_rgba(0,0,0,0.1)] dark:shadow-[0_12px_48px_rgba(0,0,0,0.5)] flex flex-col overflow-hidden animate-in zoom-in-95 duration-150"
+            className="bg-white dark:bg-[#111113] w-full max-w-3xl max-h-[88dvh] rounded-2xl border border-[#E5E7EB] dark:border-white/[0.07] shadow-[0_12px_48px_rgba(0,0,0,0.1)] dark:shadow-[0_12px_48px_rgba(0,0,0,0.5)] flex flex-col overflow-hidden animate-in zoom-in-95 duration-150"
             onClick={(e) => e.stopPropagation()}
           >
             {/* Modal header */}
@@ -573,7 +644,7 @@ export default function ChatPage() {
                     prose-headings:text-[#1F2937] dark:prose-headings:text-white prose-headings:font-semibold prose-headings:tracking-[-0.01em]
                     prose-strong:text-[#1F2937] dark:prose-strong:text-white
                     prose-li:text-[13px] prose-li:text-[#374151] dark:prose-li:text-white/65">
-                    <ReactMarkdown>{String(summary || CHAT_TEXTS.MODALS.EMPTY.SUMMARY)}</ReactMarkdown>
+                    <ReactMarkdown remarkPlugins={[remarkGfm]}>{String(summary || CHAT_TEXTS.MODALS.EMPTY.SUMMARY)}</ReactMarkdown>
                   </div>
                 )
               ) : showModal === "questions" ? (
@@ -681,7 +752,7 @@ export default function ChatPage() {
       {quotaExceeded && (
         <div
           className="fixed inset-0 z-[300] flex items-center justify-center p-4 bg-black/[0.12] dark:bg-black/60 backdrop-blur-[4px] animate-in fade-in duration-150"
-          onClick={() => setQuotaExceeded(false)}
+          onClick={() => setQuotaExceeded(null)}
         >
           <div
             className="bg-white dark:bg-[#111113] w-full max-w-sm rounded-2xl border border-[#E5E7EB] dark:border-white/[0.08] shadow-[0_20px_60px_rgba(0,0,0,0.15)] dark:shadow-[0_20px_60px_rgba(0,0,0,0.6)] p-8 text-center animate-in zoom-in-95 duration-200"
@@ -694,20 +765,20 @@ export default function ChatPage() {
               {QUOTA_TEXTS.exceeded.title}
             </h3>
             <p className="text-[13px] text-[#6B7280] dark:text-white/40 mt-2 leading-relaxed">
-              {QUOTA_TEXTS.exceeded.ai}
+              {quotaExceeded === "chat" ? QUOTA_TEXTS.exceeded.chat : QUOTA_TEXTS.exceeded.ai}
             </p>
             <p className="text-[12px] text-[#9CA3AF] dark:text-white/25 mt-1">
               {QUOTA_TEXTS.exceeded.desc}
             </p>
             <div className="flex flex-col gap-2 mt-6">
               <button
-                onClick={() => { setQuotaExceeded(false); router.push("/settings"); }}
+                onClick={() => { setQuotaExceeded(null); router.push("/settings"); }}
                 className="w-full py-2.5 rounded-xl bg-gradient-to-r from-[hsl(239_68%_58%)] to-[hsl(263_70%_62%)] text-white text-[13px] font-semibold hover:opacity-90 active:scale-[0.98] transition-all shadow-[0_4px_16px_hsl(239_68%_58%/0.3)]"
               >
                 {QUOTA_TEXTS.exceeded.upgradeBtn}
               </button>
               <button
-                onClick={() => setQuotaExceeded(false)}
+                onClick={() => setQuotaExceeded(null)}
                 className="w-full py-2.5 rounded-xl text-[13px] font-medium text-[#6B7280] dark:text-white/35 hover:bg-[#F3F4F6] dark:hover:bg-white/[0.05] transition-all"
               >
                 {QUOTA_TEXTS.exceeded.laterBtn}

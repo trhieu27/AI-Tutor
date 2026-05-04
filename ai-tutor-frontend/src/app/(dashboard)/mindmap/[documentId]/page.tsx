@@ -64,8 +64,10 @@ export default function InteractiveMindmapPage() {
 
   const [zoom, setZoom] = useState(0.8);
   const [position, setPosition] = useState({ x: 0, y: 0 });
+  const positionRef = useRef({ x: 0, y: 0 });
   const [isDragging, setIsDragging] = useState(false);
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
+  const touchRef = useRef({ pinchDist: 0, pinchMidX: 0, pinchMidY: 0, dragging: false, startX: 0, startY: 0 });
 
   const [isEditing, setIsEditing] = useState(false);
   const [editableCode, setEditableCode] = useState("");
@@ -87,6 +89,9 @@ export default function InteractiveMindmapPage() {
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [unifiedUndo, unifiedRedo]);
+
+  // Keep positionRef in sync
+  useEffect(() => { positionRef.current = position; }, [position]);
 
   // RESTORE VIEWPORT
   useEffect(() => {
@@ -219,10 +224,67 @@ export default function InteractiveMindmapPage() {
 
   useEffect(() => {
     const container = containerRef.current;
-    if (container) {
-      container.addEventListener('wheel', handleWheel, { passive: false });
-      return () => container.removeEventListener('wheel', handleWheel);
-    }
+    if (!container) return;
+
+    const getTouchDist = (t: TouchList) => {
+      const dx = t[0].clientX - t[1].clientX;
+      const dy = t[0].clientY - t[1].clientY;
+      return Math.sqrt(dx * dx + dy * dy);
+    };
+    const onTouchStart = (e: TouchEvent) => {
+      if (e.touches.length === 2) {
+        e.preventDefault();
+        touchRef.current.pinchDist = getTouchDist(e.touches);
+        touchRef.current.pinchMidX = (e.touches[0].clientX + e.touches[1].clientX) / 2;
+        touchRef.current.pinchMidY = (e.touches[0].clientY + e.touches[1].clientY) / 2;
+        touchRef.current.dragging = false;
+      } else if (e.touches.length === 1) {
+        // Đừng intercept nếu đang chạm vào node hoặc element tương tác
+        const target = e.target as HTMLElement;
+        if (
+          target instanceof HTMLButtonElement ||
+          target instanceof HTMLInputElement ||
+          target instanceof HTMLTextAreaElement ||
+          target.closest('.cursor-pointer') ||
+          target.closest('[data-mindmap-node]')
+        ) return;
+        touchRef.current.dragging = true;
+        touchRef.current.startX = e.touches[0].clientX - positionRef.current.x;
+        touchRef.current.startY = e.touches[0].clientY - positionRef.current.y;
+        setHasInteracted(true);
+      }
+    };
+    const onTouchMove = (e: TouchEvent) => {
+      e.preventDefault();
+      if (e.touches.length === 2 && touchRef.current.pinchDist > 0) {
+        const newDist = getTouchDist(e.touches);
+        const newMidX = (e.touches[0].clientX + e.touches[1].clientX) / 2;
+        const newMidY = (e.touches[0].clientY + e.touches[1].clientY) / 2;
+        const scale = newDist / touchRef.current.pinchDist;
+        const dx = newMidX - touchRef.current.pinchMidX;
+        const dy = newMidY - touchRef.current.pinchMidY;
+        setZoom(prev => Math.min(Math.max(prev * scale, 0.15), 3));
+        setPosition(prev => ({ x: prev.x + dx, y: prev.y + dy }));
+        setHasInteracted(true);
+        touchRef.current.pinchDist = newDist;
+        touchRef.current.pinchMidX = newMidX;
+        touchRef.current.pinchMidY = newMidY;
+      } else if (e.touches.length === 1 && touchRef.current.dragging) {
+        setPosition({ x: e.touches[0].clientX - touchRef.current.startX, y: e.touches[0].clientY - touchRef.current.startY });
+      }
+    };
+    const onTouchEnd = () => { touchRef.current.dragging = false; touchRef.current.pinchDist = 0; };
+
+    container.addEventListener('wheel', handleWheel, { passive: false });
+    container.addEventListener('touchstart', onTouchStart, { passive: false });
+    container.addEventListener('touchmove', onTouchMove, { passive: false });
+    container.addEventListener('touchend', onTouchEnd);
+    return () => {
+      container.removeEventListener('wheel', handleWheel);
+      container.removeEventListener('touchstart', onTouchStart);
+      container.removeEventListener('touchmove', onTouchMove);
+      container.removeEventListener('touchend', onTouchEnd);
+    };
   }, []);
 
   const handleReset = () => {
@@ -251,7 +313,7 @@ export default function InteractiveMindmapPage() {
 
   return (
     <>
-    <div className="flex flex-col h-[calc(100vh-64px)] bg-[var(--background)] overflow-hidden relative font-sans selection:bg-[hsl(239_68%_58%/0.25)] transition-colors duration-500">
+    <div className="flex flex-col h-full bg-[var(--background)] overflow-hidden relative font-sans selection:bg-[hsl(239_68%_58%/0.25)] transition-colors duration-500">
 
       {/* ── Dynamic Background Mesh (subtle, non-distracting) ────────── */}
       <div className="absolute inset-0 z-0 pointer-events-none overflow-hidden">
@@ -289,7 +351,7 @@ export default function InteractiveMindmapPage() {
             >
               <span className="material-symbols-outlined icon-thin text-[16px]">west</span>
             </button>
-            <h1 className="font-semibold text-[var(--foreground)] text-[13px] truncate max-w-[200px] md:max-w-md tracking-[-0.01em]">
+            <h1 className="font-semibold text-[var(--foreground)] text-[13px] truncate max-w-[120px] md:max-w-md tracking-[-0.01em]">
               {docData?.file_name}
             </h1>
           </div>
@@ -305,7 +367,7 @@ export default function InteractiveMindmapPage() {
                     ? 'text-[var(--muted-light)] opacity-40 cursor-not-allowed'
                     : 'text-[var(--muted)] hover:text-[var(--foreground)] hover:bg-[var(--card-bg)]'
                 }`}
-                title="Hoàn tác (Ctrl+Z)"
+                title={MINDMAP_PAGE_TEXTS.CONTROLS.UNDO}
               >
                 <span className="material-symbols-outlined icon-thin text-[16px]">undo</span>
               </button>
@@ -317,7 +379,7 @@ export default function InteractiveMindmapPage() {
                     ? 'text-[var(--muted-light)] opacity-40 cursor-not-allowed'
                     : 'text-[var(--muted)] hover:text-[var(--foreground)] hover:bg-[var(--card-bg)]'
                 }`}
-                title="Làm lại (Ctrl+Y)"
+                title={MINDMAP_PAGE_TEXTS.CONTROLS.REDO}
               >
                 <span className="material-symbols-outlined icon-thin text-[16px]">redo</span>
               </button>
@@ -349,7 +411,7 @@ export default function InteractiveMindmapPage() {
             <button
               onClick={() => setShowResetConfirm(true)}
               className="w-8 h-8 flex items-center justify-center rounded-xl text-[var(--muted)] hover:text-[hsl(343_85%_58%)] hover:bg-[hsl(343_85%_58%/0.06)] transition-all active:scale-90"
-              title="Đặt lại toàn bộ sơ đồ"
+              title={MINDMAP_PAGE_TEXTS.CONTROLS.RESET_DIAGRAM}
             >
               <span className="material-symbols-outlined icon-thin text-[17px]">restart_alt</span>
             </button>
@@ -363,18 +425,7 @@ export default function InteractiveMindmapPage() {
               <span className="material-symbols-outlined icon-thin text-[17px]">download</span>
             </button>
 
-            {/* Code sidebar toggle */}
-            <button
-              onClick={() => setIsSidebarOpen(p => !p)}
-              className={`w-8 h-8 flex items-center justify-center rounded-xl transition-all active:scale-90 ${
-                isSidebarOpen
-                  ? 'bg-[hsl(239_68%_58%/0.12)] text-[hsl(239_68%_58%)] border border-[hsl(239_68%_58%/0.25)]'
-                  : 'text-[var(--muted)] hover:text-[var(--foreground)] hover:bg-[var(--surface)] border border-transparent'
-              }`}
-              title="Mã nguồn"
-            >
-              <span className="material-symbols-outlined icon-thin text-[17px]">code</span>
-            </button>
+
           </div>
         </header>
       </div>
@@ -442,7 +493,7 @@ export default function InteractiveMindmapPage() {
                   {MINDMAP_PAGE_TEXTS.STATUS.LOADING}
                 </p>
                 <p className="text-[11px] text-[var(--muted)] font-medium">
-                  Đang phân tích nội dung tài liệu
+                  {MINDMAP_PAGE_TEXTS.STATUS.LOADING_SUBTITLE}
                 </p>
               </div>
 
@@ -471,14 +522,10 @@ export default function InteractiveMindmapPage() {
           )}
         </div>
 
-        {/* User guidance overlay */}
-        <div
-          className={`absolute bottom-8 left-8 transition-all duration-700 ${
-            !hasInteracted && isUIVisible
-              ? 'opacity-100 translate-y-0'
-              : 'opacity-0 translate-y-6 pointer-events-none'
-          }`}
-        >
+        {/* User guidance overlay — desktop */}
+        <div className={`absolute bottom-8 left-8 transition-all duration-700 hidden md:block ${
+          !hasInteracted && isUIVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-6 pointer-events-none'
+        }`}>
           <div className="bg-[var(--surface-overlay)] backdrop-blur-xl border border-[var(--border-color)] rounded-2xl shadow-[0_8px_24px_hsl(222_47%_4%/0.08)] p-3 flex items-center gap-3 w-[320px]">
             <div className="w-8 h-8 rounded-xl bg-[hsl(239_68%_58%/0.08)] border border-[hsl(239_68%_58%/0.15)] flex items-center justify-center text-[hsl(239_68%_58%)] shrink-0">
               <span className="material-symbols-outlined icon-thin text-[16px]">mouse</span>
@@ -486,6 +533,20 @@ export default function InteractiveMindmapPage() {
             <div>
               <p className="text-[9px] font-bold uppercase tracking-[0.15em] text-[var(--muted-light)] mb-0.5">{MINDMAP_PAGE_TEXTS.GUIDE.TITLE}</p>
               <p className="text-[11px] text-[var(--foreground)] font-medium leading-snug opacity-80">{MINDMAP_PAGE_TEXTS.GUIDE.DESC}</p>
+            </div>
+          </div>
+        </div>
+        {/* User guidance overlay — mobile */}
+        <div className={`absolute bottom-8 left-4 right-4 transition-all duration-700 md:hidden ${
+          !hasInteracted && isUIVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-6 pointer-events-none'
+        }`}>
+          <div className="bg-[var(--surface-overlay)] backdrop-blur-xl border border-[var(--border-color)] rounded-2xl shadow-[0_8px_24px_hsl(222_47%_4%/0.08)] p-3 flex items-center gap-3">
+            <div className="w-8 h-8 rounded-xl bg-[hsl(239_68%_58%/0.08)] border border-[hsl(239_68%_58%/0.15)] flex items-center justify-center text-[hsl(239_68%_58%)] shrink-0">
+              <span className="material-symbols-outlined icon-thin text-[16px]">touch_app</span>
+            </div>
+            <div>
+              <p className="text-[9px] font-bold uppercase tracking-[0.15em] text-[var(--muted-light)] mb-0.5">Thao tác</p>
+              <p className="text-[11px] text-[var(--foreground)] font-medium leading-snug opacity-80">{MINDMAP_PAGE_TEXTS.GUIDE.MOBILE_DESC}</p>
             </div>
           </div>
         </div>
@@ -521,8 +582,8 @@ export default function InteractiveMindmapPage() {
                   <span className="material-symbols-outlined icon-thin text-white text-[16px]">code</span>
                 </div>
                 <div>
-                  <h3 className="font-semibold text-[var(--foreground)] text-[13px] tracking-[-0.01em]">Điều chỉnh Sơ đồ</h3>
-                  <p className="text-[10px] text-[var(--muted-light)] font-medium">Mermaid Mindmap Syntax</p>
+                  <h3 className="font-semibold text-[var(--foreground)] text-[13px] tracking-[-0.01em]">{MINDMAP_PAGE_TEXTS.EDITOR.TITLE}</h3>
+                  <p className="text-[10px] text-[var(--muted-light)] font-medium">{MINDMAP_PAGE_TEXTS.EDITOR.SUBTITLE}</p>
                 </div>
               </div>
               <button
@@ -536,7 +597,7 @@ export default function InteractiveMindmapPage() {
             <div className="flex-1 space-y-4 overflow-y-auto custom-scrollbar pr-1 pb-4">
               {/* Label */}
               <p className="text-[10px] font-bold text-[hsl(239_68%_58%)] uppercase tracking-[0.15em] px-1">
-                Mã nguồn (Mermaid)
+                {MINDMAP_PAGE_TEXTS.EDITOR.LABEL}
               </p>
 
               {/* Code textarea */}
@@ -566,7 +627,7 @@ export default function InteractiveMindmapPage() {
                       ? 'bg-[hsl(158_64%_44%)] text-white'
                       : 'bg-[var(--surface)] border border-[var(--border-color)] text-[var(--muted)] hover:text-[var(--foreground)] hover:bg-[var(--card-bg-hover)]'
                   }`}
-                  title="Sao chép mã"
+                  title={MINDMAP_PAGE_TEXTS.CONTROLS.COPY_CODE}
                 >
                   <span className="material-symbols-outlined icon-thin text-[15px]">{copySuccess ? 'done_all' : 'file_copy'}</span>
                 </button>
@@ -607,10 +668,10 @@ export default function InteractiveMindmapPage() {
     {/* ── Confirm Reset Dialog ─────────────────────────── */}
     <ConfirmDialog
       open={showResetConfirm}
-      title="Đặt lại sơ đồ tư duy"
-      message="Toàn bộ sơ đồ hiện tại sẽ bị xóa và AI sẽ tạo lại từ đầu. Thao tác này không thể hoàn tác."
-      confirmLabel="Đặt lại"
-      cancelLabel="Giữ lại"
+      title={MINDMAP_PAGE_TEXTS.RESET_CONFIRM.TITLE}
+      message={MINDMAP_PAGE_TEXTS.RESET_CONFIRM.MESSAGE}
+      confirmLabel={MINDMAP_PAGE_TEXTS.RESET_CONFIRM.CONFIRM}
+      cancelLabel={MINDMAP_PAGE_TEXTS.RESET_CONFIRM.CANCEL}
       variant="warning"
       onConfirm={() => {
         setShowResetConfirm(false);

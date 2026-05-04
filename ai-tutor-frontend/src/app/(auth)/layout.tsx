@@ -12,18 +12,42 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
   const router = useRouter();
   const [ready, setReady] = useState(false);
 
+  // Áp dụng nền trắng NGAY lập tức trước khi bất kỳ effect nào chạy
+  // tránh flash đen do dark theme của body/html
+  if (typeof document !== "undefined") {
+    document.documentElement.style.backgroundColor = "#ffffff";
+    document.body.style.backgroundColor = "#ffffff";
+  }
+
+  useEffect(() => {
+    // Force white on mount và cleanup khi rời trang auth
+    document.documentElement.style.backgroundColor = "#ffffff";
+    document.body.style.backgroundColor = "#ffffff";
+    return () => {
+      document.documentElement.style.backgroundColor = "";
+      document.body.style.backgroundColor = "";
+    };
+  }, []);
+
   useEffect(() => {
     const token = localStorage.getItem("access_token");
     if (token) {
-      // Đã login → về dashboard, replace để không quay lại được bằng nút Back
       router.replace("/");
     } else {
       setReady(true);
     }
   }, [router]);
 
-  // Chờ cho đến khi biết chắc chưa login mới render form
-  if (!ready) return null;
+  // Khi chưa biết trạng thái login: hiện màn trắng thay vì null
+  // để tránh body tối lộ ra phía sau
+  if (!ready) {
+    return (
+      <div
+        style={{ minHeight: "100dvh", backgroundColor: "#ffffff" }}
+        aria-hidden="true"
+      />
+    );
+  }
 
   return <>{children}</>;
 }

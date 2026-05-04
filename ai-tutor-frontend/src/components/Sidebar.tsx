@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import { useState, useEffect } from 'react';
 import { SIDEBAR_TEXTS } from '@/constants/texts';
 import { useAuth } from '@/context/AuthContext';
 
@@ -15,10 +16,16 @@ const navItems = [
 export default function Sidebar({ onClose }: { onClose?: () => void }) {
   const pathname = usePathname();
   const { user } = useAuth();
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
   const isPro = user?.isPro ?? false;
 
   return (
-    <aside className="w-64 bg-[var(--sidebar-bg)] h-screen border-r border-[var(--border-color)] flex flex-col shrink-0 overflow-hidden selection:bg-[hsl(239_68%_58%/0.25)] pb-4 transition-colors duration-500">
+    <aside className="w-64 bg-[var(--sidebar-bg)] h-[100dvh] border-r border-[var(--border-color)] flex flex-col shrink-0 overflow-hidden selection:bg-[hsl(239_68%_58%/0.25)] pb-4 transition-colors duration-500">
 
       {/* Brand */}
       <div className="h-16 flex items-center justify-between gap-3 px-4 border-b border-[var(--border-color)] shrink-0">
@@ -53,6 +60,7 @@ export default function Sidebar({ onClose }: { onClose?: () => void }) {
               <Link
                 key={item.href}
                 href={item.href}
+                onClick={() => onClose?.()}
                 className={`group flex items-center gap-2.5 px-3 py-2.5 rounded-xl font-medium text-[13px] transition-all duration-150 relative outline-none ${
                   isActive
                     ? 'bg-[hsl(239_68%_58%/0.08)] text-[hsl(239_68%_58%)] border border-[hsl(239_68%_58%/0.15)]'
@@ -80,6 +88,7 @@ export default function Sidebar({ onClose }: { onClose?: () => void }) {
         <div className="mt-auto space-y-0.5 pt-3 border-t border-[var(--border-subtle)]">
           <Link
             href="/settings"
+            onClick={() => onClose?.()}
             className="flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-[var(--muted)] hover:text-[var(--foreground)] hover:bg-[var(--surface)] transition-all text-[13px] font-medium group"
           >
             <span className="material-symbols-outlined icon-thin text-[18px] group-hover:rotate-45 transition-transform duration-300">settings</span>
@@ -87,6 +96,7 @@ export default function Sidebar({ onClose }: { onClose?: () => void }) {
           </Link>
           <Link
             href="/help"
+            onClick={() => onClose?.()}
             className="flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-[var(--muted)] hover:text-[var(--foreground)] hover:bg-[var(--surface)] transition-all text-[13px] font-medium group"
           >
             <span className="material-symbols-outlined icon-thin text-[18px]">help</span>
@@ -95,7 +105,7 @@ export default function Sidebar({ onClose }: { onClose?: () => void }) {
         </div>
 
         {/* Pro Card — chỉ hiện khi user CHƯA là Pro */}
-        {!isPro && (
+        {mounted && !isPro && (
           <div className="mt-3 px-0.5">
             <div className="relative overflow-hidden bg-gradient-to-br from-[hsl(239_68%_58%)] to-[hsl(263_70%_55%)] rounded-3xl p-3.5 shadow-[0_2px_8px_hsl(239_68%_58%/0.20)] cursor-pointer transition-all duration-200 hover:opacity-90">
               {/* Noise overlay */}

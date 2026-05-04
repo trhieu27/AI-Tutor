@@ -15,6 +15,18 @@ interface DocumentTableProps {
   limit?: number;
 }
 
+/* ── FileName: luôn truncate với "..." ───────────────────── */
+function FileName({ name }: { name: string }) {
+  return (
+    <p
+      title={name}
+      className="text-[13px] font-semibold text-[var(--foreground)] truncate group-hover:text-[hsl(239_68%_58%)] transition-colors"
+    >
+      {name}
+    </p>
+  );
+}
+
 /* ── Skeleton row ─────────────────────────────────────────── */
 function SkeletonRow({ index, showActions }: { index: number; showActions?: boolean }) {
   return (
@@ -164,7 +176,7 @@ export default function DocumentTable({
     const ext = fileName.split(".").pop()?.toLowerCase();
     const isPdf = ext === "pdf";
     return (
-      <div className={`w-9 h-9 rounded-lg flex items-center justify-center shrink-0 border transition-transform group-hover:scale-105 ${
+      <div className={`w-9 h-9 rounded-lg flex items-center justify-center shrink-0 border ${
         isPdf
           ? "bg-[hsl(343_85%_58%/0.07)] text-[hsl(343_72%_48%)] border-[hsl(343_85%_58%/0.15)]"
           : "bg-[hsl(217_91%_60%/0.07)] text-[hsl(217_72%_48%)] border-[hsl(217_91%_60%/0.15)]"
@@ -228,24 +240,24 @@ export default function DocumentTable({
       </div>
 
       {/* ── Table ──────────────────────────────────────────── */}
-      <div className="overflow-x-auto overflow-y-auto max-h-[330px] w-full custom-scrollbar">
-        <table className="w-full text-left border-collapse table-fixed min-w-full">
-          <thead className="sticky top-0 z-20 bg-[var(--surface)]">
+      <div className="overflow-x-auto overflow-y-auto max-h-[50dvh] sm:max-h-[330px] w-full custom-scrollbar overscroll-none">
+        <table className="w-full text-left border-collapse sm:table-fixed">
+          <thead className="sticky top-0 z-20" style={{ backgroundColor: 'var(--sidebar-bg)' }}>
             <tr className="border-b border-[hsl(214_32%_91%)] dark:border-white/8">
-              <th className="py-3 px-5 text-[10px] font-bold tracking-[0.06em] text-[var(--muted-light)]" style={{ width: "36%" }}>
+              <th className="py-3 px-5 text-[10px] font-bold tracking-[0.06em] text-[var(--muted-light)] sm:w-[36%]">
                 {DOCUMENT_TABLE_TEXTS.colName}
               </th>
-              <th className="py-3 px-4 text-[10px] font-bold tracking-[0.06em] text-[var(--muted-light)] text-center" style={{ width: "15%" }}>
+              <th className="py-3 px-4 text-[10px] font-bold tracking-[0.06em] text-[var(--muted-light)] text-center hidden sm:table-cell" style={{ width: "15%" }}>
                 {DOCUMENT_TABLE_TEXTS.colDate}
               </th>
-              <th className="py-3 px-4 text-[10px] font-bold tracking-[0.06em] text-[var(--muted-light)] text-center" style={{ width: "11%" }}>
+              <th className="py-3 px-4 text-[10px] font-bold tracking-[0.06em] text-[var(--muted-light)] text-center hidden sm:table-cell" style={{ width: "11%" }}>
                 Quy mô
               </th>
-              <th className="py-3 px-4 text-[10px] font-bold tracking-[0.06em] text-[var(--muted-light)] text-center" style={{ width: "16%" }}>
+              <th className="py-3 px-4 text-[10px] font-bold tracking-[0.06em] text-[var(--muted-light)] text-center hidden sm:table-cell" style={{ width: "16%" }}>
                 {DOCUMENT_TABLE_TEXTS.colStatus}
               </th>
               {showActions && (
-                <th className="py-3 px-3 text-[10px] font-bold tracking-[0.06em] text-[var(--muted-light)] text-center" style={{ width: "22%" }}>
+                <th className="py-3 px-3 text-[10px] font-bold tracking-[0.06em] text-[var(--muted-light)] text-center sm:w-[22%]">
                   Thao tác
                 </th>
               )}
@@ -275,9 +287,7 @@ export default function DocumentTable({
                       <div className="flex items-center gap-3 overflow-hidden">
                         {getFileIcon(doc.file_name)}
                         <div className="min-w-0 flex-1">
-                          <p className="text-[13px] font-semibold text-[var(--foreground)] truncate group-hover:text-[hsl(239_68%_58%)] transition-colors">
-                            {doc.file_name}
-                          </p>
+                          <FileName name={doc.file_name} />
                           <p className="text-[11px] text-[var(--muted-light)] mt-0.5 font-medium">
                             {doc.file_size_mb} MB · {doc.file_name.split(".").pop()?.toUpperCase()}
                           </p>
@@ -285,22 +295,22 @@ export default function DocumentTable({
                       </div>
                     </td>
 
-                    {/* Date */}
-                    <td className="py-3.5 px-4 text-center">
+                    {/* Date — ẩn trên mobile */}
+                    <td className="py-3.5 px-4 text-center hidden sm:table-cell">
                       <p className="text-[12px] font-medium text-[var(--muted)]">
                         {new Date(doc.uploaded_at).toLocaleDateString("vi-VN")}
                       </p>
                     </td>
 
-                    {/* Size */}
-                    <td className="py-3.5 px-4 text-center">
+                    {/* Size — ẩn trên mobile */}
+                    <td className="py-3.5 px-4 text-center hidden sm:table-cell">
                       <p className="text-[12px] font-medium text-[var(--muted)]">
                         {doc.page_count > 0 ? `${doc.page_count} trang` : "—"}
                       </p>
                     </td>
 
-                    {/* Status */}
-                    <td className="py-3.5 px-4 text-center">
+                    {/* Status — ẩn trên mobile */}
+                    <td className="py-3.5 px-4 text-center hidden sm:table-cell">
                       <div className="flex justify-center">
                         {getStatusBadge(doc.status, doc.id)}
                       </div>
@@ -308,43 +318,43 @@ export default function DocumentTable({
 
                     {/* Actions */}
                     {showActions && (
-                      <td className="py-3.5 px-3 text-center" onClick={(e) => e.stopPropagation()}>
-                        <div className="flex items-center justify-center gap-1.5">
+                      <td className="py-2 px-2 sm:py-3.5 sm:px-3 text-center" onClick={(e) => e.stopPropagation()}>
+                        <div className="flex items-center justify-center gap-1">
                           {doc.status === "READY" && (
                             <>
                               <Link
                                 href={getRedirectUrl(doc.id)}
-                                className="w-9 h-9 rounded-lg border border-[hsl(239_68%_58%/0.20)] text-[hsl(239_55%_50%)] hover:bg-[hsl(239_68%_58%)] hover:text-white hover:border-transparent flex items-center justify-center transition-all"
+                                className="w-7 h-7 sm:w-9 sm:h-9 rounded-lg border border-[hsl(239_68%_58%/0.20)] text-[hsl(239_55%_50%)] hover:bg-[hsl(239_68%_58%)] hover:text-white hover:border-transparent flex items-center justify-center transition-all"
                                 title="Hỏi AI"
                               >
-                                <span className="material-symbols-outlined icon-thin text-[15px]">chat_bubble</span>
+                                <span className="material-symbols-outlined icon-thin text-[13px] sm:text-[15px]">chat_bubble</span>
                               </Link>
                               <Link
                                 href={`/quiz/${doc.id}`}
-                                className="w-9 h-9 rounded-lg border border-[hsl(38_92%_50%/0.20)] text-[hsl(38_80%_42%)] hover:bg-[hsl(38_92%_50%)] hover:text-white hover:border-transparent flex items-center justify-center transition-all"
+                                className="w-7 h-7 sm:w-9 sm:h-9 rounded-lg border border-[hsl(38_92%_50%/0.20)] text-[hsl(38_80%_42%)] hover:bg-[hsl(38_92%_50%)] hover:text-white hover:border-transparent flex items-center justify-center transition-all"
                                 title="Luyện tập"
                               >
-                                <span className="material-symbols-outlined icon-thin text-[15px]">quiz</span>
+                                <span className="material-symbols-outlined icon-thin text-[13px] sm:text-[15px]">quiz</span>
                               </Link>
                               <Link
                                 href={`/mindmap/${doc.id}`}
-                                className="w-9 h-9 rounded-lg border border-[hsl(173_58%_42%/0.20)] text-[hsl(173_50%_36%)] hover:bg-[hsl(173_58%_42%)] hover:text-white hover:border-transparent flex items-center justify-center transition-all"
+                                className="w-7 h-7 sm:w-9 sm:h-9 rounded-lg border border-[hsl(173_58%_42%/0.20)] text-[hsl(173_50%_36%)] hover:bg-[hsl(173_58%_42%)] hover:text-white hover:border-transparent flex items-center justify-center transition-all"
                                 title="Sơ đồ tư duy"
                               >
-                                <span className="material-symbols-outlined icon-thin text-[15px]">hub</span>
+                                <span className="material-symbols-outlined icon-thin text-[13px] sm:text-[15px]">hub</span>
                               </Link>
                             </>
                           )}
                           <button
                             onClick={() => handleDelete(doc.id, doc.file_name)}
                             disabled={deletingId === doc.id}
-                            className="w-9 h-9 rounded-lg border border-[var(--border-color)] text-[var(--muted-light)] hover:bg-[hsl(343_85%_58%)] hover:text-white hover:border-transparent flex items-center justify-center transition-all disabled:opacity-50"
+                            className="w-7 h-7 sm:w-9 sm:h-9 rounded-lg border border-[var(--border-color)] text-[var(--muted-light)] hover:bg-[hsl(343_85%_58%)] hover:text-white hover:border-transparent flex items-center justify-center transition-all disabled:opacity-50"
                             title="Xóa"
                           >
                             {deletingId === doc.id ? (
                               <div className="w-3 h-3 border border-current/30 border-t-current rounded-full animate-spin" />
                             ) : (
-                              <span className="material-symbols-outlined icon-thin text-[15px]">delete</span>
+                              <span className="material-symbols-outlined icon-thin text-[13px] sm:text-[15px]">delete</span>
                             )}
                           </button>
                         </div>

@@ -23,7 +23,7 @@ from app.rag.rag_engine import (
     generate_study_questions_stream,
 )
 from app.api.auth import get_current_user
-from app.api.quota import require_chat_quota, require_ai_quota, check_and_record_ai_quota, FREE_LIMITS
+from app.api.quota import require_chat_quota, check_and_record_ai_quota, FREE_LIMITS
 
 router = APIRouter(prefix="/chat", tags=["Chat"])
 

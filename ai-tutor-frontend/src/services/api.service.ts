@@ -213,6 +213,10 @@ export async function askQuestion(
   });
 
   if (!res.ok) {
+    if (res.status === 429) {
+      const err = await res.json().catch(() => ({}));
+      throw new QuotaError(err.detail || 'Quota exceeded');
+    }
     const error = await res.json().catch(() => ({ detail: "Hỏi thất bại" }));
     throw new Error(error.detail || "Hỏi thất bại");
   }
