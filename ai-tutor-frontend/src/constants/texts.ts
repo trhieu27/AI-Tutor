@@ -274,7 +274,7 @@ export const CHAT_TEXTS = {
   }
 };
 
-export const MINDMAP_PAGE_TEXTS = {
+export const MINDMAP_LIST_TEXTS = {
   title: "Sơ đồ tư duy",
   subtitle: "Chọn một tài liệu để tạo sơ đồ tư duy (Mindmap). AI sẽ giúp bạn trực quan hóa các mối liên hệ giữa các khái niệm chính trong bài học.",
   heroTitle: "Vì sao nên dùng Sơ đồ tư duy?",
@@ -522,13 +522,7 @@ export const SETTINGS_PAGE_TEXTS = {
   },
   profile: {
     title: "Hồ sơ cá nhân",
-    subtitle: "Thông tin cá nhân và ảnh đại diện",
-    avatar: {
-      label: "Ảnh đại diện",
-      hint: "Kéo thả hoặc click để chọn ảnh\nPNG, JPG · Tối đa 3MB",
-      errType: "Chỉ chấp nhận file PNG hoặc JPG.",
-      errSize: "Ảnh không được vượt quá 3MB."
-    },
+    subtitle: "Thông tin cá nhân",
     fields: {
       fullName: "Họ và tên",
       studentId: "MSSV",
@@ -539,8 +533,7 @@ export const SETTINGS_PAGE_TEXTS = {
     },
     save: "Lưu thay đổi",
     saving: "Đang lưu...",
-    success: "Đã lưu thay đổi",
-    avatarSuccess: "Ảnh đại diện đã cập nhật"
+    success: "Đã lưu thay đổi"
   },
   security: {
     title: "Bảo mật tài khoản",
@@ -576,3 +569,42 @@ export const SETTINGS_PAGE_TEXTS = {
     error: "Không thể tải thông tin. Vui lòng thử lại."
   }
 };
+
+export const MINDMAP_PAGE_TEXTS = {
+  STATUS: {
+    LOADING: "Đang tạo sơ đồ tư duy...",
+    LOADING_SUBTITLE: "Đang phân tích nội dung tài liệu",
+  },
+  CONTROLS: {
+    DOWNLOAD: "Tải ảnh sơ đồ",
+    RESET_VIEW: "Căn giữa sơ đồ",
+    UNDO: "Hoàn tác (Ctrl+Z)",
+    REDO: "Làm lại (Ctrl+Y)",
+    RESET_DIAGRAM: "Đặt lại toàn bộ sơ đồ",
+    CODE_SIDEBAR: "Mã nguồn",
+    COPY_CODE: "Sao chép mã",
+  },
+  GUIDE: {
+    TITLE: "Thao tác",
+    DESC: "Cầm kéo để di chuyển • Lăn chuột để thu phóng",
+    MOBILE_DESC: "1 ngón kéo để di chuyển • Chụm 2 ngón để thu phóng",
+  },
+  EDITOR: {
+    TITLE: "Điều chỉnh Sơ đồ",
+    SUBTITLE: "Mermaid Mindmap Syntax",
+    LABEL: "Mã nguồn (Mermaid)",
+    PLACEHOLDER: "mindmap\n  root((Chủ đề))\n    Nhánh A\n    Nhánh B",
+    APPLY: "Cập nhật",
+    NOTE_TITLE: "Ghi chú",
+    NOTE_DESC: "Chỉnh sửa mã và nhấn",
+    NOTE_HIGHLIGHT: "\u201cCập nhật\u201d",
+    NOTE_DESC2: "để áp dụng. Không thể hoàn tác sau khi áp dụng mã thủ công.",
+  },
+  RESET_CONFIRM: {
+    TITLE: "Đặt lại sơ đồ tư duy",
+    MESSAGE: "Toàn bộ sơ đồ hiện tại sẽ bị xóa và AI sẽ tạo lại từ đầu. Thao tác này không thể hoàn tác.",
+    CONFIRM: "Đặt lại",
+    CANCEL: "Giữ lại",
+  },
+};
+

@@ -8,6 +8,7 @@
 
 @import url('https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&family=JetBrains+Mono:wght@400;500;600&display=swap');
 @import "tailwindcss";
+@plugin "@tailwindcss/typography";
 
 /* ── 1. TAILWIND v4 @theme BLOCK ──────────────────────────────────────── */
 @theme {
@@ -443,6 +444,12 @@ h1, h2, h3, h4, h5, h6 {
 }
 .mindmap-container .mindmap-node-root text {
   font-family: var(--font-serif);
+}
+
+/* ── Filename marquee: slides left on row-hover to reveal full text ───── */
+@keyframes marquee-filename {
+  0%, 12%  { transform: translateX(0); }
+  80%, 100% { transform: translateX(-42%); }
 }
 
 /* ── 9. DIALOG ANIMATIONS ─────────────────────────────────────────────── */

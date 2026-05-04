@@ -1,7 +1,7 @@
 "use client";
 
 import DocumentTable from "@/components/DocumentTable";
-import { MINDMAP_PAGE_TEXTS } from "@/constants/texts";
+import { MINDMAP_LIST_TEXTS } from "@/constants/texts";
 
 export default function MindmapListPage() {
   return (
@@ -23,11 +23,11 @@ export default function MindmapListPage() {
         </div>
 
         <h1 className="font-display text-4xl md:text-[2.75rem] text-[hsl(222_47%_10%)] dark:text-white leading-tight">
-          {MINDMAP_PAGE_TEXTS.title}
+          {MINDMAP_LIST_TEXTS.title}
         </h1>
 
         <p className="text-[var(--muted)] text-[14px] max-w-lg mx-auto leading-relaxed">
-          {MINDMAP_PAGE_TEXTS.subtitle}
+          {MINDMAP_LIST_TEXTS.subtitle}
         </p>
       </div>
 
@@ -50,12 +50,13 @@ export default function MindmapListPage() {
         </div>
 
         <h3 className="font-display text-2xl text-[hsl(222_47%_10%)] dark:text-white mb-3 relative z-10">
-          {MINDMAP_PAGE_TEXTS.heroTitle}
+          {MINDMAP_LIST_TEXTS.heroTitle}
         </h3>
         <p className="text-[var(--muted)] text-[13px] max-w-md leading-relaxed font-medium relative z-10">
-          {MINDMAP_PAGE_TEXTS.heroDesc}
+          {MINDMAP_LIST_TEXTS.heroDesc}
         </p>
       </div>
     </div>
   );
 }
+

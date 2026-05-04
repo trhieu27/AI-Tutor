@@ -148,16 +148,20 @@ function parseMermaid(code: string): MindmapNodeData | null {
     let width: number | undefined = undefined;
     let height: number | undefined = undefined;
 
-    // Extract metadata
-    const colorMatch = raw.match(/:::color-([a-fA-F0-9]{3,6})/);
-    if (colorMatch) color = `#${colorMatch[1]}`;
+    // Extract metadata — supports both hex (#abc) and hsl(h s% l%) color formats
+    const colorMatch = raw.match(/:::color-(hsl\([^)]+\)|#?[a-fA-F0-9]{3,6})/);
+    if (colorMatch) {
+      const raw_color = colorMatch[1];
+      // Normalise: add # prefix only for bare hex strings
+      color = raw_color.startsWith('hsl') ? raw_color : `#${raw_color.replace('#', '')}`;
+    }
     const widthMatch = raw.match(/:::w-(\d+)/);
     if (widthMatch) width = parseInt(widthMatch[1]);
     const heightMatch = raw.match(/:::h-(\d+)/);
     if (heightMatch) height = parseInt(heightMatch[1]);
 
-    // 1. Cleanup text from metadata tags FIRST
-    let cleanText = raw.replace(/:::color-[a-fA-F0-9]{3,6}/g, '')
+    // 1. Cleanup text from metadata tags FIRST (strips hsl AND hex color variants)
+    let cleanText = raw.replace(/:::color-(?:hsl\([^)]+\)|#?[a-fA-F0-9]{3,6})/g, '')
       .replace(/:::w-\d+/g, '')
       .replace(/:::h-\d+/g, '')
       .trim();
@@ -261,7 +265,8 @@ function toMermaid(root: MindmapNodeData): string {
     const shape = d === 1 ? `((${safeText}))` : `(${safeText})`;
     let meta = '';
     const cleanId = n.id;
-    if (n.color) meta += `:::color-${n.color.replace('#', '')}`;
+    // Store HSL colors as-is; strip # only from hex colors
+    if (n.color) meta += `:::color-${n.color.startsWith('hsl') ? n.color : n.color.replace('#', '')}`;
     if (n.width) meta += `:::w-${n.width}`;
     if (n.height) meta += `:::h-${n.height}`;
     r += '  '.repeat(d) + `${cleanId}${shape}${meta}\n`;
@@ -821,6 +826,28 @@ const InteractiveMindmap = forwardRef(({ chart, onCodeChange, documentId, zoom =
     document.body.classList.add('select-none');
   }, [toSvgCoords]);
 
+  // Touch equivalent of handleNodeMouseDown
+  const handleNodeTouchStart = useCallback((e: React.TouchEvent, nodeId: string) => {
+    if (e.touches.length !== 1) return;
+    e.stopPropagation();
+    // Don't preventDefault here to allow scrolling until we confirm it's a drag
+    if (!treeRef.current || resizeRef.current) return;
+    const node = findNode(treeRef.current, nodeId);
+    if (!node) return;
+    const touch = e.touches[0];
+    const ctm = svgRef.current?.getScreenCTM()?.inverse() || null;
+    const svgPt = toSvgCoords(touch.clientX, touch.clientY);
+    dragRef.current = {
+      nodeId,
+      descendantIds: getDescendantIds(node),
+      startX: svgPt.x,
+      startY: svgPt.y,
+      snapPositions: { ...posRef.current },
+      startCTM: ctm
+    };
+    document.body.classList.add('select-none');
+  }, [toSvgCoords]);
+
   const handleResizeMouseDown = useCallback((e: React.MouseEvent, nodeId: string, dir: 'tl' | 'tr' | 'bl' | 'br') => {
     e.stopPropagation();
     e.preventDefault();
@@ -971,10 +998,69 @@ const InteractiveMindmap = forwardRef(({ chart, onCodeChange, documentId, zoom =
       document.body.classList.remove('select-none');
     };
 
+    const onTouchMove = (e: TouchEvent) => {
+      if (!dragRef.current && !resizeRef.current) return;
+      if (e.touches.length !== 1) return;
+      e.preventDefault();
+      const touch = e.touches[0];
+      const ds = dragRef.current;
+      if (ds) {
+        // Compute SVG delta using toSvgCoords — avoids CTM matrix bug on Safari mobile
+        const svgPt = toSvgCoords(touch.clientX, touch.clientY);
+        const dx = svgPt.x - ds.startX;
+        const dy = svgPt.y - ds.startY;
+        const nextPos = { ...ds.snapPositions };
+        for (const id of ds.descendantIds) {
+          if (nextPos[id]) {
+            nextPos[id] = { ...nextPos[id], x: nextPos[id].x + dx, y: nextPos[id].y + dy };
+          }
+        }
+        setPositions(nextPos);
+        posRef.current = nextPos;
+        isManualChangeRef.current = true;
+      }
+    };
+    const onTouchEnd = (e: TouchEvent) => {
+      const ds = dragRef.current;
+      if (!ds && !resizeRef.current) return;
+      if (ds) {
+        const touch = e.changedTouches[0];
+        const svgPt = toSvgCoords(touch.clientX, touch.clientY);
+        const dx = Math.abs(svgPt.x - ds.startX);
+        const dy = Math.abs(svgPt.y - ds.startY);
+        // Push undo snapshot if actually dragged
+        if (dx > 5 || dy > 5) {
+          const snapshot = { code: toMermaid(treeRef.current!), positions: ds.snapPositions };
+          historyRef.current = [...historyRef.current.slice(-(40 - 1)), snapshot];
+          redoRef.current = [];
+          updateUndoRedoState();
+        }
+        // Tap = show context menu
+        if (dx < 6 && dy < 6) {
+          const p = posRef.current[ds.nodeId];
+          if (p && svgRef.current) {
+            const vb = svgRef.current.viewBox.baseVal;
+            setSelectedNodeId(ds.nodeId);
+            setMenuPos({ x: p.x - vb.x, y: p.y - p.h / 2 - vb.y });
+            setMenuMode('main');
+          }
+        }
+        dragRef.current = null;
+        document.body.classList.remove('select-none');
+      }
+    };
+
     document.addEventListener('mousemove', onMouseMove);
     document.addEventListener('mouseup', onMouseUp);
+    document.addEventListener('touchmove', onTouchMove, { passive: false });
+    document.addEventListener('touchend', onTouchEnd);
 
-    return () => { document.removeEventListener('mousemove', onMouseMove); document.removeEventListener('mouseup', onMouseUp); };
+    return () => {
+      document.removeEventListener('mousemove', onMouseMove);
+      document.removeEventListener('mouseup', onMouseUp);
+      document.removeEventListener('touchmove', onTouchMove);
+      document.removeEventListener('touchend', onTouchEnd);
+    };
   }, [toSvgCoords]);
 
   // Close menu
@@ -993,7 +1079,13 @@ const InteractiveMindmap = forwardRef(({ chart, onCodeChange, documentId, zoom =
     const n = flat.find(n => n.id === selectedNodeId);
     if (n) { setEditText(n.text); setMenuMode('edit'); }
   };
-  const doCommitEdit = () => { if (tree && selectedNodeId && editText.trim()) applyUpdate(updateNode(tree, selectedNodeId, { text: editText.trim() })); };
+  const doCommitEdit = () => {
+    if (tree && selectedNodeId && editText.trim()) {
+      applyUpdate(updateNode(tree, selectedNodeId, { text: editText.trim() }));
+    }
+    setMenuMode(null);
+    setSelectedNodeId(null);
+  };
   const doColorChange = (c: string) => { if (tree && selectedNodeId) applyUpdate(updateNode(tree, selectedNodeId, { color: c })); };
 
   // === COMPUTE VIEW ===
@@ -1154,6 +1246,7 @@ const InteractiveMindmap = forwardRef(({ chart, onCodeChange, documentId, zoom =
               data-node-id={n.id}
               data-mindmap-node="true"
               onMouseDown={(e) => handleNodeMouseDown(e, n.id)}
+              onTouchStart={(e) => handleNodeTouchStart(e, n.id)}
               onClick={(e) => e.stopPropagation()}
               style={{ cursor: dragRef.current ? 'grabbing' : 'grab' }}
             >

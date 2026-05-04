@@ -1,9 +1,11 @@
 import { User, Student } from '@/models/User';
-import { API_BASE_URL } from '@/constants/config';
+
+// Sử dụng đường dẫn tương đối để đi qua Next.js proxy (giống api.service.ts)
+// Tuyệt đối KHÔNG dùng URL tuyệt đối trực tiếp đến backend — sẽ bị CORS / Failed to fetch
+const AUTH_BASE = '/api/v1';
 
 class AuthService {
   private static instance: AuthService;
-  private readonly baseUrl = process.env.NEXT_PUBLIC_API_URL || API_BASE_URL;
 
   private constructor() { }
 
@@ -40,7 +42,7 @@ class AuthService {
 
   public async login(email: string, password: string): Promise<{ user: User; accessToken: string; refreshToken: string }> {
     try {
-      const response = await fetch(`${this.baseUrl}/login`, {
+      const response = await fetch(`${AUTH_BASE}/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, password }),
@@ -74,7 +76,7 @@ class AuthService {
 
   public async googleLogin(token: string): Promise<{ user: User; accessToken: string; refreshToken: string }> {
     try {
-      const response = await fetch(`${this.baseUrl}/google-login`, {
+      const response = await fetch(`${AUTH_BASE}/google-login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ token }),
@@ -110,7 +112,7 @@ class AuthService {
     try {
       const student_id = "STU" + Math.floor(100000 + Math.random() * 900000).toString();
 
-      const response = await fetch(`${this.baseUrl}/register`, {
+      const response = await fetch(`${AUTH_BASE}/register`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ student_id, full_name: name, email, password }),
@@ -147,7 +149,7 @@ class AuthService {
       const refreshToken = localStorage.getItem('refresh_token');
       if (!refreshToken) return null;
 
-      const response = await fetch(`${this.baseUrl}/refresh`, {
+      const response = await fetch(`${AUTH_BASE}/refresh`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ refresh_token: refreshToken }),
@@ -173,14 +175,13 @@ class AuthService {
       localStorage.removeItem('access_token');
       localStorage.removeItem('refresh_token');
       localStorage.removeItem('user');
-      localStorage.removeItem('user_avatar');
       this.deleteCookie('access_token');
       this.deleteCookie('refresh_token');
     }
   }
 
   public async forgotPassword(email: string): Promise<void> {
-    const response = await fetch(`${this.baseUrl}/forgot-password`, {
+    const response = await fetch(`${AUTH_BASE}/forgot-password`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email }),
@@ -192,7 +193,7 @@ class AuthService {
   }
 
   public async verifyOtp(email: string, otp: string): Promise<void> {
-    const response = await fetch(`${this.baseUrl}/verify-otp`, {
+    const response = await fetch(`${AUTH_BASE}/verify-otp`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email, otp }),
@@ -204,7 +205,7 @@ class AuthService {
   }
 
   public async resetPassword(email: string, otp: string, password: string): Promise<void> {
-    const response = await fetch(`${this.baseUrl}/reset-password`, {
+    const response = await fetch(`${AUTH_BASE}/reset-password`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email, otp, new_password: password }),
@@ -221,7 +222,7 @@ class AuthService {
       const accessToken = localStorage.getItem('access_token');
       if (!accessToken) return null;
 
-      const response = await fetch(`${this.baseUrl}/users/me`, {
+      const response = await fetch(`${AUTH_BASE}/users/me`, {
         headers: { 'Authorization': `Bearer ${accessToken}` },
       });
 
