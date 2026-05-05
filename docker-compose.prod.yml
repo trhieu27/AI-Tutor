@@ -8,8 +8,6 @@ services:
       dockerfile: Dockerfile
     container_name: ai_tutor_backend
     restart: always
-    ports:
-      - "8081:8081"
     volumes:
       - ./ai-tutor-backend/storage:/app/storage
     env_file:
@@ -24,6 +22,27 @@ services:
       start_period: 40s
 
   # -------------------------------------------------------
+  # Frontend Next.js (production)
+  # -------------------------------------------------------
+  frontend:
+    build:
+      context: ./ai-tutor-frontend
+      dockerfile: Dockerfile
+      args:
+        NEXT_PUBLIC_API_URL: http://52.220.135.31/api/v1
+        NEXT_PUBLIC_GOOGLE_CLIENT_ID: 801791613238-tqiu8qenj6uqitun0qv3emr7lda965eo.apps.googleusercontent.com
+    container_name: ai_tutor_frontend
+    restart: always
+    networks:
+      - ai_tutor_network
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:3000"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+  # -------------------------------------------------------
   # Nginx Reverse Proxy
   # -------------------------------------------------------
   nginx:
@@ -35,9 +54,11 @@ services:
       - "443:443"
     volumes:
       - ./nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
-      - ./nginx/ssl:/etc/nginx/ssl:ro          # SSL certs (nếu có)
+      - ./nginx/ssl:/etc/nginx/ssl:ro
     depends_on:
       backend:
+        condition: service_healthy
+      frontend:
         condition: service_healthy
     networks:
       - ai_tutor_network
