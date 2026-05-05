@@ -1,0 +1,21 @@
+version: 1
+frontend:
+  phases:
+    preBuild:
+      commands:
+        - echo "Node version $(node -v), NPM version $(npm -v)"
+        - npm ci --prefer-offline
+    build:
+      commands:
+        - echo "Building Next.js app..."
+        - npm run build
+        - echo "Build complete!"
+  artifacts:
+    # Với Next.js standalone output
+    baseDirectory: .next
+    files:
+      - '**/*'
+  cache:
+    paths:
+      - node_modules/**/*
+      - .next/cache/**/*

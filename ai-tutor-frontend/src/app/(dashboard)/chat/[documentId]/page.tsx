@@ -101,7 +101,7 @@ export default function ChatPage() {
         else if (initialAction === "summary") handleGetSummary();
         else if (initialAction === "questions") handleGetStudyQuestions();
         // Load quota
-        fetchQuota().then(setQuota).catch(() => {});
+        fetchQuota().then(setQuota).catch(() => { });
       } catch (error) {
         console.error("Error loading chat data:", error);
       }
@@ -205,7 +205,7 @@ export default function ChatPage() {
     setIsLoading(false);
     abortControllerRef.current = null;
     // Refresh quota sau khi AI trả lời xong
-    fetchQuota().then(setQuota).catch(() => {});
+    fetchQuota().then(setQuota).catch(() => { });
   };
 
   const handleCancel = () => {
@@ -335,11 +335,10 @@ export default function ChatPage() {
           ) : sessions.map((session) => (
             <div key={session.id} className="relative group">
               <button onClick={() => loadSession(session.id)}
-                className={`w-full text-left px-3 py-2.5 rounded-lg transition-all ${
-                  currentSessionId === session.id
+                className={`w-full text-left px-3 py-2.5 rounded-lg transition-all ${currentSessionId === session.id
                     ? "bg-white dark:bg-white/[0.06] text-[#1F2937] dark:text-white shadow-sm border border-[#E5E7EB] dark:border-white/[0.08]"
                     : "text-[#6B7280] dark:text-white/35 hover:bg-white dark:hover:bg-white/[0.03] hover:text-[#374151] dark:hover:text-white/70"
-                }`}>
+                  }`}>
                 <p className="text-[12.5px] font-medium truncate pr-5 leading-snug">{session.title || "Cuộc trò chuyện mới"}</p>
                 <p className="text-[10.5px] text-[#9CA3AF] dark:text-white/20 mt-0.5">
                   {new Date(session.updated_at).toLocaleDateString("vi-VN")}
@@ -402,62 +401,59 @@ export default function ChatPage() {
         <div ref={messagesContainerRef} className="flex-1 overflow-y-auto custom-scrollbar relative">
           <div className="max-w-2xl mx-auto px-6 md:px-4 py-10">
 
-          {messages.length === 0 ? (
-            /* Welcome */
-            <div className="flex flex-col items-center justify-center text-center space-y-6 animate-in fade-in duration-500 pt-12">
-              <div className="w-10 h-10 rounded-xl bg-[#F3F4F6] dark:bg-white/[0.05] flex items-center justify-center">
-                <span className="material-symbols-outlined text-[20px] text-[#9CA3AF] dark:text-white/30">auto_stories</span>
+            {messages.length === 0 ? (
+              /* Welcome */
+              <div className="flex flex-col items-center justify-center text-center space-y-6 animate-in fade-in duration-500 pt-12">
+                <div className="w-10 h-10 rounded-xl bg-[#F3F4F6] dark:bg-white/[0.05] flex items-center justify-center">
+                  <span className="material-symbols-outlined text-[20px] text-[#9CA3AF] dark:text-white/30">auto_stories</span>
+                </div>
+                <div className="space-y-2">
+                  <h2 className="text-[20px] font-semibold text-[#1F2937] dark:text-white tracking-[-0.02em]"
+                    style={{ fontFamily: "var(--font-serif)" }}>
+                    {CHAT_TEXTS.WELCOME.TITLE}
+                  </h2>
+                  <p className="text-[13px] text-[#6B7280] dark:text-white/35 leading-relaxed max-w-sm">
+                    {CHAT_TEXTS.WELCOME.SUBTITLE}
+                  </p>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 w-full max-w-lg">
+                  {CHAT_TEXTS.WELCOME.SUGGESTIONS.map((q) => (
+                    <button key={q} onClick={() => setInput(q)}
+                      className="p-3 text-left text-[12px] text-[#374151] dark:text-white/55 bg-[#F9FAFB] dark:bg-white/[0.03] border border-[#E5E7EB] dark:border-white/[0.07] rounded-xl hover:border-[#9CA3AF] dark:hover:border-white/20 hover:bg-[#F3F4F6] dark:hover:bg-white/[0.06] hover:-translate-y-0.5 hover:shadow-sm transition-all duration-200 font-medium leading-snug">
+                      {q}
+                    </button>
+                  ))}
+                </div>
               </div>
-              <div className="space-y-2">
-                <h2 className="text-[20px] font-semibold text-[#1F2937] dark:text-white tracking-[-0.02em]"
-                  style={{ fontFamily: "var(--font-serif)" }}>
-                  {CHAT_TEXTS.WELCOME.TITLE}
-                </h2>
-                <p className="text-[13px] text-[#6B7280] dark:text-white/35 leading-relaxed max-w-sm">
-                  {CHAT_TEXTS.WELCOME.SUBTITLE}
-                </p>
-              </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 w-full max-w-lg">
-                {CHAT_TEXTS.WELCOME.SUGGESTIONS.map((q) => (
-                  <button key={q} onClick={() => setInput(q)}
-                    className="p-3 text-left text-[12px] text-[#374151] dark:text-white/55 bg-[#F9FAFB] dark:bg-white/[0.03] border border-[#E5E7EB] dark:border-white/[0.07] rounded-xl hover:border-[#9CA3AF] dark:hover:border-white/20 hover:bg-[#F3F4F6] dark:hover:bg-white/[0.06] hover:-translate-y-0.5 hover:shadow-sm transition-all duration-200 font-medium leading-snug">
-                    {q}
-                  </button>
-                ))}
-              </div>
-            </div>
-          ) : (
-            <div className="space-y-8 pb-4">
-              {messages.map((msg) => (
-                <div key={msg.id}
-                  className={`flex gap-4 animate-in slide-in-from-bottom-2 duration-300 ${msg.role === "user" ? "flex-row-reverse" : ""}`}>
-                  {/* Avatar */}
-                  <div className={`w-8 h-8 rounded-xl shrink-0 flex items-center justify-center mt-0.5 ${
-                    msg.role === "user"
-                      ? "bg-[#1F2937] dark:bg-white/90"
-                      : "bg-[#F3F4F6] dark:bg-white/[0.06]"
-                  }`}>
-                    <span className={`material-symbols-outlined text-[16px] ${
-                      msg.role === "user" ? "text-white dark:text-[#1F2937]" : "text-[#6B7280] dark:text-white/35"
-                    }`}>
-                      {msg.role === "user" ? "person" : "auto_awesome"}
-                    </span>
-                  </div>
+            ) : (
+              <div className="space-y-8 pb-4">
+                {messages.map((msg) => (
+                  <div key={msg.id}
+                    className={`flex gap-4 animate-in slide-in-from-bottom-2 duration-300 ${msg.role === "user" ? "flex-row-reverse" : ""}`}>
+                    {/* Avatar */}
+                    <div className={`w-8 h-8 rounded-xl shrink-0 flex items-center justify-center mt-0.5 ${msg.role === "user"
+                        ? "bg-[#1F2937] dark:bg-white/90"
+                        : "bg-[#F3F4F6] dark:bg-white/[0.06]"
+                      }`}>
+                      <span className={`material-symbols-outlined text-[16px] ${msg.role === "user" ? "text-white dark:text-[#1F2937]" : "text-[#6B7280] dark:text-white/35"
+                        }`}>
+                        {msg.role === "user" ? "person" : "auto_awesome"}
+                      </span>
+                    </div>
 
-                  {/* Content */}
-                  <div className={`flex-1 min-w-0 ${msg.role === "user" ? "flex flex-col items-end" : ""}`}>
-                    {msg.role === "assistant" && (
-                      <p className="text-[10px] font-semibold text-[#9CA3AF] dark:text-white/20 mb-1.5 uppercase tracking-[0.08em]">
-                        AI Trợ lý
-                      </p>
-                    )}
-                    <div className={`text-[13.5px] leading-[1.75] ${
-                      msg.role === "user"
-                        ? "inline-block bg-[#1F2937] dark:bg-white/90 text-white dark:text-[#111113] px-4 py-2.5 rounded-2xl rounded-tr-sm font-medium max-w-[85%]"
-                        : "text-[#374151] dark:text-white/75 w-full"
-                    }`}>
-                      {msg.role === "assistant" ? (
-                        <div className="prose prose-sm dark:prose-invert max-w-none
+                    {/* Content */}
+                    <div className={`flex-1 min-w-0 ${msg.role === "user" ? "flex flex-col items-end" : ""}`}>
+                      {msg.role === "assistant" && (
+                        <p className="text-[10px] font-semibold text-[#9CA3AF] dark:text-white/20 mb-1.5 uppercase tracking-[0.08em]">
+                          AI Trợ lý
+                        </p>
+                      )}
+                      <div className={`text-[13.5px] leading-[1.75] ${msg.role === "user"
+                          ? "inline-block bg-[#1F2937] dark:bg-white/90 text-white dark:text-[#111113] px-4 py-2.5 rounded-2xl rounded-tr-sm font-medium max-w-[85%]"
+                          : "text-[#374151] dark:text-white/75 w-full"
+                        }`}>
+                        {msg.role === "assistant" ? (
+                          <div className="prose prose-sm dark:prose-invert max-w-none
                           prose-p:leading-[1.75] prose-p:text-[13.5px] prose-p:text-[#374151] dark:prose-p:text-white/70 prose-p:m-0 prose-p:mb-3 last:prose-p:mb-0
                           prose-headings:text-[#1F2937] dark:prose-headings:text-white prose-headings:font-semibold prose-headings:tracking-[-0.01em] prose-headings:mt-5 prose-headings:mb-2
                           prose-strong:text-[#1F2937] dark:prose-strong:text-white prose-strong:font-semibold
@@ -467,39 +463,39 @@ export default function ChatPage() {
                           prose-li:text-[13.5px] prose-li:text-[#374151] dark:prose-li:text-white/65 prose-li:leading-[1.7]
                           prose-ul:my-2 prose-ol:my-2 prose-li:my-0.5
                           prose-table:text-[12px] prose-th:font-semibold prose-th:text-[#1F2937] dark:prose-th:text-white prose-td:text-[#374151] dark:prose-td:text-white/65 prose-table:border-collapse prose-th:border prose-th:border-[#E5E7EB] dark:prose-th:border-white/[0.08] prose-td:border prose-td:border-[#F3F4F6] dark:prose-td:border-white/[0.05] prose-th:px-3 prose-td:px-3">
-                          <ReactMarkdown remarkPlugins={[remarkGfm]}>{msg.content}</ReactMarkdown>
-                          {/* Blink cursor khi đang stream */}
-                          {streamingMsgId === msg.id && (
-                            <span className="inline-block w-0.5 h-[1em] bg-current ml-0.5 align-middle animate-[blink_0.9s_ease-in-out_infinite]" />
-                          )}
-                        </div>
-                      ) : (
-                        <ReactMarkdown>{msg.content}</ReactMarkdown>
-                      )}
+                            <ReactMarkdown remarkPlugins={[remarkGfm]}>{msg.content}</ReactMarkdown>
+                            {/* Blink cursor khi đang stream */}
+                            {streamingMsgId === msg.id && (
+                              <span className="inline-block w-0.5 h-[1em] bg-current ml-0.5 align-middle animate-[blink_0.9s_ease-in-out_infinite]" />
+                            )}
+                          </div>
+                        ) : (
+                          <ReactMarkdown>{msg.content}</ReactMarkdown>
+                        )}
+                      </div>
                     </div>
                   </div>
-                </div>
-              ))}
+                ))}
 
-              {/* Loading dots */}
-              {isLoading && messages[messages.length - 1]?.role !== "assistant" && (
-                <div className="flex gap-4 animate-in fade-in duration-200">
-                  <div className="w-8 h-8 rounded-xl bg-[#F3F4F6] dark:bg-white/[0.06] flex items-center justify-center mt-0.5 shrink-0">
-                    <span className="material-symbols-outlined text-[16px] text-[#9CA3AF] dark:text-white/30">auto_awesome</span>
-                  </div>
-                  <div className="pt-1">
-                    <p className="text-[12px] font-medium text-[#9CA3AF] dark:text-white/25 mb-2.5">{CHAT_TEXTS.MESSAGES.AI_ANALYZING}</p>
-                    <div className="flex gap-1.5 items-center">
-                      <span className="w-2 h-2 bg-[#D1D5DB] dark:bg-white/20 rounded-full animate-bounce" />
-                      <span className="w-2 h-2 bg-[#D1D5DB] dark:bg-white/20 rounded-full animate-bounce [animation-delay:0.15s]" />
-                      <span className="w-2 h-2 bg-[#D1D5DB] dark:bg-white/20 rounded-full animate-bounce [animation-delay:0.3s]" />
+                {/* Loading dots */}
+                {isLoading && messages[messages.length - 1]?.role !== "assistant" && (
+                  <div className="flex gap-4 animate-in fade-in duration-200">
+                    <div className="w-8 h-8 rounded-xl bg-[#F3F4F6] dark:bg-white/[0.06] flex items-center justify-center mt-0.5 shrink-0">
+                      <span className="material-symbols-outlined text-[16px] text-[#9CA3AF] dark:text-white/30">auto_awesome</span>
+                    </div>
+                    <div className="pt-1">
+                      <p className="text-[12px] font-medium text-[#9CA3AF] dark:text-white/25 mb-2.5">{CHAT_TEXTS.MESSAGES.AI_ANALYZING}</p>
+                      <div className="flex gap-1.5 items-center">
+                        <span className="w-2 h-2 bg-[#D1D5DB] dark:bg-white/20 rounded-full animate-bounce" />
+                        <span className="w-2 h-2 bg-[#D1D5DB] dark:bg-white/20 rounded-full animate-bounce [animation-delay:0.15s]" />
+                        <span className="w-2 h-2 bg-[#D1D5DB] dark:bg-white/20 rounded-full animate-bounce [animation-delay:0.3s]" />
+                      </div>
                     </div>
                   </div>
-                </div>
-              )}
-              <div ref={messagesEndRef} className="h-1" />
-            </div>
-          )}
+                )}
+                <div ref={messagesEndRef} className="h-1" />
+              </div>
+            )}
           </div>
 
           {/* Scroll to bottom — sticky inside scroll container */}
@@ -554,13 +550,12 @@ export default function ChatPage() {
                 type={isLoading ? "button" : "submit"}
                 onClick={isLoading ? handleCancel : undefined}
                 disabled={!isLoading && !input.trim()}
-                className={`shrink-0 mb-1 w-9 h-9 rounded-xl flex items-center justify-center transition-all ${
-                  isLoading
+                className={`shrink-0 mb-1 w-9 h-9 rounded-xl flex items-center justify-center transition-all ${isLoading
                     ? "bg-red-500/90 dark:bg-red-500/80 text-white hover:opacity-80 active:scale-95"
                     : input.trim()
                       ? "bg-[#1F2937] dark:bg-white/90 text-white dark:text-[#0A0A0B] hover:opacity-75 active:scale-95"
                       : "bg-[#F3F4F6] dark:bg-white/[0.04] text-[#D1D5DB] dark:text-white/15 cursor-not-allowed"
-                }`}
+                  }`}
               >
                 <span className={`material-symbols-outlined text-[18px] ${isLoading ? "animate-pulse" : ""}`}>
                   {isLoading ? "stop_circle" : "arrow_upward"}
@@ -571,11 +566,10 @@ export default function ChatPage() {
             <div className="flex items-center justify-between mt-1.5 px-0.5">
               <p className="text-[11px] text-[#9CA3AF] dark:text-white/20 font-medium">{CHAT_TEXTS.INPUT.DISCLAIMER}</p>
               {!quota?.is_pro && (
-                <span className={`text-[11px] font-medium tabular-nums transition-colors ${
-                  input.length > 540
+                <span className={`text-[11px] font-medium tabular-nums transition-colors ${input.length > 540
                     ? input.length >= 600 ? "text-red-400" : "text-amber-400"
                     : "text-[#D1D5DB] dark:text-white/15"
-                }`}>
+                  }`}>
                   {input.length}/600
                 </span>
               )}
@@ -585,11 +579,10 @@ export default function ChatPage() {
               <div className="flex items-center gap-2 mt-2 px-0.5">
                 <div className="flex-1 h-0.5 bg-[#F3F4F6] dark:bg-white/[0.05] rounded-full overflow-hidden">
                   <div
-                    className={`h-full rounded-full transition-all duration-500 ${
-                      quota.usage.chat_messages / quota.limits.chat_messages > 0.8
+                    className={`h-full rounded-full transition-all duration-500 ${quota.usage.chat_messages / quota.limits.chat_messages > 0.8
                         ? "bg-gradient-to-r from-amber-400 to-red-400"
                         : "bg-gradient-to-r from-blue-400 to-violet-400"
-                    }`}
+                      }`}
                     style={{ width: `${Math.min((quota.usage.chat_messages / quota.limits.chat_messages) * 100, 100)}%` }}
                   />
                 </div>
@@ -701,11 +694,10 @@ export default function ChatPage() {
                         </p>
                         <div className="space-y-1.5">
                           {item.options.map((opt: string, optIdx: number) => (
-                            <div key={optIdx} className={`px-4 py-2.5 rounded-lg text-[12.5px] font-medium border ${
-                              optIdx === item.correct_index
+                            <div key={optIdx} className={`px-4 py-2.5 rounded-lg text-[12.5px] font-medium border ${optIdx === item.correct_index
                                 ? "bg-emerald-50 dark:bg-emerald-500/[0.07] border-emerald-200 dark:border-emerald-500/20 text-emerald-700 dark:text-emerald-400"
                                 : "bg-[#FAFAFA] dark:bg-white/[0.02] border-[#F3F4F6] dark:border-white/[0.05] text-[#6B7280] dark:text-white/35"
-                            }`}>
+                              }`}>
                               {opt}
                             </div>
                           ))}

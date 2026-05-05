@@ -1,0 +1,62 @@
+name: 🚀 Deploy Backend to EC2
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'ai-tutor-backend/**'
+      - 'nginx/**'
+      - 'docker-compose.prod.yml'
+      - '.github/workflows/deploy-backend.yml'
+
+  # Cho phép chạy thủ công từ GitHub Actions tab
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    name: Deploy to EC2
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: 📥 Checkout code
+        uses: actions/checkout@v4
+
+      - name: 🔑 Setup SSH
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.EC2_SSH_KEY }}
+
+      - name: 📦 Deploy to EC2
+        env:
+          EC2_HOST: ${{ secrets.EC2_HOST }}
+          EC2_USER: ${{ secrets.EC2_USER }}
+        run: |
+          # Thêm host key để tránh prompt xác nhận
+          ssh-keyscan -H $EC2_HOST >> ~/.ssh/known_hosts
+
+          ssh $EC2_USER@$EC2_HOST << 'ENDSSH'
+            set -e
+            echo "📁 Navigating to project directory..."
+            cd ~/DoAn
+
+            echo "⬇️  Pulling latest code..."
+            git pull origin main
+
+            echo "🔨 Building and restarting backend..."
+            docker compose -f docker-compose.prod.yml build --no-cache backend
+            docker compose -f docker-compose.prod.yml up -d --force-recreate backend nginx
+
+            echo "🧹 Cleaning up unused Docker images..."
+            docker image prune -f
+
+            echo "✅ Health check..."
+            sleep 10
+            curl -f http://localhost/health || (echo "❌ Health check failed!" && exit 1)
+
+            echo "🎉 Deployment successful!"
+          ENDSSH
+
+      - name: 📢 Notify on failure
+        if: failure()
+        run: echo "::error::Deployment to EC2 failed! Check the logs above."
