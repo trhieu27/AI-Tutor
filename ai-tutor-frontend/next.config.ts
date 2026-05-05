@@ -1,6 +1,7 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  output: 'standalone',
   skipTrailingSlashRedirect: true,
 
   // Dev: cho phép access từ local network IPs
