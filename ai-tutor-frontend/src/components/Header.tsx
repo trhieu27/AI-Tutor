@@ -22,18 +22,53 @@ export default function Header({ onMenuClick }: HeaderProps) {
     setMounted(true);
   }, [user, isInitialLoading]);
 
+  // ── Notification types & helpers ──────────────────────────────────────────────────────
   interface NotificationItem {
     id: number;
     title: string;
     message: string;
-    time: string;
+    createdAt: number;   // Unix timestamp ms
     unread: boolean;
     type: string;
     document_id?: string;
   }
 
-  const [notifications, setNotifications] = useState<NotificationItem[]>([]);
-  const notifIdRef = useRef(0);
+  const STORAGE_KEY = `notifications_${user?.id ?? 'guest'}`;
+
+  const formatRelativeTime = (ts: number): string => {
+    const diff = Math.floor((Date.now() - ts) / 1000);
+    if (diff < 10)  return "Vừa xong";
+    if (diff < 60)  return `${diff} giây trước`;
+    if (diff < 3600) return `${Math.floor(diff / 60)} phút trước`;
+    if (diff < 86400) return `${Math.floor(diff / 3600)} giờ trước`;
+    return `${Math.floor(diff / 86400)} ngày trước`;
+  };
+
+  // Load từ localStorage khi mount
+  const [notifications, setNotifications] = useState<NotificationItem[]>(() => {
+    if (typeof window === 'undefined') return [];
+    try {
+      const key = `notifications_${localStorage.getItem('user') ? JSON.parse(localStorage.getItem('user')!).id : 'guest'}`;
+      const saved = localStorage.getItem(key);
+      return saved ? JSON.parse(saved) : [];
+    } catch { return []; }
+  });
+
+  // Tick mỗi phút để cập nhật thời gian tương đối
+  const [, forceRender] = useState(0);
+  useEffect(() => {
+    const t = setInterval(() => forceRender(x => x + 1), 60_000);
+    return () => clearInterval(t);
+  }, []);
+
+  // Lưu vào localStorage mỗi khi notifications thay đổi
+  useEffect(() => {
+    if (typeof window === 'undefined' || !user?.id) return;
+    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(notifications.slice(0, 30))); }
+    catch { /* quota */ }
+  }, [notifications, STORAGE_KEY]);
+
+  const notifIdRef = useRef(notifications.length > 0 ? Math.max(...notifications.map(n => n.id)) : 0);
 
   const { addToast } = useToast();
 
@@ -44,17 +79,16 @@ export default function Header({ onMenuClick }: HeaderProps) {
       document_failed: "error",
       system: "system",
     };
-    const item = {
+    const item: NotificationItem = {
       id: ++notifIdRef.current,
       title: n.title ?? "Thông báo",
       message: n.message ?? "",
-      time: "Vừa xong",
+      createdAt: Date.now(),
       unread: true,
       type: typeMap[n.type] ?? "info",
       document_id: n.document_id,
     };
-    setNotifications(prev => [item, ...prev.slice(0, 19)]);
-    // 💥 Hiện popup toast
+    setNotifications(prev => [item, ...prev.slice(0, 29)]);
     addToast(n);
   }, [addToast]);
 
@@ -157,7 +191,7 @@ export default function Header({ onMenuClick }: HeaderProps) {
                         {n.unread && <span className="w-1.5 h-1.5 rounded-full bg-[hsl(239_68%_58%)] shrink-0" />}
                       </div>
                       <p className="text-[11px] text-[var(--muted)] leading-relaxed mt-0.5 line-clamp-2">{n.message}</p>
-                      <p className="text-[10px] text-[var(--muted-light)] mt-1">{n.time}</p>
+                      <p className="text-[10px] text-[var(--muted-light)] mt-1">{formatRelativeTime(n.createdAt)}</p>
                     </div>
                   </div>
                 ))}
