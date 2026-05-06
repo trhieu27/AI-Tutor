@@ -1,8 +1,8 @@
 "use client";
 
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import { useAuth } from '@/context/AuthContext';
-
+import { useNotifications, WsNotification } from '@/hooks/useNotifications';
 import { HEADER_TEXTS } from '@/constants/texts';
 
 interface HeaderProps {
@@ -10,7 +10,7 @@ interface HeaderProps {
 }
 
 export default function Header({ onMenuClick }: HeaderProps) {
-  const { user, logout, isInitialLoading } = useAuth();
+  const { user, logout, isInitialLoading, accessToken } = useAuth();
   const [mounted, setMounted] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
   const [showUserMenu, setShowUserMenu] = useState(false);
@@ -21,11 +21,39 @@ export default function Header({ onMenuClick }: HeaderProps) {
     setMounted(true);
   }, [user, isInitialLoading]);
 
-  const [notifications, setNotifications] = useState([
-    { id: 1, title: "Xử lý thành công", message: "Tài liệu đã sẵn sàng để chat với AI.", time: "2 phút trước", unread: true, type: "success" },
-    { id: 2, title: "Luyện tập mới", message: "AI đã soạn xong 10 câu hỏi trắc nghiệm.", time: "1 giờ trước", unread: true, type: "info" },
-    { id: 3, title: "Cập nhật hệ thống", message: "Tính năng Sơ đồ tư duy đã được cải thiện.", time: "5 giờ trước", unread: false, type: "system" },
-  ]);
+  interface NotificationItem {
+    id: number;
+    title: string;
+    message: string;
+    time: string;
+    unread: boolean;
+    type: string;
+    document_id?: string;
+  }
+
+  const [notifications, setNotifications] = useState<NotificationItem[]>([]);
+  const notifIdRef = useRef(0);
+
+  // Nhận real-time notifications từ WebSocket
+  const handleWsNotification = useCallback((n: WsNotification) => {
+    const typeMap: Record<string, string> = {
+      document_ready: "success",
+      document_failed: "error",
+      system: "system",
+    };
+    setNotifications(prev => [{
+      id: ++notifIdRef.current,
+      title: n.title ?? "Thông báo",
+      message: n.message ?? "",
+      time: "Vừa xong",
+      unread: true,
+      type: typeMap[n.type] ?? "info",
+      document_id: n.document_id,
+    }, ...prev.slice(0, 19)]); // Giữ tối đa 20 thông báo
+  }, []);
+
+  // Kết nối WebSocket — chạy xuyên suốt app (không bị reset khi chuyển trang)
+  useNotifications({ token: accessToken ?? null, onNotification: handleWsNotification });
 
   const unreadCount = notifications.filter(n => n.unread).length;
 
@@ -42,19 +70,21 @@ export default function Header({ onMenuClick }: HeaderProps) {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  const markAllAsRead = () => setNotifications(notifications.map(n => ({ ...n, unread: false })));
+  const markAllAsRead = () => setNotifications(prev => prev.map(n => ({ ...n, unread: false })));
   const handleNotificationClick = (id: number) => {
-    setNotifications(notifications.map(n => n.id === id ? { ...n, unread: false } : n));
+    setNotifications(prev => prev.map(n => n.id === id ? { ...n, unread: false } : n));
     setShowNotifications(false);
   };
 
   const notifTypeIcon: Record<string, string> = {
     success: 'check_circle',
+    error: 'error',
     info: 'info',
     system: 'settings',
   };
   const notifTypeColor: Record<string, string> = {
     success: 'text-[hsl(158_64%_44%)] bg-[hsl(158_64%_44%/0.08)]',
+    error: 'text-red-400 bg-red-400/10',
     info: 'text-[hsl(239_68%_58%)] bg-[hsl(239_68%_58%/0.08)]',
     system: 'text-[var(--muted)] bg-[var(--surface)]',
   };

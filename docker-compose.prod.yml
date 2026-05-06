@@ -31,6 +31,7 @@ services:
       args:
         NEXT_PUBLIC_API_URL: https://aitutor.click/api/v1
         NEXT_PUBLIC_GOOGLE_CLIENT_ID: 801791613238-tqiu8qenj6uqitun0qv3emr7lda965eo.apps.googleusercontent.com
+        NEXT_PUBLIC_WS_URL: wss://aitutor.click
     container_name: ai_tutor_frontend
     restart: always
     networks:

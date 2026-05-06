@@ -9,6 +9,7 @@ from app.core.config import get_settings
 from app.core.database import init_db, close_db
 from app.api import documents, chat, auth, users
 from app.api.quota import quota_router
+from app.api.notifications import router as notifications_router
 
 
 logger = logging.getLogger(__name__)
@@ -61,11 +62,12 @@ async def log_requests(request, call_next):
             content={"detail": f"Backend Error: {str(e)}"}
         )
 
-app.include_router(auth.router,      prefix="/api/v1")
-app.include_router(documents.router, prefix="/api/v1")
-app.include_router(chat.router,      prefix="/api/v1")
-app.include_router(users.router,     prefix="/api/v1")
-app.include_router(quota_router,     prefix="/api/v1")
+app.include_router(auth.router,           prefix="/api/v1")
+app.include_router(documents.router,      prefix="/api/v1")
+app.include_router(chat.router,           prefix="/api/v1")
+app.include_router(users.router,          prefix="/api/v1")
+app.include_router(quota_router,          prefix="/api/v1")
+app.include_router(notifications_router)  # WebSocket — path đã định nghĩa đầy đủ trong router
 
 
 @app.get("/")

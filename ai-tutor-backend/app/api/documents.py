@@ -13,6 +13,7 @@ from app.rag import rag_engine
 
 from app.api.auth import get_current_user
 from app.api.quota import require_doc_quota
+from app.api.notifications import notification_manager
 
 router = APIRouter(prefix="/documents", tags=["Documents"])
 settings = get_settings()
@@ -20,7 +21,7 @@ settings = get_settings()
 ALLOWED_EXTENSIONS = {".pdf", ".doc", ".docx"}
 
 
-async def process_document_background(document_id: str, file_path: str):
+async def process_document_background(document_id: str, file_path: str, owner_id: str):
     """Background task: extract text and build ChromaDB index using MongoDB."""
     import logging
     logger = logging.getLogger(__name__)
@@ -49,12 +50,28 @@ async def process_document_background(document_id: str, file_path: str):
         )
         logger.info(f"✅ Document {document_id} processed successfully")
 
+        # 🔔 Gửi thông báo real-time cho user
+        await notification_manager.send_to_user(owner_id, {
+            "type": "document_ready",
+            "title": "Ấp xử lý thành công",
+            "message": f"Tài liệu \u201c{doc_data.get('file_name', '')}\u201d đã sẵn sàng để chat với AI.",
+            "document_id": document_id,
+        })
+
     except Exception as e:
         logger.error(f"❌ Document {document_id} processing failed: {str(e)}")
         await db.documents.update_one(
             {"id": document_id},
             {"$set": {"status": DocumentStatus.FAILED}}
         )
+
+        # 🔔 Gửi thông báo thất bại
+        await notification_manager.send_to_user(owner_id, {
+            "type": "document_failed",
+            "title": "Xử lý thất bại",
+            "message": f"Tài liệu \u201c{doc_data.get('file_name', '')}\u201d gặp lỗi. Vui lòng thử lại.",
+            "document_id": document_id,
+        })
 
 
 @router.post("/upload", response_model=DocumentResponse, status_code=201)
@@ -93,7 +110,7 @@ async def upload_document(
     await db.documents.insert_one(document.dict())
 
     if suffix in [".pdf", ".docx", ".doc"]:
-        background_tasks.add_task(process_document_background, document_id, file_path)
+        background_tasks.add_task(process_document_background, document_id, file_path, current_user_id)
     else:
         await db.documents.update_one(
             {"id": document_id},

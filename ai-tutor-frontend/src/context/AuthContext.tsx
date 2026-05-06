@@ -7,6 +7,7 @@ import { useRouter, usePathname } from 'next/navigation';
 
 interface AuthContextType {
   user: User | null;
+  accessToken: string | null;
   isLoading: boolean;
   isInitialLoading: boolean;
   error: string | null;
@@ -77,6 +78,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // accessToken — đồng bộ từ localStorage để WebSocket có thể dùng
+  const [accessToken, setAccessToken] = useState<string | null>(() => {
+    if (typeof window === 'undefined') return null;
+    return localStorage.getItem('access_token');
+  });
+
   const pathname = usePathname();
 
   /**
@@ -107,12 +114,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const freshUser = await authService.getCurrentUser();
       if (freshUser) {
         setUser(freshUser);
+        setAccessToken(localStorage.getItem('access_token'));
       } else if (!cached) {
         // Token hết hạn hoặc bị thu hồi
         setUser(null);
+        setAccessToken(null);
       }
     } catch {
       // Lỗi mạng — tiếp tục dùng cache nếu có
+      setAccessToken(localStorage.getItem('access_token'));
     } finally {
       setIsInitialLoading(false);
     }
@@ -185,6 +195,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const logout = useCallback(() => {
     setUser(null);
+    setAccessToken(null);
     authService.logout();
     window.location.replace('/login');
   }, []);
@@ -225,6 +236,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const contextValue = useMemo(() => ({
     user,
+    accessToken,
     isLoading,
     isInitialLoading,
     error,
@@ -235,7 +247,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     logout,
     updateUser,
     isAuthenticated: !!user,
-  }), [user, isLoading, isInitialLoading, error, logout, updateUser]);
+  }), [user, accessToken, isLoading, isInitialLoading, error, logout, updateUser]);
 
   return (
     <AuthContext.Provider value={contextValue}>
