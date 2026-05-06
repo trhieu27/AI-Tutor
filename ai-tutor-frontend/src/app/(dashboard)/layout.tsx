@@ -7,6 +7,7 @@ import Header from "@/components/Header";
 import { UploadProvider } from "@/context/UploadContext";
 import { DocumentProvider } from "@/context/DocumentContext";
 import { AuthGuard } from "@/components/AuthGuard";
+import { NotificationToastProvider } from "@/components/NotificationToast";
 
 export default function DashboardLayout({
   children,
@@ -23,8 +24,9 @@ export default function DashboardLayout({
 
   return (
     <AuthGuard>
-      <UploadProvider>
-        <DocumentProvider>
+      <NotificationToastProvider>
+        <UploadProvider>
+          <DocumentProvider>
           <div className="flex w-full bg-[var(--background)] text-[var(--foreground)] h-svh overflow-hidden selection:bg-indigo-500/30 transition-colors duration-500">
             {/* Mobile Sidebar Overlay */}
             {isSidebarOpen && (
@@ -80,7 +82,8 @@ export default function DashboardLayout({
             `}</style>
           </div>
         </DocumentProvider>
-      </UploadProvider>
+        </UploadProvider>
+      </NotificationToastProvider>
     </AuthGuard>
   );
 }
