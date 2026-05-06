@@ -22,7 +22,7 @@ from app.api.auth import get_current_user
 logger = logging.getLogger(__name__)
 settings = get_settings()
 
-router = APIRouter(tags=["Notifications"])
+router = APIRouter(prefix="/api/v1/ws", tags=["Notifications"])
 
 
 # ── Notification Manager (WebSocket) ─────────────────────────────────────────
@@ -119,7 +119,7 @@ async def send_notification(
 
 # ── WebSocket Endpoint ────────────────────────────────────────────────────────
 
-@router.websocket("/api/v1/ws/notifications")
+@router.websocket("/notifications")
 async def websocket_notifications(
     websocket: WebSocket,
     token: str = Query(...),
