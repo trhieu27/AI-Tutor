@@ -122,11 +122,11 @@ input:autofill {
   --foreground: hsl(210 40% 96%);
   --sidebar-bg: hsl(222 47% 7%);
   --header-bg: hsl(222 47% 7% / 0.85);
-  --card-bg: hsl(222 47% 7% / 0.7);
-  --card-bg-hover: hsl(217 33% 14% / 0.9);
-  --surface: hsl(222 47% 7% / 0.6);
-  --surface-raised: hsl(217 33% 10% / 0.95);
-  --surface-overlay: hsl(222 47% 7% / 0.92);
+  --card-bg: hsl(217 33% 11%);
+  --card-bg-hover: hsl(217 33% 14%);
+  --surface: hsl(222 47% 8%);
+  --surface-raised: hsl(217 33% 11%);
+  --surface-overlay: hsl(217 33% 10%);
 
   --border-color: hsl(215 28% 17%);
   --border-subtle: hsl(215 28% 14%);

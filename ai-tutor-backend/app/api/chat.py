@@ -23,7 +23,7 @@ from app.rag.rag_engine import (
     generate_study_questions_stream,
 )
 from app.api.auth import get_current_user
-from app.api.quota import require_chat_quota, check_and_record_ai_quota, FREE_LIMITS
+from app.api.quota import require_chat_quota, check_and_record_ai_quota, record_chat_usage, FREE_LIMITS
 
 router = APIRouter(prefix="/chat", tags=["Chat"])
 
@@ -150,6 +150,9 @@ async def chat_with_document(
                 "$set": {"updated_at": datetime.utcnow()}
             }
         )
+
+        # 7. Ghi quota SAU KHI AI trả lời thành công (không tính khi user hủy)
+        await record_chat_usage(current_user_id, db)
 
         return {
             "session_id": session_id,

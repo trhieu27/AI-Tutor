@@ -300,7 +300,7 @@ export default function ChatPage() {
 
   /* ── Render ─────────────────────────────────────────────────────────────── */
   return (
-    <div className="flex h-full overflow-hidden font-sans bg-white dark:bg-[#0A0A0B] relative">
+    <div className="flex h-full overflow-hidden font-sans bg-[var(--background)] relative">
 
       {/* Mobile backdrop overlay */}
       {isSidebarOpen && (
@@ -312,18 +312,18 @@ export default function ChatPage() {
 
       {/* ── Sidebar ──────────────────────────────────────────────────── */}
       <aside
-        className={`flex flex-col z-[70] border-r border-[#F3F4F6] dark:border-white/[0.06] bg-[#FAFAFA] dark:bg-[#111113] transition-all duration-300 ease-[cubic-bezier(0.23,1,0.32,1)] overflow-hidden
+        className={`flex flex-col z-[70] border-r border-[var(--border-color)] bg-[var(--sidebar-bg)] transition-all duration-300 ease-[cubic-bezier(0.23,1,0.32,1)] overflow-hidden
           fixed inset-y-0 left-0 w-[260px] h-full
           ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'}
           lg:relative lg:inset-y-auto lg:left-auto lg:translate-x-0 lg:shrink-0 lg:h-full
           ${isSidebarOpen ? 'lg:w-60' : 'lg:w-0 lg:border-0'}`}
       >
-        <div className="px-4 py-3.5 border-b border-[#F3F4F6] dark:border-white/[0.06] flex items-center justify-between shrink-0">
-          <span className="text-[11px] font-semibold text-[#9CA3AF] dark:text-white/25 uppercase tracking-[0.08em]">
+        <div className="px-4 py-3.5 border-b border-[var(--border-color)] flex items-center justify-between shrink-0">
+          <span className="text-[11px] font-semibold text-[var(--muted-light)] uppercase tracking-[0.08em]">
             {sessions.length} cuộc hội thoại
           </span>
           <button onClick={startNewChat} title={CHAT_TEXTS.SIDEBAR.NEW_CHAT_TOOLTIP}
-            className="w-7 h-7 rounded-lg flex items-center justify-center text-[#9CA3AF] hover:bg-[#F3F4F6] dark:hover:bg-white/5 hover:text-[#374151] dark:hover:text-white transition-all">
+            className="w-7 h-7 rounded-lg flex items-center justify-center text-[var(--muted)] hover:bg-[var(--surface)] hover:text-[var(--foreground)] transition-all">
             <span className="material-symbols-outlined text-[17px]">edit_square</span>
           </button>
         </div>
@@ -336,11 +336,11 @@ export default function ChatPage() {
             <div key={session.id} className="relative group">
               <button onClick={() => loadSession(session.id)}
                 className={`w-full text-left px-3 py-2.5 rounded-lg transition-all ${currentSessionId === session.id
-                    ? "bg-white dark:bg-white/[0.06] text-[#1F2937] dark:text-white shadow-sm border border-[#E5E7EB] dark:border-white/[0.08]"
-                    : "text-[#6B7280] dark:text-white/35 hover:bg-white dark:hover:bg-white/[0.03] hover:text-[#374151] dark:hover:text-white/70"
+                    ? "bg-[var(--card-bg)] text-[var(--foreground)] shadow-sm border border-[var(--border-color)]"
+                    : "text-[var(--muted)] hover:bg-[var(--surface)] hover:text-[var(--foreground)]"
                   }`}>
                 <p className="text-[12.5px] font-medium truncate pr-5 leading-snug">{session.title || "Cuộc trò chuyện mới"}</p>
-                <p className="text-[10.5px] text-[#9CA3AF] dark:text-white/20 mt-0.5">
+                <p className="text-[10.5px] text-[var(--muted-light)] mt-0.5">
                   {new Date(session.updated_at).toLocaleDateString("vi-VN")}
                 </p>
               </button>
@@ -356,25 +356,25 @@ export default function ChatPage() {
       </aside>
 
       {/* ── Main ─────────────────────────────────────────────────────── */}
-      <main className="flex-1 flex flex-col h-full min-w-0 bg-white dark:bg-[#0A0A0B] relative">
+      <main className="flex-1 flex flex-col h-full min-w-0 bg-[var(--background)] relative">
 
         {/* Header */}
-        <header className="h-14 border-b border-[#F3F4F6] dark:border-white/[0.06] flex items-center justify-between px-5 shrink-0">
+        <header className="h-14 border-b border-[var(--border-color)] bg-[var(--header-bg)] backdrop-blur-xl flex items-center justify-between px-5 shrink-0">
           <div className="flex items-center gap-3 min-w-0">
             <button onClick={() => setIsSidebarOpen(!isSidebarOpen)}
-              className="w-8 h-8 rounded-lg flex items-center justify-center text-[#9CA3AF] dark:text-white/25 hover:bg-[#F3F4F6] dark:hover:bg-white/5 hover:text-[#374151] dark:hover:text-white transition-all">
+              className="w-8 h-8 rounded-lg flex items-center justify-center text-[var(--muted)] hover:bg-[var(--surface)] hover:text-[var(--foreground)] transition-all">
               <span className="material-symbols-outlined text-[20px]">{isSidebarOpen ? "menu_open" : "menu"}</span>
             </button>
             <div className="min-w-0">
               <h1
-                className="text-[13.5px] font-semibold text-[#1F2937] dark:text-white/90 truncate tracking-[-0.02em] max-w-[220px] md:max-w-sm"
+                className="text-[13.5px] font-semibold text-[var(--foreground)] truncate tracking-[-0.02em] max-w-[220px] md:max-w-sm"
                 style={{ fontFamily: "var(--font-serif)" }}
                 title={docData?.file_name}
               >
                 {docData?.file_name || CHAT_TEXTS.HEADER.LOADING_DOC}
               </h1>
               {docData && (
-                <p className="hidden sm:block text-[11px] text-[#9CA3AF] dark:text-white/25 whitespace-nowrap">
+                <p className="hidden sm:block text-[11px] text-[var(--muted-light)] whitespace-nowrap">
                   {docData.file_size_mb?.toFixed?.(1) ?? "—"} MB · {docData.page_count} trang
                 </p>
               )}
@@ -389,7 +389,7 @@ export default function ChatPage() {
               { onClick: () => router.push(`/mindmap/${documentId}`), icon: "hub", label: CHAT_TEXTS.HEADER.ACTIONS.MINDMAP },
             ].map((btn, i) => (
               <button key={i} onClick={btn.onClick} title={btn.label}
-                className="flex items-center gap-1.5 px-2.5 h-8 rounded-lg text-[12px] font-medium text-[#6B7280] dark:text-white/35 hover:bg-[#F3F4F6] dark:hover:bg-white/[0.05] hover:text-[#1F2937] dark:hover:text-white transition-all">
+                className="flex items-center gap-1.5 px-2.5 h-8 rounded-lg text-[12px] font-medium text-[var(--muted)] hover:bg-[var(--surface)] hover:text-[var(--foreground)] transition-all">
                 <span className="material-symbols-outlined text-[16px]">{btn.icon}</span>
                 <span className="hidden sm:inline text-[11.5px]">{btn.label}</span>
               </button>
@@ -513,14 +513,14 @@ export default function ChatPage() {
 
 
         {/* Input bar */}
-        <div className="px-5 md:px-10 py-4 pb-6 border-t border-[#F3F4F6] dark:border-white/[0.06] shrink-0">
+        <div className="px-5 md:px-10 py-4 pb-6 border-t border-[var(--border-color)] shrink-0">
           <div className="max-w-2xl mx-auto">
             <form onSubmit={handleSendMessage} className="flex items-end gap-2 group">
 
               {/* Textarea wrapper — clips native scrollbar */}
-              <div className="flex-1 flex items-center rounded-xl border border-[#E5E7EB] dark:border-white/[0.08] bg-[#FAFAFA] dark:bg-white/[0.02] overflow-hidden transition-all focus-within:border-[#9CA3AF] dark:focus-within:border-white/20 focus-within:bg-white dark:focus-within:bg-white/[0.04]">
+              <div className="flex-1 flex items-center rounded-xl border border-[var(--border-color)] bg-[var(--surface)] overflow-hidden transition-all focus-within:border-[var(--border-emphasis)] focus-within:bg-[var(--surface-raised)]">
                 {/* Icon — flex item, self-center */}
-                <span className="material-symbols-outlined text-[18px] shrink-0 ml-4 text-[#D1D5DB] dark:text-white/15 group-focus-within:text-[#9CA3AF] dark:group-focus-within:text-white/30 transition-colors self-center pointer-events-none" style={{ lineHeight: 1 }}>
+                <span className="material-symbols-outlined text-[18px] shrink-0 ml-4 text-[var(--muted-light)] group-focus-within:text-[var(--muted)] transition-colors self-center pointer-events-none" style={{ lineHeight: 1 }}>
                   psychology
                 </span>
                 <textarea
@@ -538,9 +538,9 @@ export default function ChatPage() {
                     }
                   }}
                   rows={1}
-                  maxLength={quota?.is_pro ? undefined : 600}
+                  maxLength={quota?.is_pro ? undefined : 1200}
                   placeholder={CHAT_TEXTS.INPUT.PLACEHOLDER}
-                  className="flex-1 bg-transparent text-[#1F2937] dark:text-white/85 py-3.5 pl-3 pr-4 focus:outline-none text-[13px] font-medium placeholder:text-[#D1D5DB] dark:placeholder:text-white/15 resize-none overflow-y-auto leading-relaxed"
+                  className="flex-1 bg-transparent text-[var(--foreground)] py-3.5 pl-3 pr-4 focus:outline-none text-[13px] font-medium placeholder:text-[var(--muted-light)] resize-none overflow-y-auto leading-relaxed"
                   style={{ minHeight: "52px", maxHeight: "120px" }}
                 />
               </div>
@@ -564,13 +564,13 @@ export default function ChatPage() {
             </form>
 
             <div className="flex items-center justify-between mt-1.5 px-0.5">
-              <p className="text-[11px] text-[#9CA3AF] dark:text-white/20 font-medium">{CHAT_TEXTS.INPUT.DISCLAIMER}</p>
+              <p className="text-[11px] text-[var(--muted-light)] font-medium">{CHAT_TEXTS.INPUT.DISCLAIMER}</p>
               {!quota?.is_pro && (
-                <span className={`text-[11px] font-medium tabular-nums transition-colors ${input.length > 540
-                    ? input.length >= 600 ? "text-red-400" : "text-amber-400"
-                    : "text-[#D1D5DB] dark:text-white/15"
+                <span className={`text-[11px] font-medium tabular-nums transition-colors ${input.length > 1080
+                    ? input.length >= 1200 ? "text-red-400" : "text-amber-400"
+                    : "text-[var(--muted-light)]"
                   }`}>
-                  {input.length}/600
+                  {input.length}/1200
                 </span>
               )}
             </div>
@@ -602,13 +602,13 @@ export default function ChatPage() {
           onClick={() => { setShowModal(null); handleCancel(); }}
         >
           <div
-            className="bg-white dark:bg-[#111113] w-full max-w-3xl max-h-[88dvh] rounded-2xl border border-[#E5E7EB] dark:border-white/[0.07] shadow-[0_12px_48px_rgba(0,0,0,0.1)] dark:shadow-[0_12px_48px_rgba(0,0,0,0.5)] flex flex-col overflow-hidden animate-in zoom-in-95 duration-150"
+            className="bg-[var(--card-bg)] backdrop-blur-2xl w-full max-w-3xl max-h-[88dvh] rounded-2xl border border-[var(--border-color)] shadow-[0_12px_48px_hsl(222_47%_4%/0.18)] flex flex-col overflow-hidden animate-in zoom-in-95 duration-150"
             onClick={(e) => e.stopPropagation()}
           >
             {/* Modal header */}
-            <div className="px-6 py-4 border-b border-[#F3F4F6] dark:border-white/[0.06] flex items-center justify-between shrink-0">
-              <h3 className="text-[14px] font-semibold text-[#1F2937] dark:text-white tracking-[-0.01em] flex items-center gap-2.5">
-                <span className="material-symbols-outlined text-[16px] text-[#9CA3AF] dark:text-white/30">
+            <div className="px-6 py-4 border-b border-[var(--border-subtle)] flex items-center justify-between shrink-0">
+              <h3 className="text-[14px] font-semibold text-[var(--foreground)] tracking-[-0.01em] flex items-center gap-2.5">
+                <span className="material-symbols-outlined text-[16px] text-[var(--muted)]">
                   {showModal === "summary" ? "summarize" : showModal === "questions" ? "format_list_numbered" : "quiz"}
                 </span>
                 {showModal === "summary" ? CHAT_TEXTS.MODALS.TITLES.SUMMARY :
@@ -616,7 +616,7 @@ export default function ChatPage() {
               </h3>
               <button
                 onClick={() => { setShowModal(null); handleCancel(); }}
-                className="w-8 h-8 rounded-lg flex items-center justify-center text-[#9CA3AF] hover:bg-[#F3F4F6] dark:hover:bg-white/5 hover:text-[#374151] dark:hover:text-white transition-all"
+                className="w-8 h-8 rounded-lg flex items-center justify-center text-[var(--muted)] hover:bg-[var(--surface)] hover:text-[var(--foreground)] transition-all"
               >
                 <span className="material-symbols-outlined text-[18px]">close</span>
               </button>
@@ -713,7 +713,7 @@ export default function ChatPage() {
             </div>
 
             {/* Modal footer */}
-            <div className="px-6 py-4 border-t border-[#F9FAFB] dark:border-white/[0.05] flex items-center justify-end gap-2 shrink-0">
+            <div className="px-6 py-4 border-t border-[var(--border-subtle)] flex items-center justify-end gap-2 shrink-0">
               <button
                 onClick={() => setShowModal(null)}
                 className="px-4 py-2 text-[12px] font-medium text-[#6B7280] dark:text-white/35 hover:text-[#1F2937] dark:hover:text-white hover:bg-[#F3F4F6] dark:hover:bg-white/[0.05] rounded-lg transition-all"
@@ -747,7 +747,7 @@ export default function ChatPage() {
           onClick={() => setQuotaExceeded(null)}
         >
           <div
-            className="bg-white dark:bg-[#111113] w-full max-w-sm rounded-2xl border border-[#E5E7EB] dark:border-white/[0.08] shadow-[0_20px_60px_rgba(0,0,0,0.15)] dark:shadow-[0_20px_60px_rgba(0,0,0,0.6)] p-8 text-center animate-in zoom-in-95 duration-200"
+            className="bg-[var(--card-bg)] backdrop-blur-2xl w-full max-w-sm rounded-2xl border border-[var(--border-color)] shadow-[0_20px_60px_hsl(222_47%_4%/0.25)] p-8 text-center animate-in zoom-in-95 duration-200"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-amber-400/20 to-orange-400/20 dark:from-amber-500/10 dark:to-orange-500/10 flex items-center justify-center mx-auto mb-5">

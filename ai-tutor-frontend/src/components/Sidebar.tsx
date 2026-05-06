@@ -29,7 +29,7 @@ export default function Sidebar({ onClose }: { onClose?: () => void }) {
 
       {/* Brand */}
       <div className="h-16 flex items-center justify-between gap-3 px-4 border-b border-[var(--border-color)] shrink-0">
-        <div className="flex items-center gap-3 group">
+        <Link href="/" className="flex items-center gap-3 group" onClick={() => onClose?.()}>
           <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-[hsl(239_68%_58%)] to-[hsl(263_70%_62%)] flex items-center justify-center text-white shadow-[0_2px_6px_hsl(239_68%_58%/0.20)] group-hover:rotate-6 transition-transform duration-500 shrink-0">
             <span className="material-symbols-outlined icon-thin text-[18px]">auto_awesome</span>
           </div>
@@ -37,7 +37,7 @@ export default function Sidebar({ onClose }: { onClose?: () => void }) {
             <h1 className="font-semibold text-[var(--foreground)] text-[14px] leading-none tracking-tight">{SIDEBAR_TEXTS.brand.title}</h1>
             <p className="text-[10px] text-[var(--muted-light)] font-medium mt-0.5">Học tập thông minh hơn</p>
           </div>
-        </div>
+        </Link>
 
         {onClose && (
           <button
