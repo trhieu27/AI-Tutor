@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { useNotifications, WsNotification } from '@/hooks/useNotifications';
+import { useToast } from '@/components/NotificationToast';
 import { HEADER_TEXTS } from '@/constants/texts';
 
 interface HeaderProps {
@@ -34,6 +35,8 @@ export default function Header({ onMenuClick }: HeaderProps) {
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
   const notifIdRef = useRef(0);
 
+  const { addToast } = useToast();
+
   // Nhận real-time notifications từ WebSocket
   const handleWsNotification = useCallback((n: WsNotification) => {
     const typeMap: Record<string, string> = {
@@ -41,7 +44,7 @@ export default function Header({ onMenuClick }: HeaderProps) {
       document_failed: "error",
       system: "system",
     };
-    setNotifications(prev => [{
+    const item = {
       id: ++notifIdRef.current,
       title: n.title ?? "Thông báo",
       message: n.message ?? "",
@@ -49,8 +52,11 @@ export default function Header({ onMenuClick }: HeaderProps) {
       unread: true,
       type: typeMap[n.type] ?? "info",
       document_id: n.document_id,
-    }, ...prev.slice(0, 19)]); // Giữ tối đa 20 thông báo
-  }, []);
+    };
+    setNotifications(prev => [item, ...prev.slice(0, 19)]);
+    // 💥 Hiện popup toast
+    addToast(n);
+  }, [addToast]);
 
   // Kết nối WebSocket — chạy xuyên suốt app (không bị reset khi chuyển trang)
   useNotifications({ token: accessToken ?? null, onNotification: handleWsNotification });
