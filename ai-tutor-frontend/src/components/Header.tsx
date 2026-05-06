@@ -24,78 +24,65 @@ export default function Header({ onMenuClick }: HeaderProps) {
 
   // ── Notification types & helpers ──────────────────────────────────────────────────────
   interface NotificationItem {
-    id: number;
+    id: string;        // UUID từ backend
+    type: string;
     title: string;
     message: string;
-    createdAt: number;   // Unix timestamp ms
-    unread: boolean;
-    type: string;
-    document_id?: string;
+    is_read: boolean;
+    metadata: Record<string, unknown>;
+    created_at: string;  // ISO string
   }
 
-  const STORAGE_KEY = `notifications_${user?.id ?? 'guest'}`;
-
-  const formatRelativeTime = (ts: number): string => {
-    const diff = Math.floor((Date.now() - ts) / 1000);
-    if (diff < 10)  return "Vừa xong";
-    if (diff < 60)  return `${diff} giây trước`;
+  const formatRelativeTime = (iso: string): string => {
+    const diff = Math.floor((Date.now() - new Date(iso).getTime()) / 1000);
+    if (diff < 10)   return "Vừa xong";
+    if (diff < 60)   return `${diff} giây trước`;
     if (diff < 3600) return `${Math.floor(diff / 60)} phút trước`;
     if (diff < 86400) return `${Math.floor(diff / 3600)} giờ trước`;
     return `${Math.floor(diff / 86400)} ngày trước`;
   };
 
-  // Load từ localStorage khi mount
-  const [notifications, setNotifications] = useState<NotificationItem[]>(() => {
-    if (typeof window === 'undefined') return [];
-    try {
-      const key = `notifications_${localStorage.getItem('user') ? JSON.parse(localStorage.getItem('user')!).id : 'guest'}`;
-      const saved = localStorage.getItem(key);
-      return saved ? JSON.parse(saved) : [];
-    } catch { return []; }
-  });
+  const [notifications, setNotifications] = useState<NotificationItem[]>([]);
 
-  // Tick mỗi phút để cập nhật thời gian tương đối
+  // Tick mỗi phút để refresh thời gian tương đối
   const [, forceRender] = useState(0);
   useEffect(() => {
     const t = setInterval(() => forceRender(x => x + 1), 60_000);
     return () => clearInterval(t);
   }, []);
 
-  // Lưu vào localStorage mỗi khi notifications thay đổi
+  // Fetch lịch sử từ API khi đã login
   useEffect(() => {
-    if (typeof window === 'undefined' || !user?.id) return;
-    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(notifications.slice(0, 30))); }
-    catch { /* quota */ }
-  }, [notifications, STORAGE_KEY]);
-
-  const notifIdRef = useRef(notifications.length > 0 ? Math.max(...notifications.map(n => n.id)) : 0);
+    if (!accessToken) return;
+    fetch('/api/v1/notifications', {
+      headers: { Authorization: `Bearer ${accessToken}` }
+    })
+      .then(r => r.ok ? r.json() : [])
+      .then(setNotifications)
+      .catch(() => {});
+  }, [accessToken]);
 
   const { addToast } = useToast();
 
-  // Nhận real-time notifications từ WebSocket
+  // Nhận real-time từ WebSocket
   const handleWsNotification = useCallback((n: WsNotification) => {
-    const typeMap: Record<string, string> = {
-      document_ready: "success",
-      document_failed: "error",
-      system: "system",
-    };
-    const item: NotificationItem = {
-      id: ++notifIdRef.current,
+    const newItem: NotificationItem = {
+      id: (n.id as string) ?? crypto.randomUUID(),
+      type: n.type,
       title: n.title ?? "Thông báo",
       message: n.message ?? "",
-      createdAt: Date.now(),
-      unread: true,
-      type: typeMap[n.type] ?? "info",
-      document_id: n.document_id,
+      is_read: false,
+      metadata: (n.metadata as Record<string, unknown>) ?? {},
+      created_at: (n.created_at as string) ?? new Date().toISOString(),
     };
-    setNotifications(prev => [item, ...prev.slice(0, 29)]);
+    setNotifications(prev => [newItem, ...prev.slice(0, 29)]);
     addToast(n);
   }, [addToast]);
 
-  // Kết nối WebSocket — chạy xuyên suốt app (không bị reset khi chuyển trang)
+  // Kết nối WebSocket — chạy xuyên suốt app
   useNotifications({ token: accessToken ?? null, onNotification: handleWsNotification });
 
-  const unreadCount = notifications.filter(n => n.unread).length;
+  const unreadCount = notifications.filter(n => !n.is_read).length;
 
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
@@ -110,10 +97,24 @@ export default function Header({ onMenuClick }: HeaderProps) {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  const markAllAsRead = () => setNotifications(prev => prev.map(n => ({ ...n, unread: false })));
-  const handleNotificationClick = (id: number) => {
-    setNotifications(prev => prev.map(n => n.id === id ? { ...n, unread: false } : n));
+  const markAllAsRead = () => {
+    setNotifications(prev => prev.map(n => ({ ...n, is_read: true })));
+    if (accessToken) {
+      fetch('/api/v1/notifications/read-all', {
+        method: 'PATCH',
+        headers: { Authorization: `Bearer ${accessToken}` },
+      }).catch(() => {});
+    }
+  };
+  const handleNotificationClick = (id: string) => {
+    setNotifications(prev => prev.map(n => n.id === id ? { ...n, is_read: true } : n));
     setShowNotifications(false);
+    if (accessToken) {
+      fetch(`/api/v1/notifications/${id}/read`, {
+        method: 'PATCH',
+        headers: { Authorization: `Bearer ${accessToken}` },
+      }).catch(() => {});
+    }
   };
 
   const notifTypeIcon: Record<string, string> = {
@@ -179,7 +180,7 @@ export default function Header({ onMenuClick }: HeaderProps) {
                     key={n.id}
                     onClick={() => handleNotificationClick(n.id)}
                     className={`px-4 py-3 flex items-start gap-3 cursor-pointer transition-all duration-150 hover:bg-[var(--surface)] ${
-                      n.unread ? 'bg-[hsl(239_68%_58%/0.04)]' : ''
+                      !n.is_read ? 'bg-[hsl(239_68%_58%/0.04)]' : ''
                     }`}
                   >
                     <div className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 mt-0.5 ${notifTypeColor[n.type]}`}>
@@ -188,10 +189,10 @@ export default function Header({ onMenuClick }: HeaderProps) {
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center justify-between gap-2">
                         <p className="text-[12px] font-semibold text-[var(--foreground)] truncate">{n.title}</p>
-                        {n.unread && <span className="w-1.5 h-1.5 rounded-full bg-[hsl(239_68%_58%)] shrink-0" />}
+                        {!n.is_read && <span className="w-1.5 h-1.5 rounded-full bg-[hsl(239_68%_58%)] shrink-0" />}
                       </div>
                       <p className="text-[11px] text-[var(--muted)] leading-relaxed mt-0.5 line-clamp-2">{n.message}</p>
-                      <p className="text-[10px] text-[var(--muted-light)] mt-1">{formatRelativeTime(n.createdAt)}</p>
+                      <p className="text-[10px] text-[var(--muted-light)] mt-1">{formatRelativeTime(n.created_at)}</p>
                     </div>
                   </div>
                 ))}
