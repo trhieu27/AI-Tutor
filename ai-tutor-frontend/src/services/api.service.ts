@@ -2,6 +2,9 @@ import { authService } from './auth.service';
 
 const API_BASE = "/api/v1";
 
+// Upload gửi thẳng đến backend, bỏ qua Next.js proxy (tránh giới hạn 10MB)
+const UPLOAD_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8081/api/v1";
+
 /** Custom error class for quota exceeded (HTTP 429) */
 export class QuotaError extends Error {
   status = 429;
@@ -127,7 +130,7 @@ export async function uploadDocument(file: File): Promise<DocumentResponse> {
 
   let res: Response;
   try {
-    res = await authFetch(`${API_BASE}/documents/upload`, {
+    res = await authFetch(`${UPLOAD_BASE}/documents/upload`, {
       method: "POST",
       body: formData,
       signal: controller.signal,
