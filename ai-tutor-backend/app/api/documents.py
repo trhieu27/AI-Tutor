@@ -13,8 +13,8 @@ from app.rag import rag_engine
 
 from app.api.auth import get_current_user
 from app.api.quota import require_doc_quota
-from app.api.notifications import notification_manager
-from app.core.constants import DocNotif, ErrMsg, QuotaMsg
+from app.api.notifications import send_notification
+from app.core.constants import DocNotif, ErrMsg
 
 router = APIRouter(prefix="/documents", tags=["Documents"])
 settings = get_settings()
@@ -51,14 +51,15 @@ async def process_document_background(document_id: str, file_path: str, owner_id
         )
         logger.info(f"✅ Document {document_id} processed successfully")
 
-        # 🔔 Gửi thông báo real-time cho user
         file_name = doc_data.get('file_name', '')
-        await notification_manager.send_to_user(owner_id, {
-            "type": "document_ready",
-            "title": DocNotif.READY_TITLE,
-            "message": DocNotif.READY_MSG.format(name=file_name),
-            "document_id": document_id,
-        })
+        await send_notification(
+            user_id=owner_id,
+            notif_type="document_ready",
+            title=DocNotif.READY_TITLE,
+            message=DocNotif.READY_MSG.format(name=file_name),
+            db=db,
+            metadata={"document_id": document_id},
+        )
 
     except Exception as e:
         logger.error(f"❌ Document {document_id} processing failed: {str(e)}")
@@ -67,14 +68,15 @@ async def process_document_background(document_id: str, file_path: str, owner_id
             {"$set": {"status": DocumentStatus.FAILED}}
         )
 
-        # 🔔 Gửi thông báo thất bại
         file_name = doc_data.get('file_name', '')
-        await notification_manager.send_to_user(owner_id, {
-            "type": "document_failed",
-            "title": DocNotif.FAILED_TITLE,
-            "message": DocNotif.FAILED_MSG.format(name=file_name),
-            "document_id": document_id,
-        })
+        await send_notification(
+            user_id=owner_id,
+            notif_type="document_failed",
+            title=DocNotif.FAILED_TITLE,
+            message=DocNotif.FAILED_MSG.format(name=file_name),
+            db=db,
+            metadata={"document_id": document_id},
+        )
 
 
 @router.post("/upload", response_model=DocumentResponse, status_code=201)
