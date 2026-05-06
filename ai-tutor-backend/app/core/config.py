@@ -37,11 +37,14 @@ class Settings(BaseSettings):
 
 
 
-    # CORS — thêm domain production vào đây khi deploy
+    # CORS — Được override qua biến CORS_ORIGINS trong .env khi production
+    # Ví dụ trong .env:
+    # CORS_ORIGINS=["https://main.xxx.amplifyapp.com","https://yourdomain.com"]
     CORS_ORIGINS: list[str] = [
         "http://localhost:3000",
         "http://localhost:3001",
         "http://127.0.0.1:3000",
+        "http://192.168.4.175:3000",
     ]
 
     class Config:

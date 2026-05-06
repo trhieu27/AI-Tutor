@@ -28,7 +28,7 @@ export default function DashboardLayout({
           <div className="flex w-full bg-[var(--background)] text-[var(--foreground)] h-svh overflow-hidden selection:bg-indigo-500/30 transition-colors duration-500">
             {/* Mobile Sidebar Overlay */}
             {isSidebarOpen && (
-              <div 
+              <div
                 className="fixed inset-0 bg-black/80 backdrop-blur-md z-[55] lg:hidden"
                 onClick={() => setIsSidebarOpen(false)}
               />
@@ -50,7 +50,7 @@ export default function DashboardLayout({
               <div className="shrink-0">
                 <Header onMenuClick={() => setIsSidebarOpen(true)} />
               </div>
-              
+
               <main
                 className="flex-1 overflow-y-auto relative w-full"
                 style={{ overscrollBehaviorY: 'none' }}
