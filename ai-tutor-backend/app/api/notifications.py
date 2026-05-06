@@ -10,8 +10,9 @@ import logging
 from datetime import datetime
 from typing import Dict, List, Optional
 
+import jwt
+from jwt.exceptions import InvalidTokenError
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect, Query, Depends
-from jose import jwt, JWTError
 from motor.motor_asyncio import AsyncIOMotorDatabase
 
 from app.core.config import get_settings
@@ -130,7 +131,7 @@ async def websocket_notifications(
         if not user_id:
             await websocket.close(code=4001, reason="Invalid token")
             return
-    except JWTError:
+    except InvalidTokenError:
         await websocket.close(code=4001, reason="Invalid token")
         return
 
