@@ -44,12 +44,20 @@ export default function Header({ onMenuClick }: HeaderProps) {
 
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
 
-  // Tick mỗi phút để refresh thời gian tương đối
-  const [, forceRender] = useState(0);
+  // Adaptive tick: 10s khi có notif < 1 phút, 30s khi < 1 giờ, 60s sau đó
+  const [tick, setTick] = useState(0);
   useEffect(() => {
-    const t = setInterval(() => forceRender(x => x + 1), 60_000);
-    return () => clearInterval(t);
-  }, []);
+    const getInterval = () => {
+      if (notifications.length === 0) return 60_000;
+      const newestAge = (Date.now() - new Date(notifications[0].created_at).getTime()) / 1000;
+      if (newestAge < 60)   return 10_000;  // < 1 phút → tick 10s
+      if (newestAge < 3600) return 30_000;  // < 1 giờ → tick 30s
+      return 60_000;                         // cũ hơn → tick 60s
+    };
+    const t = setTimeout(() => setTick(x => x + 1), getInterval());
+    return () => clearTimeout(t);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tick, notifications]);
 
   // Fetch lịch sử từ API khi đã login
   useEffect(() => {
