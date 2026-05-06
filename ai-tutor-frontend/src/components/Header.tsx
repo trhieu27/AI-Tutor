@@ -125,18 +125,36 @@ export default function Header({ onMenuClick }: HeaderProps) {
     }
   };
 
+  // Icon theo type từ backend — dễ thêm type mới
   const notifTypeIcon: Record<string, string> = {
-    success: 'check_circle',
-    error: 'error',
-    info: 'info',
-    system: 'settings',
+    // Tài liệu
+    document_ready:   'description',       // 📄 file icon
+    document_failed:  'description_off',   // 📄 với dấu x
+
+    // Thanh toán (sau này dùng)
+    payment_success:  'payments',          // 💳 thẻ có tick
+    payment_failed:   'credit_card_off',   // 💳 bị từ chối
+
+    // Hệ thống
+    system:           'settings',
   };
+
   const notifTypeColor: Record<string, string> = {
-    success: 'text-[hsl(158_64%_44%)] bg-[hsl(158_64%_44%/0.08)]',
-    error: 'text-red-400 bg-red-400/10',
-    info: 'text-[hsl(239_68%_58%)] bg-[hsl(239_68%_58%/0.08)]',
-    system: 'text-[var(--muted)] bg-[var(--surface)]',
+    // Tài liệu — xanh lá / đỏ
+    document_ready:  'text-emerald-400 bg-emerald-400/10',
+    document_failed: 'text-red-400 bg-red-400/10',
+
+    // Thanh toán — vàng / cam
+    payment_success: 'text-amber-400 bg-amber-400/10',
+    payment_failed:  'text-orange-400 bg-orange-400/10',
+
+    // Hệ thống — xám
+    system:          'text-[var(--muted)] bg-[var(--surface)]',
   };
+
+  // Fallback khi type không khớp
+  const getIcon  = (t: string) => notifTypeIcon[t]  ?? 'notifications';
+  const getColor = (t: string) => notifTypeColor[t] ?? 'text-[var(--muted)] bg-[var(--surface)]';
 
   return (
     <header className="h-16 w-full sticky top-0 bg-[var(--header-bg)] backdrop-blur-xl border-b border-[var(--border-color)] flex items-center justify-between px-5 shrink-0 z-50 transition-colors duration-500">
@@ -191,8 +209,8 @@ export default function Header({ onMenuClick }: HeaderProps) {
                       !n.is_read ? 'bg-[hsl(239_68%_58%/0.04)]' : ''
                     }`}
                   >
-                    <div className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 mt-0.5 ${notifTypeColor[n.type]}`}>
-                      <span className="material-symbols-outlined icon-thin text-[14px]">{notifTypeIcon[n.type]}</span>
+                    <div className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 mt-0.5 ${getColor(n.type)}`}>
+                      <span className="material-symbols-outlined icon-thin text-[14px]">{getIcon(n.type)}</span>
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center justify-between gap-2">
