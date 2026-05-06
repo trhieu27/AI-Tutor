@@ -9,7 +9,7 @@ from app.core.config import get_settings
 from app.core.database import init_db, close_db
 from app.api import documents, chat, auth, users
 from app.api.quota import quota_router
-from app.api.notifications import notif_router, websocket_notifications
+from app.api.notifications import notif_router, notification_manager
 
 
 logger = logging.getLogger(__name__)
@@ -68,8 +68,37 @@ app.include_router(chat.router,           prefix="/api/v1")
 app.include_router(users.router,          prefix="/api/v1")
 app.include_router(quota_router,          prefix="/api/v1")
 app.include_router(notif_router)          # REST: GET/PATCH/DELETE /api/v1/notifications
-# WebSocket đăng ký trực tiếp trên app — tránh vấn đề prefix của APIRouter
-app.add_api_websocket_route("/api/v1/ws/notifications", websocket_notifications)
+
+from fastapi import WebSocket, WebSocketDisconnect
+import jwt
+from jwt.exceptions import InvalidTokenError
+
+@app.websocket("/api/v1/ws/notifications")
+async def ws_notifications(websocket: WebSocket):
+    """wss://host/api/v1/ws/notifications?token=<JWT>"""
+    token = websocket.query_params.get("token", "")
+    try:
+        payload = jwt.decode(token, settings.JWT_SECRET, algorithms=[settings.ALGORITHM])
+        user_id: str = payload.get("sub")
+        if not user_id:
+            await websocket.close(code=4001, reason="Invalid token")
+            return
+    except InvalidTokenError:
+        await websocket.close(code=4001, reason="Invalid token")
+        return
+
+    await notification_manager.connect(user_id, websocket)
+    try:
+        await websocket.send_json({"type": "connected", "message": "WebSocket connected"})
+        while True:
+            data = await websocket.receive_text()
+            if data == "ping":
+                await websocket.send_text("pong")
+    except WebSocketDisconnect:
+        notification_manager.disconnect(user_id, websocket)
+    except Exception as e:
+        logger.error(f"[WS] Error for {user_id}: {e}")
+        notification_manager.disconnect(user_id, websocket)
 
 
 @app.get("/")
