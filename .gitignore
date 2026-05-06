@@ -38,3 +38,15 @@ ai-tutor-backend/.venv/
 ai-tutor-backend/venv/
 ai-tutor-backend/*.pyc
 ai-tutor-backend/.env
+ai-tutor-backend/storage/
+
+# Storage & Runtime data (không commit dữ liệu lớn)
+**/storage/chroma_db/
+**/storage/uploads/
+**/storage/mongo_data/
+
+# SSL certs
+nginx/ssl/
+
+# Docker
+.docker/
