@@ -22,7 +22,7 @@ FREE_LIMITS = {
     "ai_features":      10,   # quiz + mindmap + summary + study_questions / ngày
     # Context window (không ghi usage_logs — áp dụng mỗi request)
     "context_messages": 6,    # số tin nhắn lịch sử gửi lên AI (3 lượt)
-    "question_chars":   600,  # ký tự tối đa mỗi câu hỏi
+    "question_chars":   1200, # ký tự tối đa mỗi câu hỏi
     "msg_chars":        800,  # ký tự tối đa mỗi tin nhắn lịch sử
 }
 
@@ -88,8 +88,8 @@ def require_doc_quota():
 
 def require_chat_quota():
     """
-    Dependency: kiểm tra user free chưa vượt giới hạn chat hôm nay.
-    Ghi usage sau khi check pass.
+    Dependency: chỉ KIỂM TRA quota chat — KHÔNG ghi usage.
+    Việc ghi usage được thực hiện sau khi AI trả lời thành công.
     Dùng tại: POST /chat/{id}/ask
     """
     async def _check(
@@ -108,9 +108,20 @@ def require_chat_quota():
                 detail=f"Bạn đã dùng hết {limit} tin nhắn miễn phí hôm nay. "
                        f"Nâng cấp Pro hoặc quay lại vào ngày mai."
             )
-        await _record_usage(current_user_id, "chat_messages", db)
+        # Không ghi usage ở đây — chỉ ghi sau khi AI trả lời thành công
         return current_user_id
     return _check
+
+
+async def record_chat_usage(user_id: str, db: AsyncIOMotorDatabase):
+    """
+    Ghi 1 lượt chat vào usage_logs.
+    Chỉ gọi sau khi AI đã trả lời thành công (tránh tính quota khi user hủy).
+    """
+    user = await _get_user(user_id, db)
+    if user.get("is_pro"):
+        return  # Pro → không giới hạn
+    await _record_usage(user_id, "chat_messages", db)
 
 
 def require_ai_quota():
