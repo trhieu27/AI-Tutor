@@ -1,4 +1,4 @@
-﻿import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { fetchDocument, fetchDocumentMindmap, fetchDocumentMindmapStream, QuotaError } from "@/services/api.service";
 import InteractiveMindmap from "@/components/InteractiveMindmap";
@@ -342,14 +342,14 @@ export default function InteractiveMindmapPage() {
       {/* ── Floating Header ────────────────────────────────── */}
       <div className="absolute top-3 left-1/2 -translate-x-1/2 z-30 w-full max-w-3xl px-4">
         <header className="bg-[var(--surface-overlay)] backdrop-blur-2xl border border-[var(--border-color)] rounded-[20px] h-13 flex items-center justify-between px-4 shadow-[0_8px_32px_hsl(222_47%_4%/0.08),0_2px_8px_hsl(222_47%_4%/0.04)]">
-          <div className="flex items-center gap-2.5">
+          <div className="flex items-center gap-2.5 min-w-0">
             <button
               onClick={() => navigate(-1)}
-              className="w-8 h-8 flex items-center justify-center rounded-xl bg-[var(--surface)] hover:bg-[var(--card-bg-hover)] text-[var(--foreground)] transition-all active:scale-90"
+              className="w-8 h-8 flex items-center justify-center rounded-xl bg-[var(--surface)] hover:bg-[var(--card-bg-hover)] text-[var(--foreground)] transition-all active:scale-90 shrink-0"
             >
               <span className="material-symbols-outlined icon-thin text-[16px]">west</span>
             </button>
-            <h1 className="font-semibold text-[var(--foreground)] text-[13px] truncate max-w-[120px] md:max-w-md tracking-[-0.01em]">
+            <h1 className="font-semibold text-[var(--foreground)] text-[13px] truncate min-w-0 max-w-[140px] md:max-w-[280px] lg:max-w-[420px] tracking-[-0.01em]">
               {docData?.file_name}
             </h1>
           </div>

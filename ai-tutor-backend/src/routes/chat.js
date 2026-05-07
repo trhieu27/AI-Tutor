@@ -171,13 +171,14 @@ router.get('/:documentId/summarize', authMiddleware, async (req, res) => {
       await Document.updateOne({ id: req.params.documentId }, { $set: { summary: fullText } });
     }
   } catch (err) {
+    console.error('Summarize error:', err.message);
+    if (res.headersSent) return res.end();
     if (err.statusCode === 429) return res.status(429).json({ detail: err.message }); // app quota
     if (err.statusCode) return res.status(err.statusCode).json({ detail: err.message });
     const msg = String(err.message);
     if (msg.includes('429') || msg.includes('RESOURCE_EXHAUSTED')) {
       return res.status(503).json({ detail: 'AI đang quá tải. Vui lòng thử lại sau.' });
     }
-    console.error('Summarize error:', err.message);
     res.status(500).json({ detail: 'Không thể tạo bản tóm tắt' });
   }
 });
@@ -223,6 +224,8 @@ router.get('/:documentId/quiz', authMiddleware, async (req, res) => {
       } catch (e) { console.error('Failed to cache quiz:', e.message); }
     }
   } catch (err) {
+    console.error('Quiz error:', err.message);
+    if (res.headersSent) return res.end();
     if (err.statusCode === 429) return res.status(429).json({ detail: err.message }); // app quota
     if (err.statusCode) return res.status(err.statusCode).json({ detail: err.message });
     const msg = String(err.message);
@@ -264,6 +267,8 @@ router.get('/:documentId/mindmap', authMiddleware, async (req, res) => {
       await Document.updateOne({ id: req.params.documentId }, { $set: { mindmap: fullText } });
     }
   } catch (err) {
+    console.error('Mindmap error:', err.message);
+    if (res.headersSent) return res.end();
     if (err.statusCode === 429) return res.status(429).json({ detail: err.message }); // app quota
     if (err.statusCode) return res.status(err.statusCode).json({ detail: err.message });
     const msg = String(err.message);
@@ -324,6 +329,8 @@ router.get('/:documentId/study-questions', authMiddleware, async (req, res) => {
       await Document.updateOne({ id: req.params.documentId }, { $set: { study_questions: questions } });
     }
   } catch (err) {
+    console.error('StudyQuestions error:', err.message);
+    if (res.headersSent) return res.end();
     if (err.statusCode === 429) return res.status(429).json({ detail: err.message }); // app quota
     if (err.statusCode) return res.status(err.statusCode).json({ detail: err.message });
     const msg = String(err.message);
