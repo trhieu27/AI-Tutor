@@ -1,17 +1,16 @@
-"use client";
-
+﻿
 import { useState } from "react";
 import Sidebar from "./Sidebar";
 import Header from "./Header";
 
-export default function ClientShell({ children }: { children: React.ReactNode }) {
+export default function ClientShell({ children }) {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
   return (
     <div className="h-screen w-screen overflow-hidden flex bg-surface antialiased relative">
       {/* Sidebar - Desktop */}
       <div className="hidden lg:block shrink-0 h-full border-r border-outline/50 bg-white">
-        <Sidebar />
+        <Sidebar onClose={() => {}} />
       </div>
 
       {/* Sidebar - Mobile Overlay */}

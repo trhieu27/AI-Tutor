@@ -1,4 +1,3 @@
-"use client";
 
 import DocumentTable from "@/components/DocumentTable";
 import { PRACTICE_PAGE_TEXTS } from "@/constants/texts";

@@ -1,15 +1,13 @@
-"use client";
-
-import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+﻿import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 
 /**
  * Auth Layout — bảo vệ các route /login, /register, /forgot-password.
  * Nếu đã có token trong localStorage → redirect về / ngay lập tức,
  * không render nội dung trang auth để tránh bị back về màn login.
  */
-export default function AuthLayout({ children }: { children: React.ReactNode }) {
-  const router = useRouter();
+export default function AuthLayout({ children }) {
+  const navigate = useNavigate();
   const [ready, setReady] = useState(false);
 
   // Áp dụng nền trắng NGAY lập tức trước khi bất kỳ effect nào chạy
@@ -32,11 +30,11 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
   useEffect(() => {
     const token = localStorage.getItem("access_token");
     if (token) {
-      router.replace("/");
+      navigate("/", { replace: true });
     } else {
       setReady(true);
     }
-  }, [router]);
+  }, [navigate]);
 
   // Khi chưa biết trạng thái login: hiện màn trắng thay vì null
   // để tránh body tối lộ ra phía sau

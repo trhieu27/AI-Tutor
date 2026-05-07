@@ -1,21 +1,14 @@
-"use client";
+﻿// @refresh reset
 
 import React, { createContext, useContext, useState, useCallback, useEffect } from 'react';
-import { fetchDocuments, DocumentResponse } from '@/services/api.service';
+import { fetchDocuments } from '@/services/api.service';
 import { useUpload } from './UploadContext';
 
-interface DocumentContextType {
-  documents: DocumentResponse[];
-  loading: boolean;
-  error: string;
-  refreshDocuments: (isSilent?: boolean) => Promise<void>;
-  lastRefreshTime: number;
-}
 
-const DocumentContext = createContext<DocumentContextType | undefined>(undefined);
+const DocumentContext = createContext(undefined);
 
-export const DocumentProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [documents, setDocuments] = useState<DocumentResponse[]>([]);
+export const DocumentProvider = ({ children }) => {
+  const [documents, setDocuments] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [lastRefreshTime, setLastRefreshTime] = useState(0);

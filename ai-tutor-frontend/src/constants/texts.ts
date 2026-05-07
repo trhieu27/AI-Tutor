@@ -1,4 +1,4 @@
-export const GLOBAL_METADATA_TEXTS = {
+﻿export const GLOBAL_METADATA_TEXTS = {
   title: "AI Tutor - Hệ thống học tập thông minh",
   description: "Phân tích, tóm tắt và thực hành trắc nghiệm dựa trên tài liệu của bạn với AI."
 };
@@ -90,7 +90,7 @@ export const AUTH_TEXTS = {
     LOGIN_BUTTON: "Đăng nhập",
     LOGIN_LOADING: "Đang xử lý...",
     LOGIN_ERROR: "Email hoặc mật khẩu không chính xác.",
-    RATE_LIMIT_COUNTDOWN: (seconds: number) => `Thử quá nhiều lần. Vui lòng thử lại sau ${seconds} giây.`,
+    RATE_LIMIT_COUNTDOWN: (seconds) => `Thử quá nhiều lần. Vui lòng thử lại sau ${seconds} giây.`,
     NO_ACCOUNT: "Bạn chưa có tài khoản?",
     REGISTER_NOW: "Đăng ký ngay"
   },
@@ -101,10 +101,10 @@ export const AUTH_TEXTS = {
     EMAIL_PLACEHOLDER: "example@email.com",
     BUTTON: "Gửi mã xác nhận",
     LOADING: "Đang gửi...",
-    SUCCESS_MSG: "Yêu cầu đã được gửi! Vui lòng kiểm tra email của bạn.",
+    SUCCESS_MSG: "Yêu cầu đã được gửi Vui lòng kiểm tra email của bạn.",
     ERROR: "Email không hợp lệ hoặc không tồn tại.",
     OTP_TITLE: "Kiểm tra Email",
-    OTP_SUBTITLE: (email: string) => `Chúng tôi đã gửi mã xác nhận đến ${email}`,
+    OTP_SUBTITLE: (email) => `Chúng tôi đã gửi mã xác nhận đến ${email}`,
     OTP_LABEL: "Mã xác nhận (6 chữ số)",
     VERIFY_OTP: "Xác thực mã",
     VERIFYING: "Đang xác thực...",
@@ -115,7 +115,7 @@ export const AUTH_TEXTS = {
     RESET_BUTTON: "Cập nhật mật khẩu",
     RESET_LOADING: "Đang cập nhật...",
     SUCCESS_TITLE: "Xong rồi!",
-    RESET_SUCCESS: "Đổi mật khẩu thành công! Vui lòng đăng nhập lại.",
+    RESET_SUCCESS: "Đổi mật khẩu thành công Vui lòng đăng nhập lại.",
     BACK_TO_LOGIN: "Quay lại Đăng nhập"
   },
   REGISTER: {
@@ -311,7 +311,7 @@ export const MINDMAP_LIST_TEXTS = {
   STATUS: {
     LOADING: "AI đang thiết kế sơ đồ...",
     DOC_LABEL: "Tài liệu:",
-    FOOTER_TIP: "Mẹo: Sử dụng con lăn chuột hoặc các phím (+) (-) để thu phóng sơ đồ."
+    FOOTER_TIP: "Mẹo dụng con lăn chuột hoặc các phím (+) (-) để thu phóng sơ đồ."
   }
 };
 
@@ -361,7 +361,7 @@ export const QUOTA_TEXTS = {
     ],
     activateBtn: "Kích hoạt Pro",
     activating: "Đang kích hoạt...",
-    successMsg: "Chúc mừng! Bạn đã nâng cấp thành công lên Pro 🎉",
+    successMsg: "Chúc mừng Bạn đã nâng cấp thành công lên Pro 🎉",
     alreadyPro: "Bạn đang sử dụng gói Pro",
   },
 };
@@ -370,7 +370,7 @@ export const QUIZ_PAGE_TEXTS = {
   header: {
     badge: "Kiểm tra trắc nghiệm",
     completed: "Đã hoàn thành",
-    scoreBadge: (score: number, total: number) => `${score} / ${total} câu đúng`,
+    scoreBadge: (score, total) => `${score} / ${total} câu đúng`,
     retake: "Làm lại"
   },
   status: {
@@ -386,8 +386,8 @@ export const QUIZ_PAGE_TEXTS = {
   results: {
     title: "Kết quả bài thi",
     expertExplanation: "Giải thích chi tiết",
-    perfect: "Tuyệt vời! Bạn đã nắm vững kiến thức từ tài liệu này.",
-    good: "Khá tốt! Bạn đã hiểu phần lớn nội dung quan trọng.",
+    perfect: "Tuyệt vời Bạn đã nắm vững kiến thức từ tài liệu này.",
+    good: "Khá tốt Bạn đã hiểu phần lớn nội dung quan trọng.",
     keepTrying: "Cần cố gắng thêm. Hãy xem lại phần giải thích để củng cố kiến thức.",
     correct: "Đúng",
     incorrect: "Sai"
@@ -442,7 +442,7 @@ export const HELP_PAGE_TEXTS = {
       },
       {
         question: "Tôi có thể sử dụng AI Tutor trên điện thoại không?",
-        answer: "Có! Giao diện AI Tutor được thiết kế responsive, hoạt động tốt trên mọi kích thước màn hình từ điện thoại, máy tính bảng cho đến máy tính để bàn. Bạn chỉ cần truy cập thông qua trình duyệt web.",
+        answer: "Có Giao diện AI Tutor được thiết kế responsive, hoạt động tốt trên mọi kích thước màn hình từ điện thoại, máy tính bảng cho đến máy tính để bàn. Bạn chỉ cần truy cập thông qua trình duyệt web.",
         icon: "devices",
         category: "Tổng quan"
       }
@@ -496,12 +496,12 @@ export const HELP_PAGE_TEXTS = {
     formTitle: "Gửi yêu cầu hỗ trợ",
     formSubtitle: "Mô tả vấn đề bạn gặp phải, chúng tôi sẽ phản hồi qua email.",
     subjectLabel: "Tiêu đề",
-    subjectPlaceholder: "Ví dụ: Lỗi khi tải lên tài liệu PDF",
+    subjectPlaceholder: "Ví dụ khi tải lên tài liệu PDF",
     messageLabel: "Nội dung chi tiết",
     messagePlaceholder: "Mô tả chi tiết vấn đề bạn đang gặp phải...",
     charCount: "ký tự",
     submitButton: "Gửi yêu cầu hỗ trợ",
-    successToast: "Yêu cầu hỗ trợ đã được gửi thành công! Chúng tôi sẽ phản hồi trong 24 giờ.",
+    successToast: "Yêu cầu hỗ trợ đã được gửi thành công Chúng tôi sẽ phản hồi trong 24 giờ.",
     errors: {
       subjectRequired: "Vui lòng nhập tiêu đề",
       messageRequired: "Vui lòng nhập nội dung",
@@ -529,7 +529,7 @@ export const SETTINGS_PAGE_TEXTS = {
       email: "Email",
       bio: "Giới thiệu",
       bioPlaceholder: "Bạn đang học gì...",
-      bioMaxChars: (n: number, max: number) => `${n}/${max}`
+      bioMaxChars: (n, max) => `${n}/${max}`
     },
     save: "Lưu thay đổi",
     saving: "Đang lưu...",

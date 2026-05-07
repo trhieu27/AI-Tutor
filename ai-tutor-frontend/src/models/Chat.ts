@@ -5,35 +5,35 @@ export enum ChatRole {
 
 export class ChatMessage {
   constructor(
-    public id: string,
+    public id,
     public role: ChatRole,
-    public content: string,
-    public timestamp: Date = new Date(),
+    public content,
+    public timestamp = new Date(),
     public sources?: {
-      documentId: string;
-      pageNumber: number;
-      textExcerpt: string;
+      documentId;
+      pageNumber;
+      textExcerpt;
     }[] // References from RAG (Retrieved Chunks)
   ) {}
 }
 
 export class ChatSession {
   constructor(
-    public id: string,
-    public userId: string,
-    public documentId: string, // The material this chat is based on
-    public title: string,
-    public messages: ChatMessage[] = [],
-    public startedAt: Date = new Date(),
-    public lastUpdatedAt: Date = new Date()
+    public id,
+    public userId,
+    public documentId, // The material this chat is based on
+    public title,
+    public messages = [],
+    public startedAt = new Date(),
+    public lastUpdatedAt = new Date()
   ) {}
 
-  addMessage(message: ChatMessage) {
+  addMessage(message) {
     this.messages.push(message);
     this.lastUpdatedAt = new Date();
   }
 
-  getRecentMessages(limit: number = 5): ChatMessage[] {
+  getRecentMessages(limit = 5) {
     return this.messages.slice(-limit);
   }
 }

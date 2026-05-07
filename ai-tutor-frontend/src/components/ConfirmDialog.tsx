@@ -1,19 +1,7 @@
-"use client";
 
 import { useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
 
-interface ConfirmDialogProps {
-  open: boolean;
-  title: string;
-  message: string;
-  confirmLabel?: string;
-  cancelLabel?: string;
-  /** danger = red destructive · warning = slate dark · info = indigo */
-  variant?: "danger" | "warning" | "info";
-  onConfirm: () => void;
-  onCancel: () => void;
-}
 
 /* ── Variant token map ──────────────────────────────────────────────────── */
 const VARIANT_CONFIG = {
@@ -32,7 +20,7 @@ const VARIANT_CONFIG = {
     iconWrapCls: "bg-[#EEF2FF] text-[#4338CA]",
     confirmCls:  "bg-[#111827] hover:bg-[#1F2937] text-white shadow-[0_2px_8px_rgba(17,24,39,0.20)]",
   },
-} as const;
+};
 
 /* ─────────────────────────────────────────────────────────────────────────── */
 export default function ConfirmDialog({
@@ -44,8 +32,8 @@ export default function ConfirmDialog({
   variant      = "danger",
   onConfirm,
   onCancel,
-}: ConfirmDialogProps) {
-  const confirmRef = useRef<HTMLButtonElement>(null);
+}) {
+  const confirmRef = useRef(null);
   const cfg        = VARIANT_CONFIG[variant];
 
   /* Auto-focus confirm button (per spec) */
@@ -59,7 +47,7 @@ export default function ConfirmDialog({
   /* Escape → cancel */
   useEffect(() => {
     if (!open) return;
-    const handler = (e: KeyboardEvent) => { if (e.key === "Escape") onCancel(); };
+    const handler = (e) => { if (e.key === "Escape") onCancel(); };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
   }, [open, onCancel]);

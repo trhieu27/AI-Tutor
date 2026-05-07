@@ -1,4 +1,4 @@
-import { APP_COLORS } from '@/constants/colors';
+﻿import { APP_COLORS } from '@/constants/colors';
 import { AUTH_TEXTS } from '@/constants/texts';
 
 export default function AuthBranding() {

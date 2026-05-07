@@ -1,36 +1,19 @@
-"use client";
 
 import { useState, useCallback, useEffect } from "react";
-import { useTheme } from "next-themes";
 import { useAuth } from "@/context/AuthContext";
-import { SETTINGS_PAGE_TEXTS as T, QUOTA_TEXTS } from "@/constants/texts";
+import { SETTINGS_PAGE_TEXTS, QUOTA_TEXTS } from "@/constants/texts";
 
 /* ── Types ────────────────────────────────────────────────────────────────── */
-interface UserProfile {
-  id: string;
-  full_name: string;
-  email: string;
-  student_id: string;
-  bio?: string;
-  is_pro?: boolean;
-  preferences?: { email_notifications: boolean; ai_response_detail: string };
-  created_at?: string;
-}
 
-interface Session {
-  id: string;
-  user_agent: string;
-  ip_address: string;
-  created_at: string;
-  last_active: string;
-}
 import { authFetch } from "@/services/api.service";
+import { useTheme } from "@/components/ThemeProvider";
 
-const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8081/api/v1";
+const API = import.meta.env.VITE_API_URL || "http://localhost:8081/api/v1";
+const T = SETTINGS_PAGE_TEXTS;
 
 
 /* ── Utilities ────────────────────────────────────────────────────────────── */
-function parseUA(ua: string) {
+function parseUA(ua) {
   let browser = "Trình duyệt không rõ", os = "Hệ điều hành không rõ";
   if (/Chrome/i.test(ua) && !/Edg/i.test(ua)) browser = "Chrome";
   else if (/Firefox/i.test(ua)) browser = "Firefox";
@@ -44,7 +27,7 @@ function parseUA(ua: string) {
   return { browser, os };
 }
 
-function getPasswordStrength(p: string): { label: string; color: string; width: string } {
+function getPasswordStrength(p) {
   if (!p) return { label: "", color: "", width: "w-0" };
   let score = 0;
   if (p.length >= 8) score++;
@@ -59,12 +42,12 @@ function getPasswordStrength(p: string): { label: string; color: string; width: 
 }
 
 /* ── Skeleton ─────────────────────────────────────────────────────────────── */
-const Skeleton = ({ cls = "" }: { cls?: string }) => (
+const Skeleton = ({ cls = "" }) =>(
   <div className={`rounded-xl bg-[var(--surface)] animate-pulse ${cls}`} />
 );
 
 /* ── Toggle ───────────────────────────────────────────────────────────────── */
-const Toggle = ({ on, onToggle }: { on: boolean; onToggle: () => void }) => (
+const Toggle = ({ on, onToggle }) =>(
   <button
     onClick={onToggle}
     className={`relative w-10 h-6 rounded-full transition-all duration-200 border ${
@@ -76,7 +59,7 @@ const Toggle = ({ on, onToggle }: { on: boolean; onToggle: () => void }) => (
 );
 
 /* ── Message toast ────────────────────────────────────────────────────────── */
-const Msg = ({ msg }: { msg: { type: "ok" | "err"; text: string } | null }) =>
+const Msg = ({ msg }) =>
   msg ? (
     <span className={`text-[12px] font-semibold ${msg.type === "ok" ? "text-[hsl(158_64%_44%)]" : "text-[hsl(343_72%_48%)]"}`}>
       {msg.text}
@@ -86,12 +69,12 @@ const Msg = ({ msg }: { msg: { type: "ok" | "err"; text: string } | null }) =>
 /* ══════════════════════════════════════════════════════════════════════════ */
 /*  PROFILE SECTION                                                           */
 /* ══════════════════════════════════════════════════════════════════════════ */
-function ProfileSection({ profile, onRefresh }: { profile: UserProfile; onRefresh: () => void }) {
+function ProfileSection({ profile, onRefresh }) {
   const { updateUser } = useAuth();
   const [name, setName] = useState(profile.full_name);
   const [bio, setBio] = useState(profile.bio ?? "");
   const [saving, setSaving] = useState(false);
-  const [msg, setMsg] = useState<{ type: "ok" | "err"; text: string } | null>(null);
+  const [msg, setMsg] = useState(null);
 
   const save = async () => {
     setSaving(true); setMsg(null);
@@ -105,7 +88,7 @@ function ProfileSection({ profile, onRefresh }: { profile: UserProfile; onRefres
       updateUser({ full_name: name.trim() });
       setMsg({ type: "ok", text: T.profile.success });
       onRefresh();
-    } catch (e: any) {
+    } catch (e) {
       setMsg({ type: "err", text: e.message });
     } finally { setSaving(false); }
   };
@@ -176,7 +159,7 @@ function SecuritySection() {
   const [form, setForm] = useState({ current: "", newPw: "", confirm: "" });
   const [show, setShow] = useState({ current: false, newPw: false, confirm: false });
   const [saving, setSaving] = useState(false);
-  const [msg, setMsg] = useState<{ type: "ok" | "err"; text: string } | null>(null);
+  const [msg, setMsg] = useState(null);
   const strength = getPasswordStrength(form.newPw);
 
   const save = async () => {
@@ -191,15 +174,15 @@ function SecuritySection() {
       if (!res.ok) throw new Error((await res.json()).detail);
       setMsg({ type: "ok", text: T.security.changePassword.success });
       setForm({ current: "", newPw: "", confirm: "" });
-    } catch (e: any) {
+    } catch (e) {
       setMsg({ type: "err", text: e.message });
     } finally { setSaving(false); }
   };
 
   const FIELDS = [
-    { k: "current" as const, label: T.security.changePassword.current },
-    { k: "newPw"   as const, label: T.security.changePassword.newPw },
-    { k: "confirm" as const, label: T.security.changePassword.confirm },
+    { k: "current", label: T.security.changePassword.current },
+    { k: "newPw"  , label: T.security.changePassword.newPw },
+    { k: "confirm", label: T.security.changePassword.confirm },
   ];
 
   return (
@@ -211,17 +194,17 @@ function SecuritySection() {
 
       <div className="max-w-sm p-6 rounded-2xl bg-[var(--surface)] border border-[var(--border-color)] space-y-4">
         <h3 className="text-[14px] font-semibold text-[var(--foreground)]">{T.security.changePassword.title}</h3>
-        {FIELDS.map(({ k, label }) => (
+        {FIELDS.map(({ k, label }) =>(
           <div key={k}>
             <label className="block text-[11px] font-semibold text-[var(--muted)] uppercase tracking-wider mb-1.5">{label}</label>
             <div className="relative">
               <input
                 type={show[k] ? "text" : "password"}
                 value={form[k]}
-                onChange={e => setForm(p => ({ ...p, [k]: e.target.value }))}
+                onChange={e => setForm(p =>({ ...p, [k]: e.target.value }))}
                 className="w-full px-3.5 py-2.5 pr-10 rounded-xl bg-[var(--background)] border border-[var(--border-color)] text-[13px] text-[var(--foreground)] focus:outline-none focus:ring-1 focus:ring-[hsl(239_68%_58%/0.30)] transition-all"
               />
-              <button type="button" onClick={() => setShow(p => ({ ...p, [k]: !p[k] }))}
+              <button type="button" onClick={() => setShow(p =>({ ...p, [k]: !p[k] }))}
                 className="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--muted)] hover:text-[var(--foreground)] transition-colors">
                 <span className="material-symbols-outlined" style={{ fontSize: 16 }}>{show[k] ? "visibility_off" : "visibility"}</span>
               </button>
@@ -254,9 +237,9 @@ function SecuritySection() {
 /*  SESSIONS SECTION                                                          */
 /* ══════════════════════════════════════════════════════════════════════════ */
 function SessionsSection() {
-  const [sessions, setSessions] = useState<Session[]>([]);
+  const [sessions, setSessions] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [revoking, setRevoking] = useState<string | null>(null);
+  const [revoking, setRevoking] = useState(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -268,7 +251,7 @@ function SessionsSection() {
 
   useEffect(() => { load(); }, [load]);
 
-  const revoke = async (id: string) => {
+  const revoke = async (id) => {
     setRevoking(id);
     try {
       await authFetch(`${API}/users/sessions/${id}`, { method: "DELETE" });
@@ -335,9 +318,7 @@ function SessionsSection() {
 /* ══════════════════════════════════════════════════════════════════════════ */
 function AppearanceSection() {
   const { theme, setTheme } = useTheme();
-  const [mounted, setMounted] = useState(false);
-  useEffect(() => setMounted(true), []);
-  const cur = mounted ? theme : "dark";
+  const cur = theme;
   return (
     <div className="space-y-8">
       <div>
@@ -345,8 +326,8 @@ function AppearanceSection() {
         <p className="text-[13px] text-[var(--muted)] mt-0.5">{T.appearance.subtitle}</p>
       </div>
       <div className="grid grid-cols-2 gap-3 max-w-xs">
-        {[T.appearance.light, T.appearance.dark].map(t => (
-          <button key={t.id} onClick={() => setTheme(t.id)}
+        {[T.appearance.light, T.appearance.dark].map(t =>(
+          <button key={t.id} onClick={() => setTheme(String(t.id))}
             className={`p-4 rounded-2xl border-2 flex flex-col items-center gap-3 transition-all ${cur === t.id ? "border-[hsl(239_68%_58%)] bg-[hsl(239_68%_58%/0.06)]" : "border-[var(--border-color)] hover:border-[hsl(239_68%_58%/0.40)]"}`}>
             <span className={`material-symbols-outlined text-[24px] ${cur === t.id ? "text-[hsl(239_55%_50%)]" : "text-[var(--muted)]"}`}>{t.icon}</span>
             <p className={`text-[12px] font-semibold ${cur === t.id ? "text-[hsl(239_55%_50%)]" : "text-[var(--foreground)]"}`}>{t.label}</p>
@@ -360,12 +341,12 @@ function AppearanceSection() {
 /* ══════════════════════════════════════════════════════════════════════════ */
 /*  PREFERENCES SECTION                                                       */
 /* ══════════════════════════════════════════════════════════════════════════ */
-function PreferencesSection({ profile, onRefresh }: { profile: UserProfile; onRefresh: () => void }) {
+function PreferencesSection({ profile, onRefresh }) {
   const prefs = profile.preferences ?? { email_notifications: true, ai_response_detail: "balanced" };
   const [emailNotif, setEmailNotif] = useState(prefs.email_notifications);
   const [aiDetail, setAiDetail] = useState(prefs.ai_response_detail);
   const [saving, setSaving] = useState(false);
-  const [msg, setMsg] = useState<{ type: "ok" | "err"; text: string } | null>(null);
+  const [msg, setMsg] = useState(null);
 
   const save = async () => {
     setSaving(true); setMsg(null);
@@ -377,7 +358,7 @@ function PreferencesSection({ profile, onRefresh }: { profile: UserProfile; onRe
       if (!res.ok) throw new Error((await res.json()).detail);
       setMsg({ type: "ok", text: "Đã lưu cài đặt" });
       onRefresh();
-    } catch (e: any) {
+    } catch (e) {
       setMsg({ type: "err", text: e.message });
     } finally { setSaving(false); }
   };
@@ -412,7 +393,7 @@ function PreferencesSection({ profile, onRefresh }: { profile: UserProfile; onRe
         <div className="p-5 rounded-2xl bg-[var(--surface)] border border-[var(--border-color)] space-y-3">
           <h3 className="text-[13px] font-semibold text-[var(--foreground)]">Mức độ chi tiết AI</h3>
           <div className="grid grid-cols-3 gap-2">
-            {AI_OPTS.map(opt => (
+            {AI_OPTS.map(opt =>(
               <button key={opt.id} onClick={() => setAiDetail(opt.id)}
                 className={`p-3 rounded-xl border text-left transition-all ${aiDetail === opt.id ? "border-[hsl(239_68%_58%)] bg-[hsl(239_68%_58%/0.06)]" : "border-[var(--border-color)] hover:border-[hsl(239_68%_58%/0.30)]"}`}>
                 <p className={`text-[11px] font-semibold ${aiDetail === opt.id ? "text-[hsl(239_55%_50%)]" : "text-[var(--foreground)]"}`}>{opt.label}</p>
@@ -437,10 +418,10 @@ function PreferencesSection({ profile, onRefresh }: { profile: UserProfile; onRe
 /* ══════════════════════════════════════════════════════════════════════════ */
 /*  UPGRADE SECTION                                                           */
 /* ══════════════════════════════════════════════════════════════════════════ */
-function UpgradeSection({ profile, onRefresh }: { profile: UserProfile; onRefresh: () => void }) {
+function UpgradeSection({ profile, onRefresh }) {
   const { updateUser } = useAuth();
   const [activating, setActivating] = useState(false);
-  const [msg, setMsg] = useState<{ type: "ok" | "err"; text: string } | null>(null);
+  const [msg, setMsg] = useState(null);
   const isPro = profile.is_pro;
   const U = QUOTA_TEXTS.upgrade;
 
@@ -452,7 +433,7 @@ function UpgradeSection({ profile, onRefresh }: { profile: UserProfile; onRefres
       updateUser({ isPro: true });
       setMsg({ type: "ok", text: U.successMsg });
       onRefresh();
-    } catch (e: any) {
+    } catch (e) {
       setMsg({ type: "err", text: e.message });
     } finally { setActivating(false); }
   };
@@ -484,7 +465,7 @@ function UpgradeSection({ profile, onRefresh }: { profile: UserProfile; onRefres
             <div className="px-4 py-3 text-[11px] font-bold text-[hsl(239_55%_50%)] uppercase tracking-wider text-center">{U.proPlan}</div>
           </div>
           {/* Rows */}
-          {U.features.map((f, i) => (
+          {U.features.map((f, i) =>(
             <div key={i} className="grid grid-cols-3 gap-0 border-b border-[var(--border-color)] last:border-0">
               <div className="px-4 py-3.5 flex items-center gap-2">
                 <span className="material-symbols-outlined text-[16px] text-[var(--muted)]">{f.icon}</span>
@@ -529,12 +510,11 @@ const NAV = [
   { id: "security",   label: T.nav.security.label,   icon: T.nav.security.icon },
   { id: "appearance", label: T.nav.appearance.label,  icon: T.nav.appearance.icon },
   { id: "upgrade",    label: QUOTA_TEXTS.upgrade.title, icon: "diamond" },
-] as const;
-type Tab = typeof NAV[number]["id"];
+];
 
 export default function SettingsPage() {
-  const [tab, setTab] = useState<Tab>("profile");
-  const [profile, setProfile] = useState<UserProfile | null>(null);
+  const [tab, setTab] = useState("profile");
+  const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
 
   const fetchProfile = useCallback(async () => {
@@ -559,7 +539,7 @@ export default function SettingsPage() {
           {/* Sidebar */}
           <aside className="w-52 shrink-0 sticky top-6">
             <nav className="space-y-1">
-              {NAV.map(n => (
+              {NAV.map(n =>(
                 <button key={n.id} onClick={() => setTab(n.id)}
                   className={`w-full flex items-center gap-2.5 px-3.5 py-2.5 rounded-xl text-[13px] font-semibold transition-all text-left ${
                     tab === n.id

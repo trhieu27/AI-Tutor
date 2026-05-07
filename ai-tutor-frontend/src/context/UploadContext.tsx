@@ -1,33 +1,19 @@
-"use client";
+﻿// @refresh reset
 
 import React, { createContext, useContext, useState, useCallback, useEffect } from 'react';
 import { uploadDocument } from '@/services/api.service';
 
-export interface UploadQueueItem {
-  id: string;
-  file: File;
-  status: "waiting" | "uploading" | "success" | "error";
-  progress: number;
-}
 
-interface UploadContextType {
-  queue: UploadQueueItem[];
-  addToQueue: (files: FileList | File[]) => Promise<void>;
-  removeFromQueue: (id: string) => void;
-  isAnyUploading: boolean;
-  clearQueue: () => void;
-  lastUploadTime: number; // Used to trigger refreshes in tables
-}
 
-const UploadContext = createContext<UploadContextType | undefined>(undefined);
+const UploadContext = createContext(undefined);
 
-export const UploadProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [queue, setQueue] = useState<UploadQueueItem[]>([]);
+export const UploadProvider = ({ children }) => {
+  const [queue, setQueue] = useState([]);
   const [lastUploadTime, setLastUploadTime] = useState(0);
 
   const isAnyUploading = queue.some(item => item.status === "uploading" || item.status === "waiting");
 
-  const removeFromQueue = useCallback((id: string) => {
+  const removeFromQueue = useCallback((id) => {
     setQueue(prev => prev.filter(item => item.id !== id));
   }, []);
 
@@ -35,7 +21,7 @@ export const UploadProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     setQueue([]);
   }, []);
 
-  const uploadFile = useCallback(async (id: string, file: File) => {
+  const uploadFile = useCallback(async (id, file: File) => {
     setQueue(prev => prev.map(item => item.id === id ? { ...item, status: "uploading" } : item));
 
     try {
@@ -63,14 +49,14 @@ export const UploadProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     }
   }, []);
 
-  const addToQueue = useCallback(async (files: FileList | File[]) => {
+  const addToQueue = useCallback(async (files) => {
     const allowedTypes = ["application/pdf", "application/vnd.openxmlformats-officedocument.wordprocessingml.document"];
-    const newItems: UploadQueueItem[] = [];
+    const newItems = [];
 
     const fileArray = Array.from(files);
 
     for (const file of fileArray) {
-      if (allowedTypes.includes(file.type)) {
+      if (allowedTypes.includes((file as File).type)) {
         newItems.push({
           id: Math.random().toString(36).substr(2, 9) + Date.now(),
           file,

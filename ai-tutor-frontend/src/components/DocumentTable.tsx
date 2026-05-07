@@ -1,22 +1,14 @@
-"use client";
-import { useState, useEffect } from "react";
-import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { DocumentResponse, deleteDocument } from "@/services/api.service";
+﻿import { useState, useEffect } from "react";
+import { Link, useNavigate } from "react-router-dom";
+import { deleteDocument } from "@/services/api.service";
 import { DOCUMENT_TABLE_TEXTS } from "@/constants/texts";
 import { useUpload } from "@/context/UploadContext";
 import { useDocuments } from "@/context/DocumentContext";
 import ConfirmDialog from "@/components/ConfirmDialog";
 
-interface DocumentTableProps {
-  refreshTrigger?: number;
-  showActions?: boolean;
-  defaultAction?: "summary" | "quiz" | "mindmap" | "questions";
-  limit?: number;
-}
 
 /* ── FileName: luôn truncate với "..." ───────────────────── */
-function FileName({ name }: { name: string }) {
+function FileName({ name }) {
   return (
     <p
       title={name}
@@ -28,7 +20,7 @@ function FileName({ name }: { name: string }) {
 }
 
 /* ── Skeleton row ─────────────────────────────────────────── */
-function SkeletonRow({ index, showActions }: { index: number; showActions?: boolean }) {
+function SkeletonRow({ index, showActions }) {
   return (
     <tr
       className="row-enter border-b border-[var(--border-subtle)]"
@@ -69,19 +61,19 @@ function SkeletonRow({ index, showActions }: { index: number; showActions?: bool
 export default function DocumentTable({
   refreshTrigger = 0,
   showActions = false,
-  defaultAction,
-  limit,
-}: DocumentTableProps) {
-  const router = useRouter();
+  defaultAction = null,
+  limit = null,
+}) {
+  const navigate = useNavigate();
   const { lastUploadTime } = useUpload();
   const { documents, loading, refreshDocuments } = useDocuments();
 
   const [searchTerm, setSearchTerm] = useState("");
-  const [deletingId, setDeletingId] = useState<string | null>(null);
-  const [retryingId, setRetryingId] = useState<string | null>(null);
-  const [pendingDelete, setPendingDelete] = useState<{ id: string; name: string } | null>(null);
+  const [deletingId, setDeletingId] = useState(null);
+  const [retryingId, setRetryingId] = useState(null);
+  const [pendingDelete, setPendingDelete] = useState(null);
 
-  const getRedirectUrl = (docId: string) => {
+  const getRedirectUrl = (docId) => {
     if (defaultAction === "mindmap") return `/mindmap/${docId}`;
     if (defaultAction === "quiz") return `/quiz/${docId}`;
     const baseUrl = `/chat/${docId}`;
@@ -102,7 +94,7 @@ export default function DocumentTable({
     if (refreshTrigger > 0) refreshDocuments();
   }, [refreshTrigger, refreshDocuments]);
 
-  const handleDelete = async (documentId: string, fileName: string) => {
+  const handleDelete = async (documentId, fileName) => {
     setPendingDelete({ id: documentId, name: fileName });
   };
 
@@ -120,13 +112,13 @@ export default function DocumentTable({
     }
   };
 
-  const handleRetry = async (documentId: string) => {
+  const handleRetry = async (documentId) => {
     setRetryingId(documentId);
     try {
       const { retryDocument } = await import("@/services/api.service");
       await retryDocument(documentId);
       await refreshDocuments(true);
-    } catch (err: any) {
+    } catch (err) {
       alert(err.message || "Thử lại thất bại");
     } finally {
       setRetryingId(null);
@@ -134,7 +126,7 @@ export default function DocumentTable({
   };
 
   /* ── Status badge — border-only with pulsing dot ────────── */
-  const getStatusBadge = (status: DocumentResponse["status"], docId: string) => {
+  const getStatusBadge = (status, docId) => {
     switch (status) {
       case "READY":
         return (
@@ -172,7 +164,7 @@ export default function DocumentTable({
   };
 
   /* ── File icon ───────────────────────────────────────────── */
-  const getFileIcon = (fileName: string) => {
+  const getFileIcon = (fileName) => {
     const ext = fileName.split(".").pop()?.toLowerCase();
     const isPdf = ext === "pdf";
     return (
@@ -266,14 +258,14 @@ export default function DocumentTable({
             <tbody>
               {/* Skeleton loading */}
               {loading && documents.length === 0
-                ? Array.from({ length: 5 }).map((_, i) => (
+                ? Array.from({ length: 5 }).map((_, i) =>(
                   <SkeletonRow key={i} index={i} showActions={showActions} />
                 ))
                 : filteredDocuments.length > 0
-                  ? filteredDocuments.map((doc, index) => (
+                  ? filteredDocuments.map((doc, index) =>(
                     <tr
                       key={doc.id}
-                      onClick={() => doc.status === "READY" && router.push(getRedirectUrl(doc.id))}
+                      onClick={() => doc.status === "READY" && navigate(getRedirectUrl(doc.id))}
                       className={`row-enter border-b border-[var(--border-subtle)] last:border-0 transition-colors duration-150 group ${doc.status === "READY"
                           ? "hover:bg-[var(--surface)] cursor-pointer"
                           : "opacity-60 cursor-wait"
@@ -321,21 +313,21 @@ export default function DocumentTable({
                             {doc.status === "READY" && (
                               <>
                                 <Link
-                                  href={getRedirectUrl(doc.id)}
+                                  to={getRedirectUrl(doc.id)}
                                   className="w-7 h-7 sm:w-9 sm:h-9 rounded-lg border border-[hsl(239_68%_58%/0.20)] text-[hsl(239_55%_50%)] hover:bg-[hsl(239_68%_58%)] hover:text-white hover:border-transparent flex items-center justify-center transition-all"
                                   title="Hỏi AI"
                                 >
                                   <span className="material-symbols-outlined icon-thin text-[13px] sm:text-[15px]">chat_bubble</span>
                                 </Link>
                                 <Link
-                                  href={`/quiz/${doc.id}`}
+                                  to={`/quiz/${doc.id}`}
                                   className="w-7 h-7 sm:w-9 sm:h-9 rounded-lg border border-[hsl(38_92%_50%/0.20)] text-[hsl(38_80%_42%)] hover:bg-[hsl(38_92%_50%)] hover:text-white hover:border-transparent flex items-center justify-center transition-all"
                                   title="Luyện tập"
                                 >
                                   <span className="material-symbols-outlined icon-thin text-[13px] sm:text-[15px]">quiz</span>
                                 </Link>
                                 <Link
-                                  href={`/mindmap/${doc.id}`}
+                                  to={`/mindmap/${doc.id}`}
                                   className="w-7 h-7 sm:w-9 sm:h-9 rounded-lg border border-[hsl(173_58%_42%/0.20)] text-[hsl(173_50%_36%)] hover:bg-[hsl(173_58%_42%)] hover:text-white hover:border-transparent flex items-center justify-center transition-all"
                                   title="Sơ đồ tư duy"
                                 >
@@ -367,10 +359,10 @@ export default function DocumentTable({
                           className="min-h-[200px] flex flex-col items-center justify-center text-center cursor-pointer group/empty py-8"
                           onClick={() => {
                             if (window.location.pathname !== "/") {
-                              router.push("/?action=upload");
+                              navigate("/?action=upload");
                             } else {
-                              const fi = document.querySelector('input[type="file"]') as HTMLInputElement;
-                              if (fi) fi.click();
+                              const fi = document.querySelector('input[type="file"]');
+                              if (fi) (fi as HTMLElement)?.click();
                             }
                           }}
                         >

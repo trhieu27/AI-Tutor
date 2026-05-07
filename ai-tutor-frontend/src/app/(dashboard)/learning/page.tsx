@@ -1,5 +1,4 @@
-"use client";
-
+﻿
 import DocumentTable from "@/components/DocumentTable";
 import { LEARNING_PAGE_TEXTS } from "@/constants/texts";
 

@@ -1,37 +1,7 @@
-"use client";
 
 import React, { useState, useCallback, useRef, useEffect, useMemo, forwardRef, useImperativeHandle } from 'react';
 
 // ===== TYPES =====
-interface MindmapNodeData {
-  id: string;
-  text: string;
-  children: MindmapNodeData[];
-  color: string;
-  width?: number;
-  height?: number;
-}
-
-interface StoredNodePos {
-  x: number;
-  y: number;
-  w: number;
-  h: number;
-  text?: string;
-  manual?: boolean; // NEW: Only pin nodes moved by user
-}
-
-interface NodePos extends StoredNodePos {
-  depth: number;
-}
-
-interface InteractiveMindmapProps {
-  chart: string;
-  onCodeChange?: (code: string) => void;
-  documentId?: string;
-  zoom?: number;
-  onUndoRedoStateChange?: (canUndo: boolean, canRedo: boolean) => void;
-}
 
 // ===== CONSTANTS =====
 // ── High-contrast SaaS colour palette ──
@@ -60,7 +30,7 @@ const NODE_H = 60;
 const NODE_MIN_W = 180;
 const PAD = 200;
 
-function wrapText(text: string, width: number, height: number, fontSize: number): string[] {
+function wrapText(text, width, height, fontSize) {
   const charWidth = fontSize * 0.55;
   const padding = 30;
   const availW = width - padding;
@@ -70,7 +40,7 @@ function wrapText(text: string, width: number, height: number, fontSize: number)
   const maxCharsPerLine = Math.max(5, Math.floor(availW / charWidth));
 
   const words = text.split(' ');
-  const lines: string[] = [];
+  const lines = [];
   let currentLine = "";
 
   for (const word of words) {
@@ -102,20 +72,20 @@ function wrapText(text: string, width: number, height: number, fontSize: number)
 }
 
 // ===== PARSER =====
-function extractText(raw: string): string {
+function extractText(raw) {
   let t = raw.trim();
   t = t.replace(/^\(\((.+)\)\)$/, '$1').replace(/^\((.+)\)$/, '$1').replace(/^\[(.+)\]$/, '$1').replace(/^\{\{(.+)\}\}$/, '$1');
   return t;
 }
-function getIndent(line: string): number { const m = line.match(/^(\s*)/); return m ? m[1].length : 0; }
+function getIndent(line) { const m = line.match(/^(\s*)/); return m ? m[1].length : 0; }
 
-function estW(text: string): number {
+function estW(text) {
   const safeText = text || "";
   const textW = safeText.length * 16;
   return Math.max(NODE_MIN_W + 60, textW + 140);
 }
 
-function parseMermaid(code: string): MindmapNodeData | null {
+function parseMermaid(code) {
   const lines = code.split('\n').filter(l => l.trim().length > 0);
   let start = -1;
   for (let i = 0; i < lines.length; i++) {
@@ -123,14 +93,14 @@ function parseMermaid(code: string): MindmapNodeData | null {
   }
   if (start === -1 || start >= lines.length) return null;
 
-  const stack: { node: MindmapNodeData; indent: number; depth: number; path: string }[] = [];
-  let root: MindmapNodeData | null = null;
+  const stack = [];
+  let root = null;
   let localNid = 0;
-  const usedIds = new Set<string>();
+  const usedIds = new Set();
   // Track how many times a name has appeared under a specific parent path to create stable index-based IDs
-  const pathNameCounts = new Map<string, number>();
+  const pathNameCounts = new Map();
 
-  const ensureUnique = (baseId: string): string => {
+  const ensureUnique = (baseId) => {
     const count = pathNameCounts.get(baseId) || 0;
     pathNameCounts.set(baseId, count + 1);
     return count === 0 ? baseId : `${baseId}-${count}`;
@@ -145,8 +115,8 @@ function parseMermaid(code: string): MindmapNodeData | null {
     let id = `node-${++localNid}`;
     let text = raw;
     let color = '';
-    let width: number | undefined = undefined;
-    let height: number | undefined = undefined;
+    let width = undefined;
+    let height = undefined;
 
     // Extract metadata — supports both hex (#abc) and hsl(h s% l%) color formats
     const colorMatch = raw.match(/:::color-(hsl\([^)]+\)|#?[a-fA-F0-9]{3,6})/);
@@ -167,7 +137,7 @@ function parseMermaid(code: string): MindmapNodeData | null {
       .trim();
 
     // 2. Extract ID and Content with Hyper-Robust Recursive Cleanup
-    // 2a. Strip ID prefix if polymorphic (id((text)) -> ((text)))
+    // 2a. Strip ID prefix if polymorphic (id((text)) -((text)))
     let contentOnly = cleanText.replace(/^[a-zA-Z0-9_-]+\s*(?=[\(\[\{])/, '');
 
     // 2b. Identify ID if present for structural purposes
@@ -199,7 +169,7 @@ function parseMermaid(code: string): MindmapNodeData | null {
     // 2d. Final Aggressive Boundary Purge (Safety for asymmetrical markers)
     text = finalizedText.replace(/^[\(\[\{]+/, '').replace(/[\)\]\}]+$/, '').trim();
 
-    // ID Assignment: Preserve explicit IDs from mermaid code, only generate for missing ones
+    // ID Assignment explicit IDs from mermaid code, only generate for missing ones
     const hasExplicitId = idExtractMatch && idExtractMatch[1];
     if (hasExplicitId) {
       // The mermaid code had an explicit ID (e.g., u-abc123 or n-some-slug)
@@ -226,7 +196,7 @@ function parseMermaid(code: string): MindmapNodeData | null {
       text = stack.length === 0 ? 'Chủ đề chính' : 'Nhánh mới';
     }
 
-    const newNode: MindmapNodeData = { id, text, children: [], color, width, height };
+    const newNode = { id, text, children: [], color, width, height };
 
     while (stack.length > 0 && stack[stack.length - 1].indent >= indent) {
       stack.pop();
@@ -257,9 +227,9 @@ function parseMermaid(code: string): MindmapNodeData | null {
   return root;
 }
 
-function toMermaid(root: MindmapNodeData): string {
+function toMermaid(root) {
   let r = 'mindmap\n';
-  function w(n: MindmapNodeData, d: number) {
+  function w(n, d) {
     if (!n) return;
     const safeText = (!n.text || n.text === 'undefined') ? (d === 1 ? 'Chủ đề chính' : 'Nhánh mới') : n.text;
     const shape = d === 1 ? `((${safeText}))` : `(${safeText})`;
@@ -278,13 +248,13 @@ function toMermaid(root: MindmapNodeData): string {
 }
 
 // ===== TREE OPS =====
-function updateNode(root: MindmapNodeData, id: string, upd: Partial<MindmapNodeData>): MindmapNodeData {
+function updateNode(root, id, upd) {
   if (root.id === id) return { ...root, ...upd };
   const children = Array.isArray(root.children) ? root.children : [];
   return { ...root, children: children.map(c => updateNode(c, id, upd)) };
 }
 
-function addChild(root: MindmapNodeData, pid: string, depth: number): MindmapNodeData {
+function addChild(root, pid, depth) {
   const children = Array.isArray(root.children) ? root.children : [];
   if (root.id === pid) {
     const id = `u-${Math.random().toString(36).substr(2, 9)}`;
@@ -300,7 +270,7 @@ function addChild(root: MindmapNodeData, pid: string, depth: number): MindmapNod
   }
   return { ...root, children: children.map(c => addChild(c, pid, depth + 1)) };
 }
-function removeNode(root: MindmapNodeData, id: string): MindmapNodeData {
+function removeNode(root, id) {
   const children = Array.isArray(root.children) ? root.children : [];
   return {
     ...root,
@@ -309,24 +279,24 @@ function removeNode(root: MindmapNodeData, id: string): MindmapNodeData {
       .map(c => removeNode(c, id))
   };
 }
-function findDepth(root: MindmapNodeData, id: string, d = 0): number {
+function findDepth(root, id, d = 0) {
   if (root.id === id) return d;
   const children = Array.isArray(root.children) ? root.children : [];
   for (const c of children) { const r = findDepth(c, id, d + 1); if (r >= 0) return r; }
   return -1;
 }
-function flattenTree(node: MindmapNodeData, depth = 0): { id: string; text: string; depth: number; color: string; width?: number; height?: number }[] {
-  const r: { id: string; text: string; depth: number; color: string; width?: number; height?: number }[] = [{ id: node.id, text: node.text, depth, color: node.color, width: node.width, height: node.height }];
+function flattenTree(node, depth = 0) {
+  const r = [{ id: node.id, text: node.text, depth, color: node.color, width: node.width, height: node.height }];
   const children = Array.isArray(node.children) ? node.children : [];
   children.forEach(c => r.push(...flattenTree(c, depth + 1))); return r;
 }
-function findNode(root: MindmapNodeData, id: string): MindmapNodeData | null {
+function findNode(root, id) {
   if (root.id === id) return root;
   const children = Array.isArray(root.children) ? root.children : [];
   for (const c of children) { const r = findNode(c, id); if (r) return r; }
   return null;
 }
-function getDescendantIds(node: MindmapNodeData): string[] {
+function getDescendantIds(node) {
   const ids = [node.id];
   const children = Array.isArray(node.children) ? node.children : [];
   children.forEach(c => ids.push(...getDescendantIds(c)));
@@ -334,7 +304,7 @@ function getDescendantIds(node: MindmapNodeData): string[] {
 }
 
 // ===== LAYOUT =====
-function stH(node: MindmapNodeData, sizeMap?: Record<string, { w?: number, h?: number }>): number {
+function stH(node, sizeMap) {
   const children = Array.isArray(node.children) ? node.children : [];
   const h = sizeMap?.[node.id]?.h || node.height || NODE_H;
   if (children.length === 0) return h;
@@ -345,21 +315,21 @@ function stH(node: MindmapNodeData, sizeMap?: Record<string, { w?: number, h?: n
 
 // Pure auto-layout: computes ideal positions based only on tree structure and node sizes.
 // Does NOT use stored x/y positions — that's mergeRecursive's job.
-function computePositions(root: MindmapNodeData, sizeMap?: Record<string, { w?: number, h?: number }>): Record<string, NodePos> {
-  const pos: Record<string, NodePos> = {};
+function computePositions(root, sizeMap) {
+  const pos = {};
   if (!root) return pos;
   const rw = sizeMap?.[root.id]?.w || root.width || Math.max(estW(root.text || ""), 140);
   const rh = sizeMap?.[root.id]?.h || root.height || Math.max(NODE_H, 80);
   pos[root.id] = { x: 0, y: 0, w: rw, h: rh, depth: 0, text: root.text };
 
-  const left: MindmapNodeData[] = [];
-  const right: MindmapNodeData[] = [];
+  const left = [];
+  const right = [];
   root.children.forEach((c, i) => {
     if (i % 2 === 0) right.push(c);
     else left.push(c);
   });
 
-  function layoutSide(parent: MindmapNodeData, children: MindmapNodeData[], dir: 1 | -1, depth: number) {
+  function layoutSide(parent, children, dir, depth) {
     const pp = pos[parent.id];
     const px = pp.x, py = pp.y;
 
@@ -396,7 +366,7 @@ function computePositions(root: MindmapNodeData, sizeMap?: Record<string, { w?: 
 // ===== SVG CONNECTION PATH — Smooth organic cubic Bézier =====
 // Uses asymmetric tension: high initial tangent pull (0.55) + subtle
 // mid-curve S-bend that avoids the robotic 90-degree elbow feel.
-function bezierPath(x1: number, y1: number, x2: number, y2: number): string {
+function bezierPath(x1, y1, x2, y2) {
   const dx = x2 - x1;
   const dy = y2 - y1;
   const absDx = Math.abs(dx);
@@ -419,26 +389,22 @@ function bezierPath(x1: number, y1: number, x2: number, y2: number): string {
 }
 
 // ===== COMPONENT =====
-const InteractiveMindmap = forwardRef(({ chart, onCodeChange, documentId, zoom = 1, onUndoRedoStateChange }: InteractiveMindmapProps, ref) => {
-  const [tree, setTree] = useState<MindmapNodeData | null>(null);
-  const [positions, setPositions] = useState<Record<string, NodePos>>({});
+const InteractiveMindmap = forwardRef<any, any>(({ chart, onCodeChange, documentId, zoom = 1, onUndoRedoStateChange }, ref) => {
+  const [tree, setTree] = useState(null);
+  const [positions, setPositions] = useState({});
   const lastExportedRef = useRef('');
-  const lastStructureRef = useRef<string>('');
+  const lastStructureRef = useRef('');
   const storageKey = `mindmap-pos-${documentId || 'default'}`;
 
   // UI state
-  const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
+  const [selectedNodeId, setSelectedNodeId] = useState(null);
   const [menuPos, setMenuPos] = useState({ x: 0, y: 0 });
-  const [menuMode, setMenuMode] = useState<'main' | 'color' | 'edit' | null>(null);
+  const [menuMode, setMenuMode] = useState(null);
   const [editText, setEditText] = useState('');
 
   // Unified Undo/Redo tracking both Structure (Code) and Layout (Positions)
-  interface HistorySnapshot {
-    code: string;
-    positions: Record<string, NodePos>;
-  }
-  const historyRef = useRef<HistorySnapshot[]>([]);
-  const redoRef = useRef<HistorySnapshot[]>([]);
+  const historyRef = useRef([]);
+  const redoRef = useRef([]);
   const MAX_HISTORY = 40;
 
   const updateUndoRedoState = useCallback(() => {
@@ -453,7 +419,7 @@ const InteractiveMindmap = forwardRef(({ chart, onCodeChange, documentId, zoom =
   const pushSnapshot = useCallback(() => {
     if (!treeRef.current) return;
     const currentCode = toMermaid(treeRef.current);
-    const snapshot: HistorySnapshot = {
+    const snapshot = {
       code: currentCode,
       positions: { ...posRef.current }
     };
@@ -472,8 +438,8 @@ const InteractiveMindmap = forwardRef(({ chart, onCodeChange, documentId, zoom =
   const undo = useCallback(() => {
     if (historyRef.current.length === 0) return;
 
-    const currentSnapshot: HistorySnapshot = {
-      code: toMermaid(treeRef.current!),
+    const currentSnapshot = {
+      code: toMermaid(treeRef.current),
       positions: { ...posRef.current }
     };
 
@@ -498,8 +464,8 @@ const InteractiveMindmap = forwardRef(({ chart, onCodeChange, documentId, zoom =
   const redo = useCallback(() => {
     if (redoRef.current.length === 0) return;
 
-    const currentSnapshot: HistorySnapshot = {
-      code: toMermaid(treeRef.current!),
+    const currentSnapshot = {
+      code: toMermaid(treeRef.current),
       positions: { ...posRef.current }
     };
 
@@ -522,12 +488,12 @@ const InteractiveMindmap = forwardRef(({ chart, onCodeChange, documentId, zoom =
   }, [onCodeChange, updateUndoRedoState]);
 
   // EXPORT ENGINE
-  useImperativeHandle(ref, () => ({
+  useImperativeHandle(ref, () =>({
     downloadImage: () => {
       if (!svgRef.current || Object.keys(positions).length === 0) return;
 
       const svg = svgRef.current;
-      const posValues = Object.values(positions);
+      const posValues = (Object.values(positions) as any[]);
       const minX = Math.min(...posValues.map(p => p.x - p.w / 2)) - 100;
       const maxX = Math.max(...posValues.map(p => p.x + p.w / 2)) + 100;
       const minY = Math.min(...posValues.map(p => p.y - p.h / 2)) - 100;
@@ -536,7 +502,7 @@ const InteractiveMindmap = forwardRef(({ chart, onCodeChange, documentId, zoom =
       const exportW = maxX - minX;
       const exportH = maxY - minY;
 
-      const clone = svg.cloneNode(true) as SVGSVGElement;
+      const clone = svg.cloneNode(true);
 
       // Clean up UI elements from clone
       clone.querySelectorAll('.resize-handles').forEach(el => el.remove());
@@ -594,8 +560,8 @@ const InteractiveMindmap = forwardRef(({ chart, onCodeChange, documentId, zoom =
     undo: undo,
     redo: redo,
     pushSnapshot: pushSnapshot,
-    getPositions: () => ({ ...posRef.current }),
-    forceSetPositions: (newPos: Record<string, NodePos>) => {
+    getPositions: () =>({ ...posRef.current }),
+    forceSetPositions: (newPos) => {
       setPositions(newPos);
       posRef.current = newPos;
       isManualChangeRef.current = true;
@@ -603,27 +569,12 @@ const InteractiveMindmap = forwardRef(({ chart, onCodeChange, documentId, zoom =
   }));
 
   // Refs for listeners
-  const svgRef = useRef<SVGSVGElement>(null);
-  const treeRef = useRef<MindmapNodeData | null>(null);
-  const posRef = useRef<Record<string, NodePos>>({});
-  const dragRef = useRef<{
-    nodeId: string;
-    descendantIds: string[];
-    startX: number; startY: number;
-    snapPositions: Record<string, NodePos>;
-    startCTM: DOMMatrix | null;
-  } | null>(null);
+  const svgRef = useRef(null);
+  const treeRef = useRef(null);
+  const posRef = useRef({});
+  const dragRef = useRef(null);
 
-  const resizeRef = useRef<{
-    nodeId: string;
-    direction: 'tl' | 'tr' | 'bl' | 'br';
-    startX: number;
-    startY: number;
-    startW: number;
-    startH: number;
-    startCTM: DOMMatrix | null;
-    startSnapshot: Record<string, NodePos>;
-  } | null>(null);
+  const resizeRef = useRef(null);
 
   useEffect(() => { treeRef.current = tree; }, [tree]);
   useEffect(() => { posRef.current = positions; }, [positions]);
@@ -631,10 +582,10 @@ const InteractiveMindmap = forwardRef(({ chart, onCodeChange, documentId, zoom =
   const isManualChangeRef = useRef(false);
 
 
-  // AUTO-PERSIST LAYOUT: Save every change instantly
+  // AUTO-PERSIST LAYOUT every change instantly
   useEffect(() => {
     if (Object.keys(positions).length > 0 && lastStructureRef.current) {
-      const layoutWithMeta: Record<string, any> = {};
+      const layoutWithMeta = {};
       const flat = tree ? flattenTree(tree) : [];
 
       Object.keys(positions).forEach(id => {
@@ -669,9 +620,9 @@ const InteractiveMindmap = forwardRef(({ chart, onCodeChange, documentId, zoom =
     lastStructureRef.current = currentStructure;
 
     setPositions(prev => {
-      // Step 1: Load stored layout data
+      // Step 1 stored layout data
       const savedData = localStorage.getItem(storageKey);
-      let stored: Record<string, StoredNodePos> = {};
+      let stored = {};
       if (savedData) {
         try {
           const parsed = JSON.parse(savedData);
@@ -679,7 +630,7 @@ const InteractiveMindmap = forwardRef(({ chart, onCodeChange, documentId, zoom =
         } catch (e) { }
       }
 
-      // Step 2: Merge with current in-memory state (handles rapid successive adds)
+      // Step 2 with current in-memory state (handles rapid successive adds)
       const treeIds = new Set(flattenTree(tree).map(n => n.id));
       Object.keys(prev).forEach(id => {
         if (treeIds.has(id) && prev[id]) {
@@ -687,26 +638,26 @@ const InteractiveMindmap = forwardRef(({ chart, onCodeChange, documentId, zoom =
         }
       });
 
-      // Step 3: Build a size-only map for auto-layout computation
-      const sizeMap: Record<string, { w?: number, h?: number }> = {};
+      // Step 3 a size-only map for auto-layout computation
+      const sizeMap = {};
       Object.keys(stored).forEach(id => {
         if (stored[id]) {
           sizeMap[id] = { w: stored[id].w, h: stored[id].h };
         }
       });
 
-      // Step 4: Compute pure auto-layout (determines ideal positions based on tree structure)
+      // Step 4 pure auto-layout (determines ideal positions based on tree structure)
       const autoLayout = computePositions(tree, sizeMap);
 
-      // Step 5: Merge auto-layout with stored positions + recursive parent shifts
-      const final: Record<string, NodePos> = {};
+      // Step 5 auto-layout with stored positions + recursive parent shifts
+      const final = {};
 
-      const mergeRecursive = (node: MindmapNodeData, parentShift = { dx: 0, dy: 0 }) => {
+      const mergeRecursive = (node, parentShift = { dx: 0, dy: 0 }) => {
         const auto = autoLayout[node.id];
         if (!auto) return;
 
         let currentShift = { ...parentShift };
-        let finalPos: NodePos;
+        let finalPos;
 
         const saved = stored[node.id];
         if (saved && typeof saved.x === 'number' && typeof saved.y === 'number') {
@@ -720,8 +671,7 @@ const InteractiveMindmap = forwardRef(({ chart, onCodeChange, documentId, zoom =
             text: saved.text || node.text,
           };
           // Update shift for children: how much does THIS manual pos differ from its IDEAL auto pos?
-          currentShift = {
-            dx: finalPos.x - auto.x,
+          currentShift = { dx: finalPos.x - auto.x,
             dy: finalPos.y - auto.y
           };
         } else {
@@ -742,10 +692,10 @@ const InteractiveMindmap = forwardRef(({ chart, onCodeChange, documentId, zoom =
 
       const flat = tree ? flattenTree(tree) : [];
 
-      // Step 6: Immediate persistence — save to localStorage right now
+      // Step 6 persistence — save to localStorage right now
       // We merge with 'stored' to preserve positions of nodes that might be 
       // temporarily missing from the tree (due to Undo/Redo or structural edits).
-      const layoutToSave: Record<string, any> = { ...stored };
+      const layoutToSave = { ...stored };
       Object.keys(final).forEach(id => {
         const n = flat.find(n => n.id === id);
         layoutToSave[id] = { ...final[id], text: n?.text || layoutToSave[id]?.text || '' };
@@ -762,14 +712,14 @@ const InteractiveMindmap = forwardRef(({ chart, onCodeChange, documentId, zoom =
   }, [tree, storageKey]);
 
   // Shared update wrapper that handles both full tree replacement and partial node updates
-  const applyUpdate = useCallback((target: MindmapNodeData | string, updates?: Partial<MindmapNodeData>, skipHistory = false) => {
+  const applyUpdate = useCallback((target, updates = null, skipHistory = false) => {
     if (!tree) return;
 
     if (!skipHistory) {
       pushSnapshot();
     }
 
-    let newTree: MindmapNodeData;
+    let newTree;
     if (typeof target === 'string') {
       newTree = JSON.parse(JSON.stringify(tree));
       const node = findNode(newTree, target);
@@ -787,7 +737,7 @@ const InteractiveMindmap = forwardRef(({ chart, onCodeChange, documentId, zoom =
   }, [tree, onCodeChange, pushSnapshot]);
 
   // === DRAG HANDLERS ===
-  const toSvgCoords = useCallback((clientX: number, clientY: number) => {
+  const toSvgCoords = useCallback((clientX, clientY) => {
     if (!svgRef.current) return { x: 0, y: 0 };
     const ctm = svgRef.current.getScreenCTM();
     if (!ctm) return { x: 0, y: 0 };
@@ -797,7 +747,7 @@ const InteractiveMindmap = forwardRef(({ chart, onCodeChange, documentId, zoom =
     return { x: svgPt.x, y: svgPt.y };
   }, []);
 
-  const handleNodeMouseDown = useCallback((e: React.MouseEvent, nodeId: string) => {
+  const handleNodeMouseDown = useCallback((e, nodeId) => {
     if (e.button !== 0) return;
 
     // Stop propagation to prevent page-level canvas drag or UI toggle
@@ -827,7 +777,7 @@ const InteractiveMindmap = forwardRef(({ chart, onCodeChange, documentId, zoom =
   }, [toSvgCoords]);
 
   // Touch equivalent of handleNodeMouseDown
-  const handleNodeTouchStart = useCallback((e: React.TouchEvent, nodeId: string) => {
+  const handleNodeTouchStart = useCallback((e, nodeId) => {
     if (e.touches.length !== 1) return;
     e.stopPropagation();
     // Don't preventDefault here to allow scrolling until we confirm it's a drag
@@ -848,7 +798,7 @@ const InteractiveMindmap = forwardRef(({ chart, onCodeChange, documentId, zoom =
     document.body.classList.add('select-none');
   }, [toSvgCoords]);
 
-  const handleResizeMouseDown = useCallback((e: React.MouseEvent, nodeId: string, dir: 'tl' | 'tr' | 'bl' | 'br') => {
+  const handleResizeMouseDown = useCallback((e, nodeId, dir: 'tl' | 'tr' | 'bl' | 'br') => {
     e.stopPropagation();
     e.preventDefault();
     if (!treeRef.current) return;
@@ -874,7 +824,7 @@ const InteractiveMindmap = forwardRef(({ chart, onCodeChange, documentId, zoom =
   }, [toSvgCoords]);
 
   useEffect(() => {
-    const onMouseMove = (e: MouseEvent) => {
+    const onMouseMove = (e) => {
       const rs = resizeRef.current;
       if (rs && rs.startCTM) {
         const ctm = rs.startCTM;
@@ -890,7 +840,7 @@ const InteractiveMindmap = forwardRef(({ chart, onCodeChange, documentId, zoom =
         if (rs.direction.includes('b')) nh = Math.max(60, rs.startH + dy * 2);
         if (rs.direction.includes('t')) nh = Math.max(60, rs.startH - dy * 2);
 
-        // Performance FIX: Update ONLY the local positions state during mouse move
+        // Performance FIX ONLY the local positions state during mouse move
         // This avoids heavy JSON stringify/parse on every frame
         setPositions(prev => {
           const updated = { ...prev, [rs.nodeId]: { ...prev[rs.nodeId], w: nw, h: nh } };
@@ -930,9 +880,9 @@ const InteractiveMindmap = forwardRef(({ chart, onCodeChange, documentId, zoom =
       }
       setPositions(nextPos);
       posRef.current = nextPos;
-      isManualChangeRef.current = true; // MARK AS MANUAL
+      isManualChangeRef.current = true; // MARK
     };
-    const onMouseUp = (e: MouseEvent) => {
+    const onMouseUp = (e) => {
       isManualChangeRef.current = true;
 
       // 1. Handle Resize Completion
@@ -941,8 +891,8 @@ const InteractiveMindmap = forwardRef(({ chart, onCodeChange, documentId, zoom =
         const finalPos = posRef.current[rs.nodeId];
 
         // Push pre-resize state to history
-        const snapshot: HistorySnapshot = {
-          code: toMermaid(treeRef.current!),
+        const snapshot = {
+          code: toMermaid(treeRef.current),
           positions: rs.startSnapshot
         };
         historyRef.current = [...historyRef.current.slice(-(MAX_HISTORY - 1)), snapshot];
@@ -971,8 +921,8 @@ const InteractiveMindmap = forwardRef(({ chart, onCodeChange, documentId, zoom =
 
       // If actually dragged (not just a click), push to undo history
       if (dx > 5 || dy > 5) {
-        const snapshot: HistorySnapshot = {
-          code: toMermaid(treeRef.current!),
+        const snapshot = {
+          code: toMermaid(treeRef.current),
           positions: ds.snapPositions
         };
         historyRef.current = [...historyRef.current.slice(-(MAX_HISTORY - 1)), snapshot];
@@ -998,7 +948,7 @@ const InteractiveMindmap = forwardRef(({ chart, onCodeChange, documentId, zoom =
       document.body.classList.remove('select-none');
     };
 
-    const onTouchMove = (e: TouchEvent) => {
+    const onTouchMove = (e) => {
       if (!dragRef.current && !resizeRef.current) return;
       if (e.touches.length !== 1) return;
       e.preventDefault();
@@ -1020,7 +970,7 @@ const InteractiveMindmap = forwardRef(({ chart, onCodeChange, documentId, zoom =
         isManualChangeRef.current = true;
       }
     };
-    const onTouchEnd = (e: TouchEvent) => {
+    const onTouchEnd = (e) => {
       const ds = dragRef.current;
       if (!ds && !resizeRef.current) return;
       if (ds) {
@@ -1030,7 +980,7 @@ const InteractiveMindmap = forwardRef(({ chart, onCodeChange, documentId, zoom =
         const dy = Math.abs(svgPt.y - ds.startY);
         // Push undo snapshot if actually dragged
         if (dx > 5 || dy > 5) {
-          const snapshot = { code: toMermaid(treeRef.current!), positions: ds.snapPositions };
+          const snapshot = { code: toMermaid(treeRef.current), positions: ds.snapPositions };
           historyRef.current = [...historyRef.current.slice(-(40 - 1)), snapshot];
           redoRef.current = [];
           updateUndoRedoState();
@@ -1072,8 +1022,8 @@ const InteractiveMindmap = forwardRef(({ chart, onCodeChange, documentId, zoom =
   }, [selectedNodeId]);
 
   // === ACTIONS ===
-  const doAddChild = () => { if (tree && selectedNodeId) applyUpdate(addChild(tree, selectedNodeId, findDepth(tree, selectedNodeId))); };
-  const doDelete = () => { if (tree && selectedNodeId && selectedNodeId !== tree.id) applyUpdate(removeNode(tree, selectedNodeId)); };
+  const doAddChild = () => { if (tree && selectedNodeId) applyUpdate(addChild(tree, selectedNodeId, findDepth(tree, selectedNodeId)), null); };
+  const doDelete = () => { if (tree && selectedNodeId && selectedNodeId !== tree.id) applyUpdate(removeNode(tree, selectedNodeId), null); };
   const doStartEdit = () => {
     const flat = tree ? flattenTree(tree) : [];
     const n = flat.find(n => n.id === selectedNodeId);
@@ -1081,19 +1031,19 @@ const InteractiveMindmap = forwardRef(({ chart, onCodeChange, documentId, zoom =
   };
   const doCommitEdit = () => {
     if (tree && selectedNodeId && editText.trim()) {
-      applyUpdate(updateNode(tree, selectedNodeId, { text: editText.trim() }));
+      applyUpdate(updateNode(tree, selectedNodeId, { text: editText.trim() }), null);
     }
     setMenuMode(null);
     setSelectedNodeId(null);
   };
-  const doColorChange = (c: string) => { if (tree && selectedNodeId) applyUpdate(updateNode(tree, selectedNodeId, { color: c })); };
+  const doColorChange = (c) => { if (tree && selectedNodeId) applyUpdate(updateNode(tree, selectedNodeId, { color: c }), null); };
 
   // === COMPUTE VIEW ===
   const viewBox = useMemo(() => {
     const ids = Object.keys(positions);
     if (!ids.length) return { minX: -500, minY: -400, w: 1000, h: 800 };
 
-    // Fixed: Stabilize viewBox calculation to allow root/overall movement to be perceptible
+    // Fixed viewBox calculation to allow root/overall movement to be perceptible
     let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
     for (const id of ids) {
       const p = positions[id];
@@ -1118,8 +1068,8 @@ const InteractiveMindmap = forwardRef(({ chart, onCodeChange, documentId, zoom =
   // Connections from tree + positions
   const connections = useMemo(() => {
     if (!tree) return [];
-    const conns: { parentId: string; childId: string; depth: number }[] = [];
-    function walk(node: MindmapNodeData, depth: number) {
+    const conns = [];
+    function walk(node, depth) {
       if (!node.children || !Array.isArray(node.children)) return;
       for (const c of node.children) {
         conns.push({ parentId: node.id, childId: c.id, depth });
@@ -1162,10 +1112,10 @@ const InteractiveMindmap = forwardRef(({ chart, onCodeChange, documentId, zoom =
         {/* Gradient defs */}
         <defs>
           {connections.map(c => {
-            const pn = findNode(tree!, c.parentId);
-            const cn = findNode(tree!, c.childId);
+            const pn = findNode(tree, c.parentId);
+            const cn = findNode(tree, c.childId);
             if (!pn || !cn) return null;
-            // Fixed: Use userSpaceOnUse to prevent gradients from disappearing on horizontal/vertical lines
+            // Fixed userSpaceOnUse to prevent gradients from disappearing on horizontal/vertical lines
             const gid = `g-${c.parentId}-${c.childId}`.replace(/[^a-zA-Z0-9-]/g, '_');
             const pp = positions[c.parentId];
             const cp = positions[c.childId];
@@ -1290,7 +1240,7 @@ const InteractiveMindmap = forwardRef(({ chart, onCodeChange, documentId, zoom =
                 className="pointer-events-none"
               />
 
-              {/* Text: Multi-line, refined typography */}
+              {/* Text-line, refined typography */}
               <text
                 x={p.x} y={p.y}
                 textAnchor="middle" dominantBaseline="central"
@@ -1306,7 +1256,7 @@ const InteractiveMindmap = forwardRef(({ chart, onCodeChange, documentId, zoom =
                   const lineHeight = fSize * 1.35;
                   const totalH = lines.length * lineHeight;
                   const firstLineY = -(totalH / 2) + (lineHeight / 2);
-                  return lines.map((line, i) => (
+                  return lines.map((line, i) =>(
                     <tspan key={i} x={p.x} dy={i === 0 ? firstLineY : lineHeight}>{line}</tspan>
                   ));
                 })()}
@@ -1319,16 +1269,16 @@ const InteractiveMindmap = forwardRef(({ chart, onCodeChange, documentId, zoom =
                 return (
                   <g className="resize-handles" stroke="hsl(239 68% 68%)" strokeWidth={2} fill="none" strokeLinecap="round">
                     {/* Top Left */}
-                    <path d={`M ${p.x - p.w / 2 - off} ${p.y - p.h / 2 - off + len} V ${p.y - p.h / 2 - off} H ${p.x - p.w / 2 - off + len}`} stroke="transparent" strokeWidth={24} cursor="nwse-resize" onMouseDown={e => handleResizeMouseDown(e, n.id, 'tl' as any)} />
+                    <path d={`M ${p.x - p.w / 2 - off} ${p.y - p.h / 2 - off + len} V ${p.y - p.h / 2 - off} H ${p.x - p.w / 2 - off + len}`} stroke="transparent" strokeWidth={24} cursor="nwse-resize" onMouseDown={e => handleResizeMouseDown(e, n.id, 'tl')} />
                     <path d={`M ${p.x - p.w / 2 - off} ${p.y - p.h / 2 - off + len} V ${p.y - p.h / 2 - off} H ${p.x - p.w / 2 - off + len}`} pointerEvents="none" />
                     {/* Top Right */}
-                    <path d={`M ${p.x + p.w / 2 + off - len} ${p.y - p.h / 2 - off} H ${p.x + p.w / 2 + off} V ${p.y - p.h / 2 - off + len}`} stroke="transparent" strokeWidth={24} cursor="nesw-resize" onMouseDown={e => handleResizeMouseDown(e, n.id, 'tr' as any)} />
+                    <path d={`M ${p.x + p.w / 2 + off - len} ${p.y - p.h / 2 - off} H ${p.x + p.w / 2 + off} V ${p.y - p.h / 2 - off + len}`} stroke="transparent" strokeWidth={24} cursor="nesw-resize" onMouseDown={e => handleResizeMouseDown(e, n.id, 'tr')} />
                     <path d={`M ${p.x + p.w / 2 + off - len} ${p.y - p.h / 2 - off} H ${p.x + p.w / 2 + off} V ${p.y - p.h / 2 - off + len}`} pointerEvents="none" />
                     {/* Bottom Left */}
-                    <path d={`M ${p.x - p.w / 2 - off} ${p.y + p.h / 2 + off - len} V ${p.y + p.h / 2 + off} H ${p.x - p.w / 2 - off + len}`} stroke="transparent" strokeWidth={24} cursor="nesw-resize" onMouseDown={e => handleResizeMouseDown(e, n.id, 'bl' as any)} />
+                    <path d={`M ${p.x - p.w / 2 - off} ${p.y + p.h / 2 + off - len} V ${p.y + p.h / 2 + off} H ${p.x - p.w / 2 - off + len}`} stroke="transparent" strokeWidth={24} cursor="nesw-resize" onMouseDown={e => handleResizeMouseDown(e, n.id, 'bl')} />
                     <path d={`M ${p.x - p.w / 2 - off} ${p.y + p.h / 2 + off - len} V ${p.y + p.h / 2 + off} H ${p.x - p.w / 2 - off + len}`} pointerEvents="none" />
                     {/* Bottom Right */}
-                    <path d={`M ${p.x + p.w / 2 + off - len} ${p.y + p.h / 2 + off} H ${p.x + p.w / 2 + off} V ${p.y + p.h / 2 + off - len}`} stroke="transparent" strokeWidth={24} cursor="nwse-resize" onMouseDown={e => handleResizeMouseDown(e, n.id, 'br' as any)} />
+                    <path d={`M ${p.x + p.w / 2 + off - len} ${p.y + p.h / 2 + off} H ${p.x + p.w / 2 + off} V ${p.y + p.h / 2 + off - len}`} stroke="transparent" strokeWidth={24} cursor="nwse-resize" onMouseDown={e => handleResizeMouseDown(e, n.id, 'br')} />
                     <path d={`M ${p.x + p.w / 2 + off - len} ${p.y + p.h / 2 + off} H ${p.x + p.w / 2 + off} V ${p.y + p.h / 2 + off - len}`} pointerEvents="none" />
                   </g>
                 );
@@ -1344,7 +1294,7 @@ const InteractiveMindmap = forwardRef(({ chart, onCodeChange, documentId, zoom =
         const node = flat.find(n => n.id === selectedNodeId);
         if (!node) return null;
         const isRoot = node.depth === 0;
-        const menuBaseStyle: React.CSSProperties = {
+        const menuBaseStyle = {
           left: menuPos.x,
           top: menuPos.y,
           transform: `translate(-50%, calc(-100% - 14px)) scale(${Math.sqrt(1 / zoom)})`,
@@ -1396,7 +1346,7 @@ const InteractiveMindmap = forwardRef(({ chart, onCodeChange, documentId, zoom =
                 <div className="rounded-2xl shadow-[0_24px_48px_hsl(222_47%_4%/0.14),0_4px_12px_hsl(222_47%_4%/0.08)] border border-[var(--border-color)] bg-[var(--card-bg)] backdrop-blur-2xl p-4">
                   <p className="text-[10px] font-bold text-[var(--muted-light)] uppercase tracking-[0.12em] mb-3 px-1">Màu nhánh</p>
                   <div className="grid grid-cols-6 gap-2">
-                    {NODE_COLORS.map(c => (
+                    {NODE_COLORS.map(c =>(
                       <button
                         key={c.value}
                         onClick={e => { e.stopPropagation(); doColorChange(c.value); }}

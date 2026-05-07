@@ -1,16 +1,12 @@
-"use client";
-
-import Link from 'next/link';
+﻿import { Link, useNavigate } from 'react-router-dom';
 import { useState, useEffect, useRef } from 'react';
-import { useRouter } from 'next/navigation';
 import { AUTH_TEXTS } from '@/constants/texts';
 import AuthBranding from '@/components/AuthBranding';
 import { authService } from '@/services/auth.service';
 
-type ForgotStep = 'email' | 'otp' | 'reset' | 'success';
 
 export default function ForgotPasswordPage() {
-  const [step, setStep] = useState<ForgotStep>('email');
+  const [step, setStep] = useState('email');
   const [email, setEmail] = useState('');
   const [lastEmailSent, setLastEmailSent] = useState('');
   const [otpValues, setOtpValues] = useState(['', '', '', '', '', '']);
@@ -27,8 +23,8 @@ export default function ForgotPasswordPage() {
   const [failedOtpAttempts, setFailedOtpAttempts] = useState(0);
   const [otpLockoutTimer, setOtpLockoutTimer] = useState(0);
 
-  const router = useRouter();
-  const inputRefs = useRef<(HTMLInputElement | null)[]>([]);
+  const navigate = useNavigate();
+  const inputRefs = useRef([]);
 
 
   // Load OTP lockout state from localStorage
@@ -58,7 +54,7 @@ export default function ForgotPasswordPage() {
   // General Timers (Resend & OTP Lockout)
   useEffect(() => {
     const timer = setInterval(() => {
-      setResendTimer((prev) => (prev > 0 ? prev - 1 : 0));
+      setResendTimer((prev) =>(prev > 0 ? prev - 1 : 0));
       setOtpLockoutTimer((prev) => {
         const checkEmail = (step === 'email') ? email : lastEmailSent;
         if (prev <= 1 && prev > 0) {
@@ -72,7 +68,7 @@ export default function ForgotPasswordPage() {
     return () => clearInterval(timer);
   }, [email, lastEmailSent, step]);
 
-  const handleOtpChange = (index: number, value: string) => {
+  const handleOtpChange = (index, value) => {
     if (!/^\d*$/.test(value)) return;
     const newOtp = [...otpValues];
     newOtp[index] = value.slice(-1);
@@ -82,13 +78,13 @@ export default function ForgotPasswordPage() {
     }
   };
 
-  const handleKeyDown = (index: number, e: React.KeyboardEvent) => {
+  const handleKeyDown = (index, e) => {
     if (e.key === 'Backspace' && !otpValues[index] && index > 0) {
       inputRefs.current[index - 1]?.focus();
     }
   };
 
-  const handleSendOtp = async (e?: React.FormEvent) => {
+  const handleSendOtp = async (e = null) => {
     if (e) e.preventDefault();
 
     if (resendTimer > 0 && email === lastEmailSent) {
@@ -104,14 +100,14 @@ export default function ForgotPasswordPage() {
       setOtpValues(['', '', '', '', '', '']); // Xóa sạch mã cũ
       setStep('otp');
       setResendTimer(60);
-    } catch (err: any) {
+    } catch (err) {
       setError(err.message || "Email không tồn tại trong hệ thống.");
     } finally {
       setIsLoading(false);
     }
   };
 
-  const handleVerifyOtp = async (e: React.FormEvent) => {
+  const handleVerifyOtp = async (e) => {
     e.preventDefault();
     if (otpLockoutTimer > 0) return;
 
@@ -127,7 +123,7 @@ export default function ForgotPasswordPage() {
       await authService.verifyOtp(lastEmailSent, otpString);
       setStep('reset');
       localStorage.removeItem(`otp_lockout_${lastEmailSent}`);
-    } catch (err: any) {
+    } catch (err) {
       const newAttempts = failedOtpAttempts + 1;
       setFailedOtpAttempts(newAttempts);
 
@@ -143,7 +139,7 @@ export default function ForgotPasswordPage() {
     }
   };
 
-  const handleResetPassword = async (e: React.FormEvent) => {
+  const handleResetPassword = async (e) => {
     e.preventDefault();
     setError('');
     if (newPassword !== confirmPassword) {
@@ -154,7 +150,7 @@ export default function ForgotPasswordPage() {
     try {
       await authService.resetPassword(lastEmailSent, otpValues.join(''), newPassword);
       setStep('success');
-    } catch (err: any) {
+    } catch (err) {
       setError(err.message || "Không thể đổi mật khẩu.");
     } finally {
       setIsLoading(false);
@@ -196,7 +192,7 @@ export default function ForgotPasswordPage() {
         return (
           <form onSubmit={handleVerifyOtp} className="flex flex-col gap-10 w-full animate-in fade-in slide-in-from-right-4 duration-500">
             <div className="flex justify-between gap-4">
-              {otpValues.map((digit, idx) => (
+              {otpValues.map((digit, idx) =>(
                 <input
                   key={idx}
                   ref={(el) => { inputRefs.current[idx] = el; }}
@@ -291,7 +287,7 @@ export default function ForgotPasswordPage() {
             <h2 className="text-2xl font-bold text-slate-800 mb-4 tracking-tight">Cập nhật thành công</h2>
             <p className="text-slate-400 text-[16px] mb-10 leading-relaxed font-medium">Mật khẩu của bạn đã được thay đổi. Hãy đăng nhập lại để tiếp tục học tập.</p>
             <button
-              onClick={() => router.replace('/login')}
+              onClick={() => navigate('/login', { replace: true })}
               className="w-full bg-slate-800 text-white font-semibold rounded-2xl py-4.5 hover:bg-slate-900 transition-all shadow-lg active:scale-[0.99]"
             >
               Đăng nhập ngay
@@ -321,7 +317,7 @@ export default function ForgotPasswordPage() {
         {step !== 'success' && (
           <button
             type="button"
-            onClick={() => step === 'email' ? router.replace('/login') : setStep('email')}
+            onClick={() => step === 'email' ? navigate('/login', { replace: true }) : setStep('email')}
             className="absolute top-10 left-8 sm:left-12 flex items-center gap-2 text-slate-400 hover:text-[#0052ff] transition-all font-semibold text-sm group"
           >
             <span className="material-symbols-outlined text-[20px] group-hover:-translate-x-1 transition-transform">arrow_back</span>

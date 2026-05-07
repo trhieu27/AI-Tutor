@@ -1,4 +1,4 @@
-export enum DocumentStatus {
+﻿export enum DocumentStatus {
   UPLOADING = 'UPLOADING',
   PROCESSING = 'PROCESSING', // Extracting text & generating embeddings
   READY = 'READY',           // RAG is ready
@@ -14,17 +14,17 @@ export enum FileType {
 
 export class UploadedDocument {
   constructor(
-    public id: string,
-    public ownerId: string,
-    public fileName: string,
-    public fileSizeMB: number,
+    public id,
+    public ownerId,
+    public fileName,
+    public fileSizeMB,
     public status: DocumentStatus,
-    public uploadedAt: Date = new Date(),
-    public pageCount: number = 0,
-    public url?: string // Cdn or Storage URL
+    public uploadedAt = new Date(),
+    public pageCount = 0,
+    public url // Cdn or Storage URL
   ) { }
 
-  getFileType(): FileType {
+  getFileType() {
     const ext = this.fileName.split('.').pop()?.toLowerCase();
     switch (ext) {
       case 'pdf': return FileType.PDF;
@@ -34,7 +34,7 @@ export class UploadedDocument {
     }
   }
 
-  isReadyForRAG(): boolean {
+  isReadyForRAG() {
     return this.status === DocumentStatus.READY;
   }
 }

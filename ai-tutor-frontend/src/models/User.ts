@@ -5,13 +5,13 @@ export enum UserRole {
 
 export abstract class User {
   constructor(
-    public id: string,
-    public full_name: string,
-    public email: string,
+    public id,
+    public full_name,
+    public email,
     public role: UserRole,
-    public isPro: boolean = false,
-    public student_id?: string,
-    public createdAt: Date = new Date()
+    public isPro = false,
+    public student_id = null,
+    public createdAt = new Date()
   ) { }
 
   getProfile() {
@@ -28,19 +28,19 @@ export abstract class User {
 
 export class Student extends User {
   constructor(
-    id: string,
-    full_name: string,
-    email: string,
-    student_id?: string,
-    public isPro_flag: boolean = false,
-    public totalDocumentsUploaded: number = 0,
-    public totalQuizzesTaken: number = 0,
-    public lastActive: Date = new Date()
+    id,
+    full_name,
+    email,
+    student_id,
+    public isPro_flag = false,
+    public totalDocumentsUploaded = 0,
+    public totalQuizzesTaken = 0,
+    public lastActive = new Date()
   ) {
     super(id, full_name, email, UserRole.STUDENT, isPro_flag, student_id);
   }
 
-  getDashboardUrl(): string {
+  getDashboardUrl() {
     return '/';
   }
 
@@ -54,19 +54,19 @@ export class Student extends User {
 
 export class Admin extends User {
   constructor(
-    id: string,
-    full_name: string,
-    email: string,
-    public permissions: string[] = ['ALL']
+    id,
+    full_name,
+    email,
+    public permissions = ['ALL']
   ) {
-    super(id, full_name, email, UserRole.ADMIN);
+    super(id, full_name, email, UserRole.ADMIN, false, null);
   }
 
-  getDashboardUrl(): string {
+  getDashboardUrl() {
     return '/admin';
   }
 
-  hasPermission(permission: string): boolean {
+  hasPermission(permission) {
     return this.permissions.includes('ALL') || this.permissions.includes(permission);
   }
 }

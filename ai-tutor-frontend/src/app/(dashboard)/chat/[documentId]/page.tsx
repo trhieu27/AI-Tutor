@@ -1,7 +1,5 @@
-"use client";
-
 import { useState, useEffect, useRef } from "react";
-import { useParams, useRouter, useSearchParams } from "next/navigation";
+import { useParams, useNavigate, useSearchParams } from "react-router-dom";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import MermaidChart from "@/components/MermaidChart";
@@ -21,24 +19,20 @@ import {
   deleteChatSession,
   fetchQuota,
   QuotaError,
-  DocumentResponse,
-  ChatSessionResponse,
-  MessageResponse,
-  QuotaResponse,
 } from "@/services/api.service";
 import { CHAT_TEXTS, QUOTA_TEXTS } from "@/constants/texts";
 
 export default function ChatPage() {
   const params = useParams();
-  const router = useRouter();
-  const searchParams = useSearchParams();
-  const documentId = params.documentId as string;
+  const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const documentId = params.documentId;
   const initialAction = searchParams.get("action");
 
-  const [docData, setDocData] = useState<DocumentResponse | null>(null);
-  const [sessions, setSessions] = useState<ChatSessionResponse[]>([]);
-  const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
-  const [messages, setMessages] = useState<MessageResponse[]>([]);
+  const [docData, setDocData] = useState(null);
+  const [sessions, setSessions] = useState([]);
+  const [currentSessionId, setCurrentSessionId] = useState(null);
+  const [messages, setMessages] = useState([]);
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
@@ -48,23 +42,23 @@ export default function ChatPage() {
     if (window.innerWidth >= 1024) setIsSidebarOpen(true);
   }, []);
 
-  const [summary, setSummary] = useState<string | null>(null);
+  const [summary, setSummary] = useState(null);
   const [isSummaryLoading, setIsSummaryLoading] = useState(false);
-  const [quiz, setQuiz] = useState<any[] | null>(null);
+  const [quiz, setQuiz] = useState(null);
   const [isQuizLoading, setIsQuizLoading] = useState(false);
-  const [studyQuestions, setStudyQuestions] = useState<string[] | null>(null);
+  const [studyQuestions, setStudyQuestions] = useState(null);
   const [isStudyQuestionsLoading, setIsStudyQuestionsLoading] = useState(false);
-  const [showModal, setShowModal] = useState<"summary" | "quiz" | "mindmap" | "questions" | null>(null);
-  const [quota, setQuota] = useState<QuotaResponse | null>(null);
-  const [streamingMsgId, setStreamingMsgId] = useState<string | null>(null);
-  const [quotaExceeded, setQuotaExceeded] = useState<"chat" | "ai" | null>(null);
+  const [showModal, setShowModal] = useState(null);
+  const [quota, setQuota] = useState(null);
+  const [streamingMsgId, setStreamingMsgId] = useState(null);
+  const [quotaExceeded, setQuotaExceeded] = useState(null);
 
-  const messagesEndRef = useRef<HTMLDivElement>(null);
-  const abortControllerRef = useRef<AbortController | null>(null);
-  const typewriterIntervalRef = useRef<NodeJS.Timeout | null>(null);
-  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const messagesEndRef = useRef(null);
+  const abortControllerRef = useRef(null);
+  const typewriterIntervalRef = useRef(null);
+  const textareaRef = useRef(null);
 
-  const messagesContainerRef = useRef<HTMLDivElement>(null);
+  const messagesContainerRef = useRef(null);
   const [isAtBottom, setIsAtBottom] = useState(true);
 
   const scrollToBottom = (force = false) => {
@@ -113,7 +107,7 @@ export default function ChatPage() {
     };
   }, [documentId]);
 
-  const loadSession = async (sessionId: string) => {
+  const loadSession = async (sessionId) => {
     try {
       const detail = await fetchSessionDetail(sessionId);
       setMessages(detail.messages);
@@ -125,10 +119,10 @@ export default function ChatPage() {
     }
   };
 
-  const handleSendMessage = async (e?: React.FormEvent) => {
+  const handleSendMessage = async (e = null) => {
     e?.preventDefault();
     if (!input.trim() || isLoading) return;
-    const userMessage: MessageResponse = {
+    const userMessage = {
       id: Date.now().toString(),
       session_id: currentSessionId || "",
       role: "user",
@@ -174,7 +168,7 @@ export default function ChatPage() {
         }
       }, 10);
       typewriterIntervalRef.current = interval;
-    } catch (error: any) {
+    } catch (error) {
       if (error.name === "AbortError") return;
       if (error instanceof QuotaError) {
         // Remove the user's unanswered message & show upgrade modal
@@ -238,7 +232,7 @@ export default function ChatPage() {
     if (window.innerWidth < 1024) setIsSidebarOpen(false);
   };
 
-  const handleDeleteSession = async (sessionId: string) => {
+  const handleDeleteSession = async (sessionId) => {
     if (!confirm("Xóa phiên thảo luận này?")) return;
     try {
       await deleteChatSession(sessionId);
@@ -251,11 +245,11 @@ export default function ChatPage() {
     setIsSummaryLoading(true); setShowModal("summary"); setSummary("");
     const controller = new AbortController(); abortControllerRef.current = controller;
     try {
-      await fetchDocumentSummaryStream(documentId, (chunk) => { setIsSummaryLoading(false); setSummary((prev) => (prev || "") + chunk); }, controller.signal);
-    } catch (error: any) {
+      await fetchDocumentSummaryStream(documentId, (chunk) => { setIsSummaryLoading(false); setSummary((prev) =>(prev || "") + chunk); }, controller.signal);
+    } catch (error) {
       if (error.name === "AbortError") return;
       if (error instanceof QuotaError) { setQuotaExceeded("ai"); setShowModal(null); return; }
-      setSummary((prev) => (prev || "") + "\n\n_Dừng tóm tắt._");
+      setSummary((prev) =>(prev || "") + "\n\n_Dừng tóm tắt._");
     } finally { setIsSummaryLoading(false); abortControllerRef.current = null; }
   };
 
@@ -275,7 +269,7 @@ export default function ChatPage() {
         const data = await fetchDocumentQuiz(documentId, controller.signal);
         setQuiz(data);
       }
-    } catch (error: any) {
+    } catch (error) {
       if (error.name === "AbortError") return;
       if (error instanceof QuotaError) { setQuotaExceeded("ai"); setShowModal(null); return; }
     } finally { setIsQuizLoading(false); abortControllerRef.current = null; }
@@ -292,7 +286,7 @@ export default function ChatPage() {
         const lines = accumulated.split("\n").map((l) => l.replace(/^\d+\.\s*/, "").trim()).filter((l) => l.length > 5);
         setStudyQuestions(lines);
       }, controller.signal);
-    } catch (error: any) {
+    } catch (error) {
       if (error.name === "AbortError") return;
       if (error instanceof QuotaError) { setQuotaExceeded("ai"); setShowModal(null); return; }
     } finally { setIsStudyQuestionsLoading(false); abortControllerRef.current = null; }
@@ -332,7 +326,7 @@ export default function ChatPage() {
             <div className="py-14 text-center">
               <p className="text-[12px] text-[#9CA3AF] dark:text-white/20 font-medium">{CHAT_TEXTS.SIDEBAR.NO_SESSIONS}</p>
             </div>
-          ) : sessions.map((session) => (
+          ) : sessions.map((session) =>(
             <div key={session.id} className="relative group">
               <button onClick={() => loadSession(session.id)}
                 className={`w-full text-left px-3 py-2.5 rounded-lg transition-all ${currentSessionId === session.id
@@ -385,9 +379,9 @@ export default function ChatPage() {
           <div className="flex items-center gap-0.5 shrink-0">
             {[
               { onClick: handleGetSummary, icon: "summarize", label: CHAT_TEXTS.HEADER.ACTIONS.SUMMARY },
-              { onClick: () => router.push(`/quiz/${documentId}`), icon: "quiz", label: CHAT_TEXTS.HEADER.ACTIONS.QUIZ },
-              { onClick: () => router.push(`/mindmap/${documentId}`), icon: "hub", label: CHAT_TEXTS.HEADER.ACTIONS.MINDMAP },
-            ].map((btn, i) => (
+              { onClick: () => navigate(`/quiz/${documentId}`), icon: "quiz", label: CHAT_TEXTS.HEADER.ACTIONS.QUIZ },
+              { onClick: () => navigate(`/mindmap/${documentId}`), icon: "hub", label: CHAT_TEXTS.HEADER.ACTIONS.MINDMAP },
+            ].map((btn, i) =>(
               <button key={i} onClick={btn.onClick} title={btn.label}
                 className="flex items-center gap-1.5 px-2.5 h-8 rounded-lg text-[12px] font-medium text-[var(--muted)] hover:bg-[var(--surface)] hover:text-[var(--foreground)] transition-all">
                 <span className="material-symbols-outlined text-[16px]">{btn.icon}</span>
@@ -417,7 +411,7 @@ export default function ChatPage() {
                   </p>
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 w-full max-w-lg">
-                  {CHAT_TEXTS.WELCOME.SUGGESTIONS.map((q) => (
+                  {CHAT_TEXTS.WELCOME.SUGGESTIONS.map((q) =>(
                     <button key={q} onClick={() => setInput(q)}
                       className="p-3 text-left text-[12px] text-[#374151] dark:text-white/55 bg-[#F9FAFB] dark:bg-white/[0.03] border border-[#E5E7EB] dark:border-white/[0.07] rounded-xl hover:border-[#9CA3AF] dark:hover:border-white/20 hover:bg-[#F3F4F6] dark:hover:bg-white/[0.06] hover:-translate-y-0.5 hover:shadow-sm transition-all duration-200 font-medium leading-snug">
                       {q}
@@ -427,7 +421,7 @@ export default function ChatPage() {
               </div>
             ) : (
               <div className="space-y-8 pb-4">
-                {messages.map((msg) => (
+                {messages.map((msg) =>(
                   <div key={msg.id}
                     className={`flex gap-4 animate-in slide-in-from-bottom-2 duration-300 ${msg.role === "user" ? "flex-row-reverse" : ""}`}>
                     {/* Avatar */}
@@ -627,7 +621,7 @@ export default function ChatPage() {
               {showModal === "summary" ? (
                 isSummaryLoading ? (
                   <div className="space-y-3 animate-pulse">
-                    {[100, 88, 95, 76, 91, 83].map((w, i) => (
+                    {[100, 88, 95, 76, 91, 83].map((w, i) =>(
                       <div key={i} className="h-3 bg-[#F3F4F6] dark:bg-white/[0.05] rounded-md" style={{ width: `${w}%` }} />
                     ))}
                   </div>
@@ -643,7 +637,7 @@ export default function ChatPage() {
               ) : showModal === "questions" ? (
                 isStudyQuestionsLoading ? (
                   <div className="space-y-4 animate-pulse">
-                    {[1, 2, 3, 4, 5].map((i) => (
+                    {[1, 2, 3, 4, 5].map((i) =>(
                       <div key={i} className="flex gap-3">
                         <div className="w-5 h-5 rounded-md bg-[#F3F4F6] dark:bg-white/[0.05] shrink-0 mt-0.5" />
                         <div className="flex-1 space-y-2">
@@ -655,7 +649,7 @@ export default function ChatPage() {
                   </div>
                 ) : (
                   <div className="space-y-1.5">
-                    {studyQuestions ? studyQuestions.map((q, idx) => (
+                    {studyQuestions ? studyQuestions.map((q, idx) =>(
                       <div key={idx} className="group flex gap-3 px-3 py-3 rounded-xl hover:bg-[#F9FAFB] dark:hover:bg-white/[0.025] transition-all">
                         <span className="w-5 h-5 rounded-md bg-[#F3F4F6] dark:bg-white/[0.06] text-[#6B7280] dark:text-white/35 flex items-center justify-center text-[10px] font-bold shrink-0 mt-0.5">{idx + 1}</span>
                         <div className="flex-1">
@@ -675,10 +669,10 @@ export default function ChatPage() {
               ) : (
                 isQuizLoading ? (
                   <div className="space-y-5 animate-pulse">
-                    {[1, 2].map((i) => (
+                    {[1, 2].map((i) =>(
                       <div key={i} className="space-y-3 p-4 rounded-xl border border-[#F3F4F6] dark:border-white/[0.06]">
                         <div className="h-3.5 bg-[#F3F4F6] dark:bg-white/[0.05] rounded-md w-full" />
-                        {[78, 72, 82, 68].map((w, j) => (
+                        {[78, 72, 82, 68].map((w, j) =>(
                           <div key={j} className="h-8 bg-[#F3F4F6] dark:bg-white/[0.04] rounded-lg" style={{ width: `${w}%` }} />
                         ))}
                       </div>
@@ -686,14 +680,14 @@ export default function ChatPage() {
                   </div>
                 ) : (
                   <div className="space-y-4">
-                    {quiz ? quiz.map((item, idx) => (
+                    {quiz ? quiz.map((item, idx) =>(
                       <div key={idx} className="p-5 rounded-xl border border-[#E5E7EB] dark:border-white/[0.07] space-y-3">
                         <p className="text-[13px] font-semibold text-[#1F2937] dark:text-white leading-snug">
                           <span className="text-[#9CA3AF] dark:text-white/25 font-medium mr-1">{idx + 1}.</span>
                           {item.question}
                         </p>
                         <div className="space-y-1.5">
-                          {item.options.map((opt: string, optIdx: number) => (
+                          {item.options.map((opt, optIdx) =>(
                             <div key={optIdx} className={`px-4 py-2.5 rounded-lg text-[12.5px] font-medium border ${optIdx === item.correct_index
                                 ? "bg-emerald-50 dark:bg-emerald-500/[0.07] border-emerald-200 dark:border-emerald-500/20 text-emerald-700 dark:text-emerald-400"
                                 : "bg-[#FAFAFA] dark:bg-white/[0.02] border-[#F3F4F6] dark:border-white/[0.05] text-[#6B7280] dark:text-white/35"
@@ -764,7 +758,7 @@ export default function ChatPage() {
             </p>
             <div className="flex flex-col gap-2 mt-6">
               <button
-                onClick={() => { setQuotaExceeded(null); router.push("/settings"); }}
+                onClick={() => { setQuotaExceeded(null); navigate("/settings"); }}
                 className="w-full py-2.5 rounded-xl bg-gradient-to-r from-[hsl(239_68%_58%)] to-[hsl(263_70%_62%)] text-white text-[13px] font-semibold hover:opacity-90 active:scale-[0.98] transition-all shadow-[0_4px_16px_hsl(239_68%_58%/0.3)]"
               >
                 {QUOTA_TEXTS.exceeded.upgradeBtn}

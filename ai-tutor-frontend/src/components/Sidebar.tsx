@@ -1,7 +1,4 @@
-"use client";
-
-import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { Link, useLocation } from 'react-router-dom';
 import { useState, useEffect } from 'react';
 import { SIDEBAR_TEXTS } from '@/constants/texts';
 import { useAuth } from '@/context/AuthContext';
@@ -13,15 +10,9 @@ const navItems = [
   { href: "/mindmap", icon: "hub", label: SIDEBAR_TEXTS.mindmap },
 ];
 
-export default function Sidebar({ onClose }: { onClose?: () => void }) {
-  const pathname = usePathname();
+export default function Sidebar({ onClose }) {
+  const { pathname } = useLocation();
   const { user } = useAuth();
-  const [mounted, setMounted] = useState(false);
-
-  useEffect(() => {
-    setMounted(true);
-  }, []);
-
   const isPro = user?.isPro ?? false;
 
   return (
@@ -29,7 +20,7 @@ export default function Sidebar({ onClose }: { onClose?: () => void }) {
 
       {/* Brand */}
       <div className="h-16 flex items-center justify-between gap-3 px-4 border-b border-[var(--border-color)] shrink-0">
-        <Link href="/" className="flex items-center gap-3 group" onClick={() => onClose?.()}>
+        <Link to="/" className="flex items-center gap-3 group" onClick={() => onClose?.()}>
           <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-[hsl(239_68%_58%)] to-[hsl(263_70%_62%)] flex items-center justify-center text-white shadow-[0_2px_6px_hsl(239_68%_58%/0.20)] group-hover:rotate-6 transition-transform duration-500 shrink-0">
             <span className="material-symbols-outlined icon-thin text-[18px]">auto_awesome</span>
           </div>
@@ -59,7 +50,7 @@ export default function Sidebar({ onClose }: { onClose?: () => void }) {
             return (
               <Link
                 key={item.href}
-                href={item.href}
+                to={item.href}
                 onClick={() => onClose?.()}
                 className={`group flex items-center gap-2.5 px-3 py-2.5 rounded-xl font-medium text-[13px] transition-all duration-150 relative outline-none ${
                   isActive
@@ -87,7 +78,7 @@ export default function Sidebar({ onClose }: { onClose?: () => void }) {
         {/* Footer Links */}
         <div className="mt-auto space-y-0.5 pt-3 border-t border-[var(--border-subtle)]">
           <Link
-            href="/settings"
+            to="/settings"
             onClick={() => onClose?.()}
             className="flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-[var(--muted)] hover:text-[var(--foreground)] hover:bg-[var(--surface)] transition-all text-[13px] font-medium group"
           >
@@ -95,7 +86,7 @@ export default function Sidebar({ onClose }: { onClose?: () => void }) {
             {SIDEBAR_TEXTS.settings}
           </Link>
           <Link
-            href="/help"
+            to="/help"
             onClick={() => onClose?.()}
             className="flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-[var(--muted)] hover:text-[var(--foreground)] hover:bg-[var(--surface)] transition-all text-[13px] font-medium group"
           >
@@ -105,7 +96,7 @@ export default function Sidebar({ onClose }: { onClose?: () => void }) {
         </div>
 
         {/* Pro Card — chỉ hiện khi user CHƯA là Pro */}
-        {mounted && !isPro && (
+        {!isPro && (
           <div className="mt-3 px-0.5">
             <div className="relative overflow-hidden bg-gradient-to-br from-[hsl(239_68%_58%)] to-[hsl(263_70%_55%)] rounded-3xl p-3.5 shadow-[0_2px_8px_hsl(239_68%_58%/0.20)] cursor-pointer transition-all duration-200 hover:opacity-90">
               {/* Noise overlay */}
