@@ -1,16 +1,12 @@
-"use client";
-
+﻿
 import React, { useEffect, useState, useRef } from 'react';
 import mermaid from 'mermaid';
 
-interface MermaidChartProps {
-  chart: string;
-}
 
-const MermaidChart: React.FC<MermaidChartProps> = ({ chart }) => {
-  const [svg, setSvg] = useState<string>('');
+const MermaidChart = ({ chart }) => {
+  const [svg, setSvg] = useState('');
   const [isError, setIsError] = useState(false);
-  const containerRef = useRef<HTMLDivElement>(null);
+  const containerRef = useRef(null);
 
   useEffect(() => {
     const isDark = document.documentElement.classList.contains('dark');

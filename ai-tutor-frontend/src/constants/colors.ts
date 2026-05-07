@@ -1,4 +1,4 @@
-export const APP_COLORS = {
+﻿export const APP_COLORS = {
   primary: '#3b28cc',
   primaryContainer: '#ebe8ff',
   onPrimaryContainer: '#3b28cc',

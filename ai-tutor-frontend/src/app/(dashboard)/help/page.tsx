@@ -1,17 +1,15 @@
-"use client";
 
 import React, { useState, useRef, useEffect, useCallback } from "react";
 import { HELP_PAGE_TEXTS } from "@/constants/texts";
 
 import { authFetch } from "@/services/api.service";
 
-const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8081/api/v1";
+const API = import.meta.env.VITE_API_URL || "http://localhost:8081/api/v1";
 
-type TabId = "faq" | "guide" | "contact";
 
 /* ── Animated collapse ────────────────────────────────────────────────────── */
-function AnimatedCollapse({ open, children }: { open: boolean; children: React.ReactNode }) {
-  const ref = useRef<HTMLDivElement>(null);
+function AnimatedCollapse({ open, children }) {
+  const ref = useRef(null);
   const [height, setHeight] = useState(0);
   useEffect(() => {
     if (ref.current) setHeight(open ? ref.current.scrollHeight : 0);
@@ -24,7 +22,7 @@ function AnimatedCollapse({ open, children }: { open: boolean; children: React.R
 }
 
 /* ── Toast ────────────────────────────────────────────────────────────────── */
-function Toast({ show, message, onClose }: { show: boolean; message: string; onClose: () => void }) {
+function Toast({ show, message, onClose }) {
   useEffect(() => {
     if (show) { const t = setTimeout(onClose, 4000); return () => clearTimeout(t); }
   }, [show, onClose]);
@@ -44,7 +42,7 @@ function Toast({ show, message, onClose }: { show: boolean; message: string; onC
 
 /* ── Data ─────────────────────────────────────────────────────────────────── */
 const T = HELP_PAGE_TEXTS;
-const TABS: { id: TabId; label: string; icon: string }[] = [
+const TABS = [
   { id: "faq",     label: T.tabs.faq,     icon: "quiz" },
   { id: "guide",   label: T.tabs.guide,   icon: "menu_book" },
   { id: "contact", label: T.tabs.contact, icon: "support_agent" },
@@ -54,16 +52,16 @@ const guideSteps = T.guide.steps;
 
 /* ══════════════════════════════════════════════════════════════════════════ */
 export default function HelpPage() {
-  const [activeTab,    setActiveTab]    = useState<TabId>("faq");
-  const [activeFaq,    setActiveFaq]    = useState<number | null>(null);
+  const [activeTab,    setActiveTab]    = useState("faq");
+  const [activeFaq,    setActiveFaq]    = useState(null);
   const [activeGuide,  setActiveGuide]  = useState(0);
   const [searchQuery,  setSearchQuery]  = useState("");
   const [faqCategory,  setFaqCategory]  = useState(T.faq.allCategory);
   const [contactForm,  setContactForm]  = useState({ subject: "", message: "" });
-  const [formErrors,   setFormErrors]   = useState<{ subject?: string; message?: string }>({});
+  const [formErrors, setFormErrors] = useState({ subject: "", message: "" });
   const [showToast,    setShowToast]    = useState(false);
   const [submitting,   setSubmitting]   = useState(false);
-  const [submitError,  setSubmitError]  = useState<string | null>(null);
+  const [submitError,  setSubmitError]  = useState(null);
 
   const faqCategories  = [T.faq.allCategory, ...Array.from(new Set(faqs.map(f => f.category)))];
   const filteredFaqs   = faqs.filter(f => {
@@ -73,12 +71,12 @@ export default function HelpPage() {
   });
 
   const handleSubmit = useCallback(async () => {
-    const errs: typeof formErrors = {};
+    const errs = { subject: "", message: "" };
     if (!contactForm.subject.trim())          errs.subject = T.contact.errors.subjectRequired;
     if (!contactForm.message.trim())          errs.message = T.contact.errors.messageRequired;
     else if (contactForm.message.length < 20) errs.message = T.contact.errors.messageMinLength;
     setFormErrors(errs);
-    if (Object.keys(errs).length) return;
+    if (errs.subject || errs.message) return;
 
     setSubmitting(true);
     setSubmitError(null);
@@ -88,13 +86,13 @@ export default function HelpPage() {
         body: JSON.stringify({ subject: contactForm.subject, message: contactForm.message }),
       });
       if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
+        const data = await res.json().catch(() =>({}));
         throw new Error(data.detail || "Gửi thất bại, vui lòng thử lại");
       }
       setShowToast(true);
       setContactForm({ subject: "", message: "" });
-      setFormErrors({});
-    } catch (e: any) {
+      setFormErrors({ subject: "", message: "" });
+    } catch (e) {
       setSubmitError(e.message);
     } finally {
       setSubmitting(false);
@@ -117,7 +115,7 @@ export default function HelpPage() {
 
         {/* ── Tab bar ─────────────────────────────────────────────────────── */}
         <div className="flex gap-1 p-1 bg-[var(--surface)] rounded-2xl border border-[var(--border-color)]">
-          {TABS.map(tab => (
+          {TABS.map(tab =>(
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
@@ -159,7 +157,7 @@ export default function HelpPage() {
                   )}
                 </div>
                 <div className="flex gap-1.5 flex-wrap">
-                  {faqCategories.map(cat => (
+                  {faqCategories.map(cat =>(
                     <button key={cat} onClick={() => setFaqCategory(cat)}
                       className={`px-3.5 py-2 rounded-xl text-[12px] font-semibold transition-all ${
                         faqCategory === cat
@@ -215,7 +213,7 @@ export default function HelpPage() {
               {/* Step list */}
               <div className="lg:col-span-2 space-y-1.5">
                 <p className="text-[11px] font-semibold text-[var(--muted)] uppercase tracking-wider mb-3">{T.guide.stepsLabel}</p>
-                {guideSteps.map((step, idx) => (
+                {guideSteps.map((step, idx) =>(
                   <button key={idx} onClick={() => setActiveGuide(idx)}
                     className={`w-full flex items-center gap-3 p-3.5 rounded-xl transition-all text-left ${
                       activeGuide === idx
@@ -252,7 +250,7 @@ export default function HelpPage() {
 
                   {/* Progress */}
                   <div className="flex items-center gap-1.5 pt-1">
-                    {guideSteps.map((_, i) => (
+                    {guideSteps.map((_, i) =>(
                       <button key={i} onClick={() => setActiveGuide(i)}
                         className={`h-1.5 rounded-full transition-all duration-300 ${i === activeGuide ? "bg-[hsl(239_68%_58%)] w-8" : i < activeGuide ? "bg-[hsl(239_68%_58%/0.35)] w-3" : "bg-[var(--border-color)] w-3"}`}
                       />
@@ -293,7 +291,7 @@ export default function HelpPage() {
                     </label>
                     <input
                       value={contactForm.subject}
-                      onChange={e => { setContactForm(p => ({ ...p, subject: e.target.value })); if (formErrors.subject) setFormErrors(p => ({ ...p, subject: undefined })); }}
+                      onChange={e => { setContactForm(p =>({ ...p, subject: e.target.value })); if (formErrors.subject) setFormErrors(p =>({ ...p, subject: undefined })); }}
                       placeholder={T.contact.subjectPlaceholder}
                       className={formErrors.subject ? inputErrCls : inputCls}
                     />
@@ -306,7 +304,7 @@ export default function HelpPage() {
                     </label>
                     <textarea
                       value={contactForm.message} rows={5}
-                      onChange={e => { setContactForm(p => ({ ...p, message: e.target.value })); if (formErrors.message) setFormErrors(p => ({ ...p, message: undefined })); }}
+                      onChange={e => { setContactForm(p =>({ ...p, message: e.target.value })); if (formErrors.message) setFormErrors(p =>({ ...p, message: undefined })); }}
                       placeholder={T.contact.messagePlaceholder}
                       className={`${formErrors.message ? inputErrCls : inputCls} resize-none`}
                     />

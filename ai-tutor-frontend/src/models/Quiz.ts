@@ -1,50 +1,50 @@
 export class QuizOption {
   constructor(
-    public id: string,
-    public text: string,
-    public isCorrect: boolean
+    public id,
+    public text,
+    public isCorrect
   ) {}
 }
 
 export class QuizQuestion {
   constructor(
-    public id: string,
-    public content: string,
-    public options: QuizOption[],
-    public explanation?: string, // Explanation for the correct answer
-    public sourcePageOffset?: number // Point back to the document page
+    public id,
+    public content,
+    public options = [],
+    public explanation, // Explanation for the correct answer
+    public sourcePageOffset // Point back to the document page
   ) {}
 
-  getCorrectOption(): QuizOption | undefined {
+  getCorrectOption() {
     return this.options.find(opt => opt.isCorrect);
   }
 }
 
 export class Quiz {
   constructor(
-    public id: string,
-    public documentId: string, // Generated from which document
-    public title: string,
-    public questions: QuizQuestion[],
-    public createdAt: Date = new Date()
+    public id,
+    public documentId, // Generated from which document
+    public title,
+    public questions = [],
+    public createdAt = new Date()
   ) {}
 
-  getTotalQuestions(): number {
+  getTotalQuestions() {
     return this.questions.length;
   }
 }
 
 export class QuizAttempt {
   constructor(
-    public id: string,
-    public quizId: string,
-    public userId: string,
-    public score: number = 0,
-    public answers: { questionId: string; selectedOptionId: string }[] = [],
-    public completedAt: Date = new Date()
+    public id,
+    public quizId,
+    public userId,
+    public score = 0,
+    public answers = [],
+    public completedAt = new Date()
   ) {}
 
-  calculateScore(quiz: Quiz): number {
+  calculateScore(quiz) {
     let correct = 0;
     this.answers.forEach(ans => {
       const question = quiz.questions.find(q => q.id === ans.questionId);

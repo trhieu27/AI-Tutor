@@ -1,23 +1,21 @@
-"use client";
-
-import { useState, useEffect, useCallback, useRef } from "react";
-import { useParams, useRouter } from "next/navigation";
-import { fetchDocument, fetchDocumentMindmap, fetchDocumentMindmapStream, QuotaError, DocumentResponse } from "@/services/api.service";
+﻿import { useState, useEffect, useCallback, useRef } from "react";
+import { useParams, useNavigate } from "react-router-dom";
+import { fetchDocument, fetchDocumentMindmap, fetchDocumentMindmapStream, QuotaError } from "@/services/api.service";
 import InteractiveMindmap from "@/components/InteractiveMindmap";
 import ConfirmDialog from "@/components/ConfirmDialog";
 import { MINDMAP_PAGE_TEXTS, QUOTA_TEXTS } from "@/constants/texts";
 
 export default function InteractiveMindmapPage() {
   const params = useParams();
-  const router = useRouter();
-  const documentId = params.documentId as string;
+  const navigate = useNavigate();
+  const documentId = params.documentId;
   if (!documentId) return null;
 
-  const [docData, setDocData] = useState<DocumentResponse | null>(null);
-  const [mindmapCode, setMindmapCode] = useState<string>("");
-  const mindmapCodeRef = useRef<string>("");
+  const [docData, setDocData] = useState(null);
+  const [mindmapCode, setMindmapCode] = useState("");
+  const mindmapCodeRef = useRef("");
 
-  const updateCode = useCallback((code: string) => {
+  const updateCode = useCallback((code) => {
     setMindmapCode(code);
     setEditableCode(code);
     mindmapCodeRef.current = code;
@@ -27,25 +25,25 @@ export default function InteractiveMindmapPage() {
   const [canRedo, setCanRedo] = useState(false);
   const [showResetConfirm, setShowResetConfirm] = useState(false);
   const isStreamingRef = useRef(false);
-  const abortRef = useRef<AbortController | null>(null);
+  const abortRef = useRef(null);
   const [quotaExceeded, setQuotaExceeded] = useState(false);
 
-  const syncToDB = useCallback(async (code: string) => {
+  const syncToDB = useCallback(async (code) => {
     try {
       const { updateDocumentMindmap } = await import("@/services/api.service");
-      await updateDocumentMindmap(documentId as string, code);
+      await updateDocumentMindmap(documentId, code);
     } catch (err) {
       console.error("Failed to sync mindmap to DB:", err);
     }
   }, [documentId]);
 
-  const handleCodeChange = useCallback((newCode: string) => {
+  const handleCodeChange = useCallback((newCode) => {
     if (newCode === mindmapCode) return;
     updateCode(newCode);
     syncToDB(newCode);
   }, [mindmapCode, updateCode, syncToDB]);
 
-  const handleUndoRedoStateChange = useCallback((canUndo: boolean, canRedo: boolean) => {
+  const handleUndoRedoStateChange = useCallback((canUndo, canRedo) => {
     setCanUndo(canUndo);
     setCanRedo(canRedo);
   }, []);
@@ -74,14 +72,14 @@ export default function InteractiveMindmapPage() {
 
   const [isUIVisible, setIsUIVisible] = useState(true);
   const [hasInteracted, setHasInteracted] = useState(false);
-  const uiTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const uiTimeoutRef = useRef(null);
 
-  const containerRef = useRef<HTMLDivElement>(null);
-  const mindmapRef = useRef<any>(null);
+  const containerRef = useRef(null);
+  const mindmapRef = useRef(null);
 
   // Keyboard shortcuts for UNIFIED undo/redo
   useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
+    const handleKeyDown = (e) => {
       if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
       if ((e.ctrlKey || e.metaKey) && e.key === 'z') { e.preventDefault(); unifiedUndo(); }
       if ((e.ctrlKey || e.metaKey) && e.key === 'y') { e.preventDefault(); unifiedRedo(); }
@@ -105,7 +103,7 @@ export default function InteractiveMindmapPage() {
     }
   }, [documentId]);
 
-  const cleanMermaidCode = (code: string) => {
+  const cleanMermaidCode = (code) => {
     let clean = code.trim();
 
     // Remove markdown code blocks
@@ -124,7 +122,7 @@ export default function InteractiveMindmapPage() {
     return clean.replace(/\n\s*\n/g, '\n');
   };
 
-  const loadData = useCallback(async (force: boolean = false) => {
+  const loadData = useCallback(async (force = false) => {
     // Hủy request cũ nếu đang chạy
     abortRef.current?.abort();
     const controller = new AbortController();
@@ -162,7 +160,7 @@ export default function InteractiveMindmapPage() {
         controller.signal,
         force
       );
-    } catch (error: any) {
+    } catch (error) {
       if (error.name === 'AbortError') return;
       if (!isActive()) return;
       if (error instanceof QuotaError) {
@@ -189,18 +187,18 @@ export default function InteractiveMindmapPage() {
     setIsUIVisible(prev => !prev);
   }, []);
 
-  const handleMouseDown = (e: React.MouseEvent) => {
+  const handleMouseDown = (e) => {
     if (e.button !== 0) return;
     if (e.target instanceof HTMLTextAreaElement || e.target instanceof HTMLButtonElement || e.target instanceof HTMLInputElement) return;
     // Don't start drag if clicking inside the interactive mindmap SVG/nodes
-    const target = e.target as HTMLElement;
+    const target = e.target;
     if (target.closest('.cursor-pointer') || target.closest('[data-mindmap-node]')) return;
     setIsDragging(true);
     if (!hasInteracted) setHasInteracted(true);
     setDragStart({ x: e.clientX - position.x, y: e.clientY - position.y });
   };
 
-  const handleMouseMove = (e: React.MouseEvent) => {
+  const handleMouseMove = (e) => {
     if (!isDragging) return;
     setPosition({ x: e.clientX - dragStart.x, y: e.clientY - dragStart.y });
   };
@@ -211,7 +209,7 @@ export default function InteractiveMindmapPage() {
     localStorage.setItem(`mindmap_view_${documentId}`, JSON.stringify({ zoom, position }));
   };
 
-  const handleWheel = (e: WheelEvent) => {
+  const handleWheel = (e) => {
     e.preventDefault();
     if (!hasInteracted) setHasInteracted(true);
     const delta = e.deltaY > 0 ? -0.05 : 0.05;
@@ -226,12 +224,12 @@ export default function InteractiveMindmapPage() {
     const container = containerRef.current;
     if (!container) return;
 
-    const getTouchDist = (t: TouchList) => {
+    const getTouchDist = (t) => {
       const dx = t[0].clientX - t[1].clientX;
       const dy = t[0].clientY - t[1].clientY;
       return Math.sqrt(dx * dx + dy * dy);
     };
-    const onTouchStart = (e: TouchEvent) => {
+    const onTouchStart = (e) => {
       if (e.touches.length === 2) {
         e.preventDefault();
         touchRef.current.pinchDist = getTouchDist(e.touches);
@@ -240,7 +238,7 @@ export default function InteractiveMindmapPage() {
         touchRef.current.dragging = false;
       } else if (e.touches.length === 1) {
         // Đừng intercept nếu đang chạm vào node hoặc element tương tác
-        const target = e.target as HTMLElement;
+        const target = e.target;
         if (
           target instanceof HTMLButtonElement ||
           target instanceof HTMLInputElement ||
@@ -254,7 +252,7 @@ export default function InteractiveMindmapPage() {
         setHasInteracted(true);
       }
     };
-    const onTouchMove = (e: TouchEvent) => {
+    const onTouchMove = (e) => {
       e.preventDefault();
       if (e.touches.length === 2 && touchRef.current.pinchDist > 0) {
         const newDist = getTouchDist(e.touches);
@@ -264,7 +262,7 @@ export default function InteractiveMindmapPage() {
         const dx = newMidX - touchRef.current.pinchMidX;
         const dy = newMidY - touchRef.current.pinchMidY;
         setZoom(prev => Math.min(Math.max(prev * scale, 0.15), 3));
-        setPosition(prev => ({ x: prev.x + dx, y: prev.y + dy }));
+        setPosition(prev =>({ x: prev.x + dx, y: prev.y + dy }));
         setHasInteracted(true);
         touchRef.current.pinchDist = newDist;
         touchRef.current.pinchMidX = newMidX;
@@ -346,7 +344,7 @@ export default function InteractiveMindmapPage() {
         <header className="bg-[var(--surface-overlay)] backdrop-blur-2xl border border-[var(--border-color)] rounded-[20px] h-13 flex items-center justify-between px-4 shadow-[0_8px_32px_hsl(222_47%_4%/0.08),0_2px_8px_hsl(222_47%_4%/0.04)]">
           <div className="flex items-center gap-2.5">
             <button
-              onClick={() => router.back()}
+              onClick={() => navigate(-1)}
               className="w-8 h-8 flex items-center justify-center rounded-xl bg-[var(--surface)] hover:bg-[var(--card-bg-hover)] text-[var(--foreground)] transition-all active:scale-90"
             >
               <span className="material-symbols-outlined icon-thin text-[16px]">west</span>
@@ -462,13 +460,13 @@ export default function InteractiveMindmapPage() {
               </div>
               <div className="flex gap-3">
                 <button
-                  onClick={() => router.push("/settings")}
+                  onClick={() => navigate("/settings")}
                   className="px-5 py-2 rounded-xl bg-gradient-to-r from-[hsl(239_68%_58%)] to-[hsl(263_70%_62%)] text-white text-[12px] font-bold hover:opacity-90 transition-all active:scale-95 shadow-[0_4px_16px_hsl(239_68%_58%/0.3)]"
                 >
                   {QUOTA_TEXTS.exceeded.upgradeBtn}
                 </button>
                 <button
-                  onClick={() => router.back()}
+                  onClick={() => navigate(-1)}
                   className="px-5 py-2 rounded-xl bg-[var(--surface)] border border-[var(--border-color)] text-[var(--muted)] text-[12px] font-bold hover:bg-[var(--card-bg)] transition-all active:scale-95"
                 >
                   {QUOTA_TEXTS.exceeded.laterBtn}
@@ -499,7 +497,7 @@ export default function InteractiveMindmapPage() {
 
               {/* Jumping dots */}
               <div className="flex items-center gap-1.5">
-                {[0, 1, 2].map((i) => (
+                {[0, 1, 2].map((i) =>(
                   <div
                     key={i}
                     className="w-1.5 h-1.5 rounded-full bg-[hsl(239_68%_58%)] animate-jumping-dot"
@@ -512,7 +510,7 @@ export default function InteractiveMindmapPage() {
             <div className="pointer-events-auto min-w-[1400px] flex items-center justify-center">
               <InteractiveMindmap
                 ref={mindmapRef}
-                documentId={documentId as string}
+                documentId={documentId}
                 chart={mindmapCode}
                 zoom={zoom}
                 onCodeChange={handleCodeChange}
@@ -644,7 +642,7 @@ export default function InteractiveMindmapPage() {
                   Không thể hoàn tác sau khi áp dụng mã thủ công.
                 </p>
                 <div className="flex flex-wrap gap-1.5 pt-1">
-                  {['#Mindmap', '#Mermaid', '#AI_Tutor'].map(tag => (
+                  {['#Mindmap', '#Mermaid', '#AI_Tutor'].map(tag =>(
                     <span
                       key={tag}
                       className="px-2 py-0.5 bg-[hsl(239_68%_58%/0.08)] border border-[hsl(239_68%_58%/0.15)] rounded-full text-[9px] text-[hsl(239_68%_58%)] font-bold tracking-wide"
@@ -657,7 +655,7 @@ export default function InteractiveMindmapPage() {
         </div>
       </aside>
 
-      <style jsx global>{`
+      <style>{`
         @media print {
           header, aside, button, .z-30 { display: none !important; }
           body { background: white !important; }

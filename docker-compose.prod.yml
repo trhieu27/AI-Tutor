@@ -1,6 +1,24 @@
 services:
   # -------------------------------------------------------
-  # Backend FastAPI (production)
+  # ChromaDB — Vector Database cho RAG
+  # -------------------------------------------------------
+  chromadb:
+    image: chromadb/chroma:latest
+    container_name: ai_tutor_chromadb
+    restart: always
+    volumes:
+      - chroma_data:/chroma/chroma
+    networks:
+      - ai_tutor_network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/v1/heartbeat"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
+
+  # -------------------------------------------------------
+  # Backend Node.js (production)
   # -------------------------------------------------------
   backend:
     build:
@@ -12,6 +30,11 @@ services:
       - ./ai-tutor-backend/storage:/app/storage
     env_file:
       - ./ai-tutor-backend/.env
+    environment:
+      - CHROMA_URL=http://chromadb:8000
+    depends_on:
+      chromadb:
+        condition: service_healthy
     networks:
       - ai_tutor_network
     healthcheck:
@@ -22,7 +45,7 @@ services:
       start_period: 40s
 
   # -------------------------------------------------------
-  # Frontend Next.js (production)
+  # Frontend React/Vite (production)
   # -------------------------------------------------------
   frontend:
     build:
@@ -69,3 +92,7 @@ networks:
   ai_tutor_network:
     name: ai_tutor_network
     driver: bridge
+
+volumes:
+  chroma_data:
+    name: ai_tutor_chroma_data

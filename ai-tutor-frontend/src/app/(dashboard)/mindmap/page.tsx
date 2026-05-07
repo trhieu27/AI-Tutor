@@ -1,5 +1,4 @@
-"use client";
-
+﻿
 import DocumentTable from "@/components/DocumentTable";
 import { MINDMAP_LIST_TEXTS } from "@/constants/texts";
 

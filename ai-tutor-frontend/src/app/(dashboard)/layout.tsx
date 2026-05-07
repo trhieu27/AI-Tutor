@@ -1,89 +1,43 @@
-"use client";
+﻿import { useState, useEffect } from 'react';
+import { Outlet, useLocation } from 'react-router-dom';
+import Sidebar from '@/components/Sidebar';
+import Header from '@/components/Header';
+import { UploadProvider } from '@/context/UploadContext';
+import { DocumentProvider } from '@/context/DocumentContext';
+import { NotificationToastProvider } from '@/components/NotificationToast';
 
-import { useState, useEffect } from "react";
-import { usePathname } from "next/navigation";
-import Sidebar from "@/components/Sidebar";
-import Header from "@/components/Header";
-import { UploadProvider } from "@/context/UploadContext";
-import { DocumentProvider } from "@/context/DocumentContext";
-import { AuthGuard } from "@/components/AuthGuard";
-import { NotificationToastProvider } from "@/components/NotificationToast";
-
-export default function DashboardLayout({
-  children,
-}: Readonly<{
-  children: React.ReactNode;
-}>) {
+export default function DashboardLayout() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
-  const pathname = usePathname();
+  const location = useLocation();
 
-  // Auto-đóng sidebar khi navigate sang trang khác trên mobile
-  useEffect(() => {
-    setIsSidebarOpen(false);
-  }, [pathname]);
+  useEffect(() => { setIsSidebarOpen(false); }, [location.pathname]);
 
   return (
-    <AuthGuard>
-      <NotificationToastProvider>
-        <UploadProvider>
-          <DocumentProvider>
+    <NotificationToastProvider>
+      <UploadProvider>
+        <DocumentProvider>
           <div className="flex w-full bg-[var(--background)] text-[var(--foreground)] h-svh overflow-hidden selection:bg-indigo-500/30 transition-colors duration-500">
-            {/* Mobile Sidebar Overlay */}
             {isSidebarOpen && (
-              <div
-                className="fixed inset-0 bg-black/80 backdrop-blur-md z-[55] lg:hidden"
-                onClick={() => setIsSidebarOpen(false)}
-              />
+              <div className="fixed inset-0 bg-black/80 backdrop-blur-md z-[55] lg:hidden" onClick={() => setIsSidebarOpen(false)} />
             )}
-
-            {/* Sidebar - Fixed for desktop */}
             <div className={`fixed inset-y-0 left-0 z-[60] w-64 transform ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'} lg:translate-x-0 transition-transform duration-300 ease-in-out`}>
               <Sidebar onClose={() => setIsSidebarOpen(false)} />
             </div>
-
-            {/* Main Content Area */}
             <div className="flex-1 flex flex-col min-w-0 h-full relative bg-[var(--background)] lg:pl-64">
-              {/* Organic Background Mesh */}
               <div className="fixed inset-0 z-0 opacity-0 dark:opacity-30 pointer-events-none transition-opacity duration-500">
-                <div className="absolute top-[-10%] right-[-10%] w-[40%] h-[40%] bg-indigo-600/20 blur-[150px] rounded-full"></div>
-                <div className="absolute bottom-[-10%] left-[-10%] w-[40%] h-[40%] bg-purple-600/20 blur-[150px] rounded-full"></div>
+                <div className="absolute top-[-10%] right-[-10%] w-[40%] h-[40%] bg-indigo-600/20 blur-[150px] rounded-full" />
+                <div className="absolute bottom-[-10%] left-[-10%] w-[40%] h-[40%] bg-purple-600/20 blur-[150px] rounded-full" />
               </div>
-
               <div className="shrink-0">
                 <Header onMenuClick={() => setIsSidebarOpen(true)} />
               </div>
-
-              <main
-                className="flex-1 overflow-y-auto relative w-full"
-                style={{ overscrollBehaviorY: 'none' }}
-              >
-                {children}
+              <main className="flex-1 overflow-y-auto relative w-full" style={{ overscrollBehaviorY: 'none' }}>
+                <Outlet />
               </main>
             </div>
-
-            <style jsx global>{`
-              .custom-scrollbar::-webkit-scrollbar {
-                width: 6px;
-                height: 6px;
-              }
-              .custom-scrollbar::-webkit-scrollbar-track {
-                background: transparent;
-              }
-              .custom-scrollbar::-webkit-scrollbar-thumb {
-                background: rgba(148, 163, 184, 0.3);
-                border-radius: 10px;
-              }
-              .dark .custom-scrollbar::-webkit-scrollbar-thumb {
-                background: rgba(255, 255, 255, 0.05);
-              }
-              .custom-scrollbar::-webkit-scrollbar-thumb:hover {
-                background: rgba(99, 102, 241, 0.3);
-              }
-            `}</style>
           </div>
         </DocumentProvider>
-        </UploadProvider>
-      </NotificationToastProvider>
-    </AuthGuard>
+      </UploadProvider>
+    </NotificationToastProvider>
   );
 }

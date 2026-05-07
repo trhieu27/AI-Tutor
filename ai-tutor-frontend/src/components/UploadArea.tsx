@@ -1,20 +1,16 @@
-"use client";
-
+﻿
 import { useState, useRef } from "react";
 import { useUpload } from "@/context/UploadContext";
 import { UPLOAD_AREA_TEXTS } from "@/constants/texts";
 
-interface UploadAreaProps {
-  onUploadSuccess?: () => void;
-}
 
-export default function UploadArea({ onUploadSuccess }: UploadAreaProps) {
+export default function UploadArea({ onUploadSuccess }) {
   const { queue, addToQueue, removeFromQueue, isAnyUploading } = useUpload();
   const [isDragging, setIsDragging] = useState(false);
   const [error, setError] = useState("");
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  const fileInputRef = useRef(null);
 
-  const processFiles = async (files: FileList | null) => {
+  const processFiles = async (files) => {
     if (!files || files.length === 0) return;
     const allowedTypes = ["application/pdf", "application/vnd.openxmlformats-officedocument.wordprocessingml.document"];
     let hasInvalid = false;
@@ -26,7 +22,7 @@ export default function UploadArea({ onUploadSuccess }: UploadAreaProps) {
     if (onUploadSuccess) onUploadSuccess();
   };
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileChange = (e) => {
     processFiles(e.target.files);
     if (fileInputRef.current) fileInputRef.current.value = "";
   };
@@ -75,7 +71,7 @@ export default function UploadArea({ onUploadSuccess }: UploadAreaProps) {
 
           {/* Format chips */}
           <div className="flex gap-2">
-            {['PDF', 'DOCX'].map(f => (
+            {['PDF', 'DOCX'].map(f =>(
               <span key={f} className="px-2.5 py-1 bg-[var(--card-bg)] border border-[var(--border-color)] rounded-full text-[10px] font-bold text-[var(--muted)] tracking-wide">
                 {f}
               </span>
@@ -96,7 +92,7 @@ export default function UploadArea({ onUploadSuccess }: UploadAreaProps) {
       {/* Queue */}
       {queue.length > 0 && (
         <div className="space-y-2 max-h-[240px] overflow-y-auto pr-1 custom-scrollbar shrink-0">
-          {queue.map((item) => (
+          {queue.map((item) =>(
             <div
               key={item.id}
               className="group/item bg-[var(--card-bg)] p-3.5 rounded-xl border border-[var(--border-color)] flex items-center gap-3 transition-colors duration-200"

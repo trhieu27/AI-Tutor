@@ -1,4 +1,3 @@
-"use client";
 
 /**
  * NotificationToast — floating popup notification
@@ -9,22 +8,10 @@
  */
 
 import { useEffect, useState, useCallback, createContext, useContext, useRef } from "react";
-import { WsNotification } from "@/hooks/useNotifications";
-
-// ── Types ─────────────────────────────────────────────────────────────────────
-
-interface Toast extends WsNotification {
-  toastId: string;
-  createdAt: number;
-}
-
-interface ToastContextType {
-  addToast: (n: WsNotification) => void;
-}
 
 // ── Context ───────────────────────────────────────────────────────────────────
 
-const ToastContext = createContext<ToastContextType>({ addToast: () => {} });
+const ToastContext = createContext({ addToast: (_n) => {} });
 
 export function useToast() {
   return useContext(ToastContext);
@@ -56,15 +43,15 @@ const typeConfig = {
     bar: "bg-[var(--muted)]",
     border: "border-[var(--border-color)]",
   },
-} as const;
+};
 
-function ToastItem({ toast, onDismiss }: { toast: Toast; onDismiss: (id: string) => void }) {
+function ToastItem({ toast, onDismiss }) {
   const [visible, setVisible] = useState(false);
   const [progress, setProgress] = useState(100);
   const startRef = useRef(Date.now());
-  const rafRef = useRef<number>(0);
+  const rafRef = useRef(0);
 
-  const cfg = typeConfig[toast.type as keyof typeof typeConfig] ?? typeConfig.system;
+  const cfg = typeConfig[toast.type] ?? typeConfig.system;
 
   // Slide-in
   useEffect(() => {
@@ -145,16 +132,16 @@ function ToastItem({ toast, onDismiss }: { toast: Toast; onDismiss: (id: string)
 
 // ── Provider + Container ──────────────────────────────────────────────────────
 
-export function NotificationToastProvider({ children }: { children: React.ReactNode }) {
-  const [toasts, setToasts] = useState<Toast[]>([]);
+export function NotificationToastProvider({ children }) {
+  const [toasts, setToasts] = useState([]);
   const counterRef = useRef(0);
 
-  const addToast = useCallback((n: WsNotification) => {
+  const addToast = useCallback((n) => {
     const toastId = `toast-${++counterRef.current}`;
     setToasts(prev => [...prev, { ...n, toastId, createdAt: Date.now() }]);
   }, []);
 
-  const dismissToast = useCallback((id: string) => {
+  const dismissToast = useCallback((id) => {
     setToasts(prev => prev.filter(t => t.toastId !== id));
   }, []);
 
@@ -168,7 +155,7 @@ export function NotificationToastProvider({ children }: { children: React.ReactN
         aria-live="polite"
         aria-label="Thông báo"
       >
-        {toasts.map(toast => (
+        {toasts.map(toast =>(
           <div key={toast.toastId} className="pointer-events-auto">
             <ToastItem toast={toast} onDismiss={dismissToast} />
           </div>

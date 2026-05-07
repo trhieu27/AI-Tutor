@@ -1,289 +1,241 @@
-"use client";
-
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { useAuth } from '@/context/AuthContext';
-import { useNotifications, WsNotification } from '@/hooks/useNotifications';
+import { useNotifications } from '@/hooks/useNotifications';
 import { useToast } from '@/components/NotificationToast';
 import { HEADER_TEXTS } from '@/constants/texts';
+import {
+  fetchNotifications,
+  markAllNotificationsRead,
+  clearAllNotifications,
+} from '@/services/api.service';
 
-interface HeaderProps {
-  onMenuClick: () => void;
-}
-
-export default function Header({ onMenuClick }: HeaderProps) {
+export default function Header({ onMenuClick }) {
   const { user, logout, isInitialLoading, accessToken } = useAuth();
   const [mounted, setMounted] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
   const [showUserMenu, setShowUserMenu] = useState(false);
-  const notificationRef = useRef<HTMLDivElement>(null);
-  const userMenuRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    setMounted(true);
-  }, [user, isInitialLoading]);
-
-  // ── Notification types & helpers ──────────────────────────────────────────────────────
-  interface NotificationItem {
-    id: string;        // UUID từ backend
-    type: string;
-    title: string;
-    message: string;
-    is_read: boolean;
-    metadata: Record<string, unknown>;
-    created_at: string;  // ISO string
-  }
-
-  const formatRelativeTime = (iso: string): string => {
-    const diff = Math.floor((Date.now() - new Date(iso).getTime()) / 1000);
-    if (diff < 10)   return "Vừa xong";
-    if (diff < 60)   return `${diff} giây trước`;
-    if (diff < 3600) return `${Math.floor(diff / 60)} phút trước`;
-    if (diff < 86400) return `${Math.floor(diff / 3600)} giờ trước`;
-    return `${Math.floor(diff / 86400)} ngày trước`;
-  };
-
-  const [notifications, setNotifications] = useState<NotificationItem[]>([]);
-
-  // Adaptive tick: 10s khi có notif < 1 phút, 30s khi < 1 giờ, 60s sau đó
-  const [tick, setTick] = useState(0);
-  useEffect(() => {
-    const getInterval = () => {
-      if (notifications.length === 0) return 60_000;
-      const newestAge = (Date.now() - new Date(notifications[0].created_at).getTime()) / 1000;
-      if (newestAge < 60)   return 10_000;  // < 1 phút → tick 10s
-      if (newestAge < 3600) return 30_000;  // < 1 giờ → tick 30s
-      return 60_000;                         // cũ hơn → tick 60s
-    };
-    const t = setTimeout(() => setTick(x => x + 1), getInterval());
-    return () => clearTimeout(t);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tick, notifications]);
-
-  // Fetch lịch sử từ API khi đã login
-  useEffect(() => {
-    if (!accessToken) return;
-    fetch('/api/v1/notifications', {
-      headers: { Authorization: `Bearer ${accessToken}` }
-    })
-      .then(r => r.ok ? r.json() : [])
-      .then(setNotifications)
-      .catch(() => {});
-  }, [accessToken]);
-
+  const [notifications, setNotifications] = useState([]);
+  const notificationRef = useRef(null);
+  const userMenuRef = useRef(null);
   const { addToast } = useToast();
 
-  // Nhận real-time từ WebSocket
-  const handleWsNotification = useCallback((n: WsNotification) => {
-    const newItem: NotificationItem = {
-      id: (n.id as string) ?? crypto.randomUUID(),
-      type: n.type,
-      title: n.title ?? "Thông báo",
-      message: n.message ?? "",
-      is_read: false,
-      metadata: (n.metadata as Record<string, unknown>) ?? {},
-      created_at: (n.created_at as string) ?? new Date().toISOString(),
+  useEffect(() => { setMounted(true); }, []);
+
+  // Load notifications from API on mount
+  useEffect(() => {
+    if (!accessToken) return;
+    fetchNotifications().then(setNotifications).catch(() => {});
+  }, [accessToken]);
+
+  // Close dropdowns on outside click
+  useEffect(() => {
+    const handler = (e) => {
+      if (notificationRef.current && !notificationRef.current.contains(e.target)) setShowNotifications(false);
+      if (userMenuRef.current && !userMenuRef.current.contains(e.target)) setShowUserMenu(false);
     };
-    setNotifications(prev => [newItem, ...prev.slice(0, 29)]);
-    addToast(n);
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, []);
+
+  const handleNotification = useCallback((notification) => {
+    // Add to local list
+    setNotifications(prev => [{ ...notification, is_read: false }, ...prev]);
+
+    addToast({
+      type: notification.type === 'document_ready' ? 'document_ready'
+        : notification.type === 'document_failed' ? 'document_failed'
+        : 'system',
+      title: notification.title || 'Thông báo',
+      message: notification.message || '',
+      documentId: notification.document_id,
+    });
   }, [addToast]);
 
-  // Kết nối WebSocket — chạy xuyên suốt app
-  useNotifications({ token: accessToken ?? null, onNotification: handleWsNotification });
+  useNotifications({
+    token: accessToken,
+    onNotification: handleNotification,
+  });
 
   const unreadCount = notifications.filter(n => !n.is_read).length;
 
-  useEffect(() => {
-    function handleClickOutside(event: MouseEvent) {
-      if (notificationRef.current && !notificationRef.current.contains(event.target as Node)) {
-        setShowNotifications(false);
-      }
-      if (userMenuRef.current && !userMenuRef.current.contains(event.target as Node)) {
-        setShowUserMenu(false);
-      }
-    }
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, []);
-
-  const markAllAsRead = () => {
+  const handleMarkAllRead = async () => {
+    await markAllNotificationsRead().catch(() => {});
     setNotifications(prev => prev.map(n => ({ ...n, is_read: true })));
-    if (accessToken) {
-      fetch('/api/v1/notifications/read-all', {
-        method: 'PATCH',
-        headers: { Authorization: `Bearer ${accessToken}` },
-      }).catch(() => {});
-    }
   };
-  const handleNotificationClick = (id: string) => {
-    setNotifications(prev => prev.map(n => n.id === id ? { ...n, is_read: true } : n));
+
+  const handleClearAll = async () => {
+    await clearAllNotifications().catch(() => {});
+    setNotifications([]);
     setShowNotifications(false);
-    if (accessToken) {
-      fetch(`/api/v1/notifications/${id}/read`, {
-        method: 'PATCH',
-        headers: { Authorization: `Bearer ${accessToken}` },
-      }).catch(() => {});
-    }
   };
 
-  // Icon theo type từ backend — dễ thêm type mới
-  const notifTypeIcon: Record<string, string> = {
-    // Tài liệu
-    document_ready:   'description',       // 📄 file icon
-    document_failed:  'description_off',   // 📄 với dấu x
-
-    // Thanh toán (sau này dùng)
-    payment_success:  'payments',          // 💳 thẻ có tick
-    payment_failed:   'credit_card_off',   // 💳 bị từ chối
-
-    // Hệ thống
-    system:           'settings',
+  // Icon + color theo type
+  const notifTypeIcon = {
+    document_ready:  'description',
+    document_failed: 'hide_source',
+    payment_success: 'payments',
+    payment_failed:  'money_off',
+    system:          'settings',
   };
 
-  const notifTypeColor: Record<string, string> = {
-    // Tài liệu — xanh lá / đỏ
+  const notifTypeColor = {
     document_ready:  'text-emerald-400 bg-emerald-400/10',
     document_failed: 'text-red-400 bg-red-400/10',
-
-    // Thanh toán — vàng / cam
     payment_success: 'text-amber-400 bg-amber-400/10',
     payment_failed:  'text-orange-400 bg-orange-400/10',
-
-    // Hệ thống — xám
     system:          'text-[var(--muted)] bg-[var(--surface)]',
   };
 
-  // Fallback khi type không khớp
-  const getIcon  = (t: string) => notifTypeIcon[t]  ?? 'notifications';
-  const getColor = (t: string) => notifTypeColor[t] ?? 'text-[var(--muted)] bg-[var(--surface)]';
+  function timeAgo(dateStr) {
+    const diff = Date.now() - new Date(dateStr).getTime();
+    const m = Math.floor(diff / 60000);
+    if (m < 1) return 'Vừa xong';
+    if (m < 60) return `${m} phút trước`;
+    const h = Math.floor(m / 60);
+    if (h < 24) return `${h} giờ trước`;
+    return `${Math.floor(h / 24)} ngày trước`;
+  }
+
+  if (!mounted || isInitialLoading) {
+    return (
+      <header className="h-14 bg-[var(--card-bg)] border-b border-[var(--border-color)] flex items-center px-4 gap-3">
+        <div className="w-8 h-8 rounded-full bg-[var(--surface)] animate-pulse" />
+        <div className="flex-1 h-5 bg-[var(--surface)] rounded animate-pulse max-w-xs" />
+      </header>
+    );
+  }
+
+  const initials = user?.full_name
+    ? user.full_name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)
+    : '?';
 
   return (
-    <header className="h-16 w-full sticky top-0 bg-[var(--header-bg)] backdrop-blur-xl border-b border-[var(--border-color)] flex items-center justify-between px-5 shrink-0 z-50 transition-colors duration-500">
-      {/* Left */}
-      <div className="flex items-center gap-3">
+    <header className="h-14 bg-[var(--card-bg)] border-b border-[var(--border-color)] flex items-center px-4 gap-3 sticky top-0 z-40">
+      {/* Mobile menu button */}
+      <button
+        onClick={onMenuClick}
+        className="lg:hidden w-9 h-9 flex items-center justify-center rounded-xl text-[var(--muted)] hover:bg-[var(--surface)] transition-colors"
+        aria-label="Menu"
+      >
+        <span className="material-symbols-outlined text-[20px]">menu</span>
+      </button>
+
+      {/* Spacer */}
+      <div className="flex-1" />
+
+      {/* Notification bell */}
+      <div className="relative" ref={notificationRef}>
         <button
-          className="lg:hidden w-9 h-9 flex items-center justify-center rounded-xl bg-[var(--surface)] text-[var(--muted)] hover:text-[var(--foreground)] transition-all active:scale-90"
-          onClick={onMenuClick}
+          id="notification-bell"
+          onClick={() => {
+            setShowNotifications(p => !p);
+            setShowUserMenu(false);
+            if (!showNotifications && unreadCount > 0) handleMarkAllRead();
+          }}
+          className="relative w-9 h-9 flex items-center justify-center rounded-xl text-[var(--muted)] hover:bg-[var(--surface)] transition-colors"
+          aria-label="Thông báo"
         >
-          <span className="material-symbols-outlined icon-thin text-[20px]">menu</span>
+          <span className="material-symbols-outlined text-[20px]">notifications</span>
+          {unreadCount > 0 && (
+            <span className="absolute top-1.5 right-1.5 w-4 h-4 rounded-full bg-[hsl(343_72%_48%)] text-white text-[9px] font-bold flex items-center justify-center leading-none">
+              {unreadCount > 9 ? '9+' : unreadCount}
+            </span>
+          )}
         </button>
+
+        {showNotifications && (
+          <div className="absolute right-0 top-full mt-1 w-80 bg-[var(--card-bg)] border border-[var(--border-color)] rounded-2xl shadow-xl z-50 overflow-hidden">
+            {/* Header */}
+            <div className="flex items-center justify-between px-4 py-3 border-b border-[var(--border-color)]">
+              <p className="text-[13px] font-semibold text-[var(--foreground)]">Thông báo</p>
+              {notifications.length > 0 && (
+                <button
+                  onClick={handleClearAll}
+                  className="text-[11px] text-[var(--muted)] hover:text-[hsl(343_72%_48%)] transition-colors"
+                >
+                  Xóa tất cả
+                </button>
+              )}
+            </div>
+
+            {/* List */}
+            <div className="max-h-80 overflow-y-auto">
+              {notifications.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-10 gap-2 text-[var(--muted)]">
+                  <span className="material-symbols-outlined text-[32px] icon-thin">notifications_off</span>
+                  <p className="text-[12px]">Chưa có thông báo</p>
+                </div>
+              ) : (
+                notifications.map((n, i) => {
+                  const iconKey = n.type in notifTypeIcon ? n.type : 'system';
+                  return (
+                    <div
+                      key={n.id || i}
+                      className={`flex items-start gap-3 px-4 py-3 border-b border-[var(--border-subtle)] last:border-0 transition-colors ${!n.is_read ? 'bg-[hsl(239_68%_58%/0.04)]' : ''}`}
+                    >
+                      <div className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 mt-0.5 ${notifTypeColor[iconKey]}`}>
+                        <span className="material-symbols-outlined text-[14px] icon-thin">{notifTypeIcon[iconKey]}</span>
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-[12px] font-semibold text-[var(--foreground)] leading-snug">{n.title}</p>
+                        {n.message && (
+                          <p className="text-[11px] text-[var(--muted)] mt-0.5 leading-snug line-clamp-2">{n.message}</p>
+                        )}
+                        <p className="text-[10px] text-[var(--muted-light)] mt-1">{timeAgo(n.created_at)}</p>
+                      </div>
+                      {!n.is_read && (
+                        <div className="w-1.5 h-1.5 rounded-full bg-[hsl(239_68%_58%)] shrink-0 mt-1.5" />
+                      )}
+                    </div>
+                  );
+                })
+              )}
+            </div>
+          </div>
+        )}
       </div>
 
-      {/* Right */}
-      <div className="flex items-center gap-1.5">
+      {/* User menu */}
+      <div className="relative" ref={userMenuRef}>
+        <button
+          onClick={() => { setShowUserMenu(p => !p); setShowNotifications(false); }}
+          className="flex items-center gap-2 px-2 py-1 rounded-xl hover:bg-[var(--surface)] transition-colors"
+        >
+          <div className="w-7 h-7 rounded-full bg-gradient-to-br from-[hsl(239_68%_58%)] to-[hsl(263_70%_62%)] flex items-center justify-center text-white text-[11px] font-bold">
+            {initials}
+          </div>
+          <span className="hidden sm:block text-[13px] font-medium text-[var(--foreground)] max-w-[120px] truncate">
+            {user?.full_name}
+          </span>
+          <span className="material-symbols-outlined text-[var(--muted)] text-[16px]">expand_more</span>
+        </button>
 
-        {/* Notifications */}
-        <div className="relative" ref={notificationRef}>
-          <button
-            onClick={() => setShowNotifications(!showNotifications)}
-            className={`w-9 h-9 flex items-center justify-center rounded-xl transition-all relative active:scale-90 ${
-              showNotifications
-                ? 'bg-[hsl(239_68%_58%/0.10)] text-[hsl(239_68%_58%)] border border-[hsl(239_68%_58%/0.25)]'
-                : 'text-[var(--muted)] hover:text-[var(--foreground)] hover:bg-[var(--surface)]'
-            }`}
-          >
-            <span className="material-symbols-outlined icon-thin text-[20px]">notifications</span>
-            {unreadCount > 0 && (
-              <span className="absolute top-2 right-2 w-2 h-2 bg-[hsl(343_85%_58%)] rounded-full border-2 border-[var(--header-bg)]" />
-            )}
-          </button>
-
-          {showNotifications && (
-            <div className="absolute top-full right-0 mt-2 w-80 bg-[var(--card-bg)] border border-[var(--border-color)] rounded-xl shadow-[0_16px_40px_hsl(222_47%_4%/0.14),0_4px_12px_hsl(222_47%_4%/0.08)] overflow-hidden z-[60] animate-fade-up backdrop-blur-2xl">
-              <div className="px-4 py-3 flex items-center justify-between border-b border-[var(--border-subtle)]">
-                <div className="flex items-center gap-2">
-                  <h3 className="text-[13px] font-semibold text-[var(--foreground)]">{HEADER_TEXTS.notifications.title}</h3>
-                  {unreadCount > 0 && (
-                    <span className="px-1.5 py-0.5 bg-[hsl(239_68%_58%)] text-white rounded-full text-[9px] font-bold">{unreadCount}</span>
-                  )}
-                </div>
-                <button onClick={markAllAsRead} className="text-[10px] font-bold text-[hsl(239_68%_58%)] hover:text-[hsl(239_62%_50%)] transition-colors">
-                  Đọc tất cả
-                </button>
-              </div>
-              <div className="max-h-[320px] overflow-y-auto custom-scrollbar divide-y divide-[var(--border-subtle)]">
-                {notifications.map(n => (
-                  <div
-                    key={n.id}
-                    onClick={() => handleNotificationClick(n.id)}
-                    className={`px-4 py-3 flex items-start gap-3 cursor-pointer transition-all duration-150 hover:bg-[var(--surface)] ${
-                      !n.is_read ? 'bg-[hsl(239_68%_58%/0.04)]' : ''
-                    }`}
-                  >
-                    <div className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 mt-0.5 ${getColor(n.type)}`}>
-                      <span className="material-symbols-outlined icon-thin text-[14px]">{getIcon(n.type)}</span>
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center justify-between gap-2">
-                        <p className="text-[12px] font-semibold text-[var(--foreground)] truncate">{n.title}</p>
-                        {!n.is_read && <span className="w-1.5 h-1.5 rounded-full bg-[hsl(239_68%_58%)] shrink-0" />}
-                      </div>
-                      <p className="text-[11px] text-[var(--muted)] leading-relaxed mt-0.5 line-clamp-2">{n.message}</p>
-                      <p className="text-[10px] text-[var(--muted-light)] mt-1">{formatRelativeTime(n.created_at)}</p>
-                    </div>
-                  </div>
-                ))}
-                {notifications.length === 0 && (
-                  <div className="p-8 text-center">
-                    <span className="material-symbols-outlined icon-thin text-[32px] text-[var(--muted-light)] block mb-2">notifications_off</span>
-                    <p className="text-[12px] text-[var(--muted)] font-medium">{HEADER_TEXTS.notifications.empty}</p>
-                  </div>
-                )}
-              </div>
+        {showUserMenu && (
+          <div className="absolute right-0 top-full mt-1 w-52 bg-[var(--card-bg)] border border-[var(--border-color)] rounded-2xl shadow-xl z-50 overflow-hidden py-1">
+            <div className="px-4 py-3 border-b border-[var(--border-color)]">
+              <p className="text-[13px] font-semibold text-[var(--foreground)] truncate">{user?.full_name}</p>
+              <p className="text-[11px] text-[var(--muted)] truncate">{user?.email}</p>
+              {/* Plan badge */}
+              {user?.isPro ? (
+                <span className="inline-flex items-center gap-1 mt-1.5 px-2 py-0.5 rounded-full bg-gradient-to-r from-[hsl(239_68%_58%)] to-[hsl(263_70%_62%)] text-white text-[10px] font-bold">
+                  <span className="material-symbols-outlined text-[11px]" style={{ fontVariationSettings: "'FILL' 1" }}>workspace_premium</span>
+                  Pro
+                </span>
+              ) : (
+                <span className="inline-flex items-center gap-1 mt-1.5 px-2 py-0.5 rounded-full bg-[var(--surface)] text-[var(--muted)] text-[10px] font-semibold border border-[var(--border-color)]">
+                  Free
+                </span>
+              )}
             </div>
-          )}
-        </div>
-
-        {/* Divider */}
-        <div className="h-5 w-px bg-[var(--border-color)] mx-1" />
-
-        {/* User Profile */}
-        <div className="relative" ref={userMenuRef}>
-          {(!mounted || isInitialLoading || !user) ? (
-            <div className="flex items-center gap-2.5">
-              <div className="flex flex-col items-end gap-1.5">
-                <div className="w-20 h-2 bg-[var(--surface)] rounded-full shimmer" />
-                <div className="w-14 h-1.5 bg-[var(--surface)] rounded-full shimmer" />
-              </div>
-              <div className="w-9 h-9 rounded-xl bg-[var(--surface)] shimmer" />
-            </div>
-          ) : (
             <button
-              onClick={() => setShowUserMenu(!showUserMenu)}
-              className="flex items-center gap-2.5 p-1.5 pr-3 rounded-xl hover:bg-[var(--surface)] transition-all active:scale-95"
+              onClick={logout}
+              className="w-full flex items-center gap-2.5 px-4 py-2.5 text-[13px] text-[hsl(343_72%_48%)] hover:bg-[hsl(343_85%_58%/0.06)] transition-colors"
             >
-              <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-[hsl(239_68%_58%)] to-[hsl(263_70%_62%)] flex items-center justify-center text-white font-bold text-[13px] shadow-[0_2px_8px_hsl(239_68%_58%/0.35)]">
-                {(user.full_name?.[0] || 'U').toUpperCase()}
-              </div>
-              <div className="flex flex-col items-start hidden sm:flex">
-                <p className="text-[12px] font-semibold text-[var(--foreground)] leading-none">{user.full_name || HEADER_TEXTS.user.defaultName}</p>
-                {user.isPro ? (
-                  <span className="text-[9px] font-bold text-[hsl(38_92%_50%)] uppercase tracking-wide mt-0.5">Pro</span>
-                ) : (
-                  <span className="text-[9px] font-medium text-[var(--muted-light)] mt-0.5">Miễn phí</span>
-                )}
-              </div>
-              <span className="material-symbols-outlined icon-thin text-[14px] text-[var(--muted-light)] hidden sm:block">expand_more</span>
+              <span className="material-symbols-outlined text-[16px]">logout</span>
+              {HEADER_TEXTS.logout}
             </button>
-          )}
-
-          {showUserMenu && user && (
-            <div className="absolute top-full right-0 mt-2 w-52 bg-[var(--card-bg)] border border-[var(--border-color)] rounded-xl shadow-[0_16px_40px_hsl(222_47%_4%/0.14)] overflow-hidden z-[60] animate-fade-up backdrop-blur-2xl">
-              <div className="px-4 py-3 border-b border-[var(--border-subtle)]">
-                <p className="text-[11px] font-semibold text-[var(--foreground)] truncate">{user.full_name}</p>
-                <p className="text-[10px] text-[var(--muted)] truncate mt-0.5">{user.email}</p>
-              </div>
-              <div className="p-1.5">
-                <button
-                  onClick={() => { logout(); setShowUserMenu(false); }}
-                  className="w-full flex items-center gap-2.5 px-3 py-2.5 text-[hsl(343_85%_58%)] hover:bg-[hsl(343_85%_58%/0.08)] rounded-xl transition-all text-[12px] font-semibold"
-                >
-                  <span className="material-symbols-outlined icon-thin text-[16px]">logout</span>
-                  {HEADER_TEXTS.logout}
-                </button>
-              </div>
-            </div>
-          )}
-        </div>
+          </div>
+        )}
       </div>
     </header>
   );

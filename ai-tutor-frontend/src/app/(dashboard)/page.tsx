@@ -1,16 +1,14 @@
-"use client";
-
-import { useRouter } from "next/navigation";
+﻿
+import { useNavigate, Link } from "react-router-dom";
 import { useState, useRef, useEffect } from "react";
-import Link from "next/link";
 import UploadArea from "@/components/UploadArea";
 import DocumentTable from "@/components/DocumentTable";
 import { DASHBOARD_TEXTS } from "@/constants/texts";
 
 export default function Dashboard() {
-  const router = useRouter();
+  const navigate = useNavigate();
   const [refreshTrigger, setRefreshTrigger] = useState(0);
-  const uploadSectionRef = useRef<HTMLDivElement>(null);
+  const uploadSectionRef = useRef(null);
 
   const handleUploadSuccess = () => setRefreshTrigger((prev) => prev + 1);
 
@@ -27,8 +25,8 @@ export default function Dashboard() {
       setTimeout(() => {
         scrollToUpload();
         setTimeout(() => {
-          const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement;
-          if (fileInput) fileInput.click();
+          const fileInput = document.querySelector('input[type="file"]');
+          if (fileInput) (fileInput as HTMLElement)?.click();
           window.history.replaceState({}, '', '/');
         }, 600);
       }, 300);
@@ -112,7 +110,7 @@ export default function Dashboard() {
               Bắt đầu học ngay
             </button>
             <Link
-              href="/learning"
+              to="/learning"
               className="px-6 py-3 bg-white/10 text-white font-semibold rounded-2xl hover:bg-white/20 border border-white/20 transition-all text-[13px]"
             >
               Khám phá tính năng
@@ -123,9 +121,9 @@ export default function Dashboard() {
 
       {/* ── Feature Cards ─────────────────────────────────────────────── */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        {featureCards.map((feat, idx) => (
+        {featureCards.map((feat, idx) =>(
           <Link
-            href={feat.link}
+            to={feat.link}
             key={idx}
             className="group relative bg-[var(--card-bg)] p-5 rounded-3xl border border-[var(--border-color)] shadow-sm hover:border-[var(--border-emphasis)] transition-all duration-200"
           >

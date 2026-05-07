@@ -1,37 +1,28 @@
-"use client";
-
 import { useState, useEffect, useRef } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { useParams, useNavigate } from "react-router-dom";
 import {
   fetchDocument,
   fetchDocumentQuiz,
   fetchDocumentQuizStream,
-  QuotaError,
-  DocumentResponse
+  QuotaError
 } from "@/services/api.service";
 import { QUIZ_PAGE_TEXTS, QUOTA_TEXTS } from "@/constants/texts";
 import ConfirmDialog from "@/components/ConfirmDialog";
 
-interface QuizItem {
-  question: string;
-  options: string[];
-  correct_index: number;
-  explanation: string;
-}
 
 export default function InteractiveQuizPage() {
   const params = useParams();
-  const router = useRouter();
-  const documentId = params.documentId as string;
+  const navigate = useNavigate();
+  const documentId = params.documentId;
 
-  const [docData, setDocData] = useState<DocumentResponse | null>(null);
-  const [quiz, setQuiz] = useState<QuizItem[]>([]);
+  const [docData, setDocData] = useState(null);
+  const [quiz, setQuiz] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState(null);
   const [quotaExceeded, setQuotaExceeded] = useState(false);
 
   // User performance state
-  const [userAnswers, setUserAnswers] = useState<Record<number, number>>({});
+  const [userAnswers, setUserAnswers] = useState({});
   const [isSubmitted, setIsSubmitted] = useState(false);
   const [score, setScore] = useState(0);
 
@@ -40,7 +31,7 @@ export default function InteractiveQuizPage() {
   const [showRegenConfirm, setShowRegenConfirm] = useState(false);
 
   // AbortController — hủy stream khi chuyển trang hoặc tạo lại
-  const abortRef = useRef<AbortController | null>(null);
+  const abortRef = useRef(null);
 
   const loadQuiz = async (force = false) => {
     // Hủy request cũ nếu đang chạy
@@ -64,7 +55,7 @@ export default function InteractiveQuizPage() {
         if (isActive()) setDocData(doc);
       }
 
-      let data: QuizItem[] = [];
+      let data = [];
 
       if (!force) {
         data = await fetchDocumentQuiz(documentId, controller.signal);
@@ -95,7 +86,7 @@ export default function InteractiveQuizPage() {
       } else {
         setError("Không thể tạo bộ câu hỏi trắc nghiệm cho tài liệu này.");
       }
-    } catch (err: any) {
+    } catch (err) {
       if (err?.name === "AbortError") return; // bị huỷ chủ động — không cập nhật UI
       if (!isActive()) return;
       if (err instanceof QuotaError) {
@@ -123,9 +114,9 @@ export default function InteractiveQuizPage() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [documentId]);
 
-  const handleSelectOption = (qIdx: number, oIdx: number) => {
+  const handleSelectOption = (qIdx, oIdx) => {
     if (isSubmitted) return;
-    setUserAnswers(prev => ({ ...prev, [qIdx]: oIdx }));
+    setUserAnswers(prev =>({ ...prev, [qIdx]: oIdx }));
   };
 
   const handleSubmit = () => {
@@ -167,7 +158,7 @@ export default function InteractiveQuizPage() {
           </div>
           {/* Jumping dots */}
           <div className="flex items-center gap-1.5">
-            {[0, 1, 2].map((i) => (
+            {[0, 1, 2].map((i) =>(
               <div
                 key={i}
                 className="w-1.5 h-1.5 rounded-full bg-[hsl(38_92%_50%)] animate-jumping-dot"
@@ -192,13 +183,13 @@ export default function InteractiveQuizPage() {
         <p className="text-[var(--muted-light)] text-[12px] mb-6">{QUOTA_TEXTS.exceeded.desc}</p>
         <div className="flex items-center gap-3">
           <button
-            onClick={() => router.push("/settings")}
+            onClick={() => navigate("/settings")}
             className="px-6 py-2.5 rounded-xl bg-gradient-to-r from-[hsl(239_68%_58%)] to-[hsl(263_70%_62%)] text-white text-[13px] font-bold hover:opacity-90 transition-all active:scale-95 shadow-[0_4px_16px_hsl(239_68%_58%/0.3)]"
           >
             {QUOTA_TEXTS.exceeded.upgradeBtn}
           </button>
           <button
-            onClick={() => router.back()}
+            onClick={() => navigate(-1)}
             className="px-5 py-2.5 rounded-xl bg-[var(--surface)] text-[var(--muted)] text-[13px] font-bold border border-[var(--border-color)] hover:bg-[var(--card-bg)] transition-all active:scale-95"
           >
             {QUIZ_PAGE_TEXTS.status.error.back}
@@ -225,7 +216,7 @@ export default function InteractiveQuizPage() {
             Tạo lại
           </button>
           <button
-            onClick={() => router.back()}
+            onClick={() => navigate(-1)}
             className="px-5 py-2.5 rounded-xl bg-[var(--surface)] text-[var(--muted)] text-[13px] font-bold border border-[var(--border-color)] hover:bg-[var(--card-bg)] transition-all active:scale-95"
           >
             {QUIZ_PAGE_TEXTS.status.error.back}
@@ -243,7 +234,7 @@ export default function InteractiveQuizPage() {
       <header className="sticky top-0 z-50 bg-[var(--header-bg)] backdrop-blur-xl border-b border-[var(--border-color)] px-6 h-16 flex items-center justify-between">
         <div className="flex items-center gap-3">
           <button
-            onClick={() => router.back()}
+            onClick={() => navigate(-1)}
             className="w-9 h-9 flex items-center justify-center rounded-xl hover:bg-[var(--surface)] text-[var(--muted)] hover:text-[var(--foreground)] transition-all active:scale-90"
           >
             <span className="material-symbols-outlined icon-thin text-[20px]">arrow_back</span>
@@ -279,7 +270,7 @@ export default function InteractiveQuizPage() {
             </div>
           ) : (
             <div className="text-[11px] font-bold text-[var(--muted)] bg-[var(--surface)] px-3 py-1.5 rounded-xl border border-[var(--border-color)]">
-              {QUIZ_PAGE_TEXTS.header.completed}: {Object.keys(userAnswers).length} / {quiz.length}
+              {QUIZ_PAGE_TEXTS.header.completed} / {quiz.length}
             </div>
           )}
         </div>
@@ -328,7 +319,7 @@ export default function InteractiveQuizPage() {
 
         {/* Questions */}
         <div className="space-y-8">
-          {quiz.map((item, qIdx) => (
+          {quiz.filter(item => item?.question && Array.isArray(item?.options)).map((item, qIdx) => (
             <div key={qIdx} className="space-y-4">
               <h3 className="text-[15px] font-bold text-[var(--foreground)] leading-snug">
                 <span className="text-[hsl(239_55%_50%)] mr-2">Câu {qIdx + 1}:</span>
@@ -336,7 +327,7 @@ export default function InteractiveQuizPage() {
               </h3>
 
               <div className="grid grid-cols-1 gap-2.5 md:pl-10">
-                {item.options.map((opt, oIdx) => {
+                {(Array.isArray(item.options) ? item.options : []).map((opt, oIdx) => {
                   const isSelected = userAnswers[qIdx] === oIdx;
                   const isCorrect = oIdx === item.correct_index;
                   const showResult = isSubmitted;

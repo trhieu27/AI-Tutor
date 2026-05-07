@@ -1,13 +1,19 @@
 # AI Tutor - Root .gitignore
 
-# Common
+# ── Common ────────────────────────────────────────────────────────────────────
 node_modules/
 .DS_Store
+Thumbs.db
 *.pem
-.env*
-.vercel
 
-# IDE
+# Environment files (chứa secrets, không bao giờ commit)
+.env
+.env.*
+.env.local
+.env.*.local
+!.env.example
+
+# IDE & Editor
 .idea/
 .vscode/
 *.swp
@@ -23,30 +29,51 @@ node_modules/
 **/AGENTS.md
 **/CLAUDE.md
 
-# Frontend (ai-tutor-frontend)
+# ── Frontend (ai-tutor-frontend) ──────────────────────────────────────────────
 ai-tutor-frontend/node_modules/
 ai-tutor-frontend/.next/
 ai-tutor-frontend/out/
 ai-tutor-frontend/build/
+ai-tutor-frontend/dist/
 ai-tutor-frontend/npm-debug.log*
 ai-tutor-frontend/next-env.d.ts
 ai-tutor-frontend/*.tsbuildinfo
 
-# Backend (ai-tutor-backend)
+# ── Backend (ai-tutor-backend) ────────────────────────────────────────────────
+ai-tutor-backend/node_modules/
 ai-tutor-backend/__pycache__/
 ai-tutor-backend/.venv/
 ai-tutor-backend/venv/
 ai-tutor-backend/*.pyc
-ai-tutor-backend/.env
+
+# Uploaded documents & processed storage
 ai-tutor-backend/storage/
 
-# Storage & Runtime data (không commit dữ liệu lớn)
-**/storage/chroma_db/
+# ── ChromaDB (vector database) ────────────────────────────────────────────────
+**/chroma_db/
+**/chroma_data/
+**/.chroma/
+
+# ── Storage & Runtime data ────────────────────────────────────────────────────
 **/storage/uploads/
 **/storage/mongo_data/
 
-# SSL certs
-nginx/ssl/
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+logs/
 
-# Docker
+# ── SSL & Secrets ─────────────────────────────────────────────────────────────
+nginx/ssl/
+*.key
+*.crt
+*.cert
+
+# ── Docker ────────────────────────────────────────────────────────────────────
 .docker/
+
+# ── OS ────────────────────────────────────────────────────────────────────────
+.DS_Store
+Desktop.ini
