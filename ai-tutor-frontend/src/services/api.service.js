@@ -1,4 +1,8 @@
 import { authService } from './auth.service';
+import { Document } from '@/models/Document';
+import { Quiz } from '@/models/Quiz';
+import { ChatSession } from '@/models/Chat';
+import { Notification, Quota } from '@/models/Notification';
 const API_BASE = '/api/v1';
 const UPLOAD_BASE = import.meta.env.VITE_API_URL ?? 'http://localhost:8081/api/v1';
 
@@ -83,12 +87,13 @@ export async function uploadDocument(file) {
 export async function fetchDocuments() {
   const res = await authFetch(`${API_BASE}/documents`);
   if (!res.ok) throw new Error('Không thể tải danh sách tài liệu');
-  return res.json();
+  const data = await res.json();
+  return data.map(d => Document.fromJSON(d));
 }
 export async function fetchDocument(documentId) {
   const res = await authFetch(`${API_BASE}/documents/${documentId}`);
   if (!res.ok) throw new Error('Không tìm thấy tài liệu');
-  return res.json();
+  return Document.fromJSON(await res.json());
 }
 export async function deleteDocument(documentId) {
   const res = await authFetch(`${API_BASE}/documents/${documentId}`, {
@@ -130,7 +135,8 @@ export async function askQuestion(documentId, request, signal) {
 export async function fetchChatSessions(documentId) {
   const res = await authFetch(`${API_BASE}/chat/${documentId}/sessions`);
   if (!res.ok) throw new Error('Không thể tải lịch sử chat');
-  return res.json();
+  const data = await res.json();
+  return data.map(s => ChatSession.fromJSON(s));
 }
 export async function fetchSessionDetail(sessionId) {
   const res = await authFetch(`${API_BASE}/chat/sessions/${sessionId}`);
@@ -196,12 +202,11 @@ export async function fetchDocumentQuizStream(documentId, onChunk, force = false
   await readStream(res, onChunk);
 }
 export async function fetchDocumentQuiz(documentId, signal) {
-  const res = await authFetch(`${API_BASE}/chat/${documentId}/quiz`, {
-    signal
-  });
+  const res = await authFetch(`${API_BASE}/chat/${documentId}/quiz`, { signal });
   if (!res.ok) throw new Error('Không thể tải bài kiểm tra');
   try {
-    return JSON.parse(await res.text());
+    const arr = JSON.parse(await res.text());
+    return Array.isArray(arr) ? arr : [];
   } catch {
     return [];
   }
@@ -264,12 +269,13 @@ export async function fetchDocumentStudyQuestions(documentId, signal) {
 export async function fetchQuota() {
   const res = await authFetch(`${API_BASE}/quota/me`);
   if (!res.ok) throw new Error('Không thể tải thông tin quota');
-  return res.json();
+  return Quota.fromJSON(await res.json());
 }
 export async function fetchNotifications(limit = 30) {
   const res = await authFetch(`${API_BASE}/notifications?limit=${limit}`);
   if (!res.ok) return [];
-  return res.json();
+  const data = await res.json();
+  return data.map(n => Notification.fromJSON(n));
 }
 export async function markNotificationRead(notifId) {
   await authFetch(`${API_BASE}/notifications/${notifId}/read`, {

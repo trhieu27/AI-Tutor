@@ -1,6 +1,8 @@
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from '@/context/AuthContext';
 import { ThemeProvider } from '@/components/ThemeProvider';
+import { DocumentProvider } from '@/context/DocumentContext';
+import { UploadProvider } from '@/context/UploadContext';
 
 // Auth pages
 import LoginPage from '@/app/(auth)/login/page';
@@ -59,7 +61,9 @@ function PublicRoute({
 export default function App() {
   return /*#__PURE__*/_jsx(ThemeProvider, {
     children: /*#__PURE__*/_jsx(AuthProvider, {
-      children: /*#__PURE__*/_jsxs(Routes, {
+      children: /*#__PURE__*/_jsx(UploadProvider, {
+        children: /*#__PURE__*/_jsx(DocumentProvider, {
+          children: /*#__PURE__*/_jsxs(Routes, {
         children: [/*#__PURE__*/_jsx(Route, {
           path: "/login",
           element: /*#__PURE__*/_jsx(PublicRoute, {
@@ -114,6 +118,8 @@ export default function App() {
             replace: true
           })
         })]
+          })
+        })
       })
     })
   });
