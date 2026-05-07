@@ -192,7 +192,7 @@ export default function DocumentTable({
           children: [/*#__PURE__*/_jsx("span", {
             className: `material-symbols-outlined icon-thin text-[12px] ${retryingId === docId ? "animate-spin" : ""}`,
             children: "refresh"
-          }), "Th\u1EED l\u1EA1i"]
+          }), DOCUMENT_TABLE_TEXTS.retryBtn]
         });
     }
   };
@@ -248,7 +248,7 @@ export default function DocumentTable({
               })]
             }), /*#__PURE__*/_jsx("input", {
               type: "text",
-              placeholder: "T\xECm t\xEAn t\xE0i li\u1EC7u, ch\u1EE7 \u0111\u1EC1...",
+              placeholder: DOCUMENT_TABLE_TEXTS.searchPlaceholder,
               value: searchTerm,
               onChange: e => setSearchTerm(e.target.value),
               className: "w-full pl-9 pr-4 py-2.5 bg-white/60 dark:bg-white/5 backdrop-blur-lg border border-[hsl(214_32%_91%)] dark:border-white/10 rounded-xl text-[12px] text-[var(--foreground)] placeholder:text-[var(--muted-light)] focus:outline-none focus:ring-1 focus:ring-[hsl(239_68%_58%/0.35)] focus:border-transparent transition-all font-medium shadow-[0_1px_3px_hsl(0_0%_0%/0.04)]"
@@ -287,7 +287,7 @@ export default function DocumentTable({
                 style: {
                   width: "11%"
                 },
-                children: "Quy m\xF4"
+                children: DOCUMENT_TABLE_TEXTS.colSize
               }), /*#__PURE__*/_jsx("th", {
                 className: "py-3 px-4 text-[10px] font-bold tracking-[0.06em] text-[var(--muted-light)] text-center hidden sm:table-cell",
                 style: {
@@ -296,7 +296,7 @@ export default function DocumentTable({
                 children: DOCUMENT_TABLE_TEXTS.colStatus
               }), showActions && /*#__PURE__*/_jsx("th", {
                 className: "py-3 px-3 text-[10px] font-bold tracking-[0.06em] text-[var(--muted-light)] text-center sm:w-[22%]",
-                children: "Thao t\xE1c"
+                children: DOCUMENT_TABLE_TEXTS.colActions
               })]
             })
           }), /*#__PURE__*/_jsx("tbody", {
@@ -352,7 +352,7 @@ export default function DocumentTable({
                     children: [/*#__PURE__*/_jsx(Link, {
                       to: getRedirectUrl(doc.id),
                       className: "w-7 h-7 sm:w-9 sm:h-9 rounded-lg border border-[hsl(239_68%_58%/0.20)] text-[hsl(239_55%_50%)] hover:bg-[hsl(239_68%_58%)] hover:text-white hover:border-transparent flex items-center justify-center transition-all",
-                      title: "H\u1ECFi AI",
+                      title: DOCUMENT_TABLE_TEXTS.actions.chat,
                       children: /*#__PURE__*/_jsx("span", {
                         className: "material-symbols-outlined icon-thin text-[13px] sm:text-[15px]",
                         children: "chat_bubble"
@@ -360,7 +360,7 @@ export default function DocumentTable({
                     }), /*#__PURE__*/_jsx(Link, {
                       to: `/quiz/${doc.id}`,
                       className: "w-7 h-7 sm:w-9 sm:h-9 rounded-lg border border-[hsl(38_92%_50%/0.20)] text-[hsl(38_80%_42%)] hover:bg-[hsl(38_92%_50%)] hover:text-white hover:border-transparent flex items-center justify-center transition-all",
-                      title: "Luy\u1EC7n t\u1EADp",
+                      title: DOCUMENT_TABLE_TEXTS.actions.practice,
                       children: /*#__PURE__*/_jsx("span", {
                         className: "material-symbols-outlined icon-thin text-[13px] sm:text-[15px]",
                         children: "quiz"
@@ -368,7 +368,7 @@ export default function DocumentTable({
                     }), /*#__PURE__*/_jsx(Link, {
                       to: `/mindmap/${doc.id}`,
                       className: "w-7 h-7 sm:w-9 sm:h-9 rounded-lg border border-[hsl(173_58%_42%/0.20)] text-[hsl(173_50%_36%)] hover:bg-[hsl(173_58%_42%)] hover:text-white hover:border-transparent flex items-center justify-center transition-all",
-                      title: "S\u01A1 \u0111\u1ED3 t\u01B0 duy",
+                      title: DOCUMENT_TABLE_TEXTS.actions.mindmap,
                       children: /*#__PURE__*/_jsx("span", {
                         className: "material-symbols-outlined icon-thin text-[13px] sm:text-[15px]",
                         children: "hub"
@@ -429,10 +429,10 @@ export default function DocumentTable({
       })]
     }), /*#__PURE__*/_jsx(ConfirmDialog, {
       open: !!pendingDelete,
-      title: "X\xF3a t\xE0i li\u1EC7u",
+      title: DOCUMENT_TABLE_TEXTS.deleteConfirm.title,
       message: `Bạn có chắc muốn xóa "${pendingDelete?.name}"? Thao tác này không thể hoàn tác.`,
-      confirmLabel: "X\xF3a",
-      cancelLabel: "Gi\u1EEF l\u1EA1i",
+      confirmLabel: "Xóa",
+      cancelLabel: DOCUMENT_TABLE_TEXTS.deleteConfirm.cancel,
       variant: "danger",
       onConfirm: confirmDelete,
       onCancel: () => setPendingDelete(null)
