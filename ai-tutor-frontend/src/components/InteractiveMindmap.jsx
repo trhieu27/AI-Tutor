@@ -1,4 +1,5 @@
 import React, { useState, useCallback, useRef, useEffect, useMemo, forwardRef, useImperativeHandle } from 'react';
+import { INTERACTIVE_MINDMAP_TEXTS } from '@/constants/texts';
 
 // ===== TYPES =====
 
@@ -1215,7 +1216,7 @@ const InteractiveMindmap = /*#__PURE__*/forwardRef(({
           })]
         }), /*#__PURE__*/_jsx("p", {
           className: "text-[10px] font-bold uppercase tracking-[0.25em] text-[var(--muted-light)]",
-          children: "\u0110ang x\xE2y d\u1EF1ng\u2026"
+          children: INTERACTIVE_MINDMAP_TEXTS.building
         })]
       })
     });
@@ -1483,7 +1484,7 @@ const InteractiveMindmap = /*#__PURE__*/forwardRef(({
               className: "w-[300px] rounded-2xl shadow-[0_24px_48px_hsl(222_47%_4%/0.14),0_4px_12px_hsl(222_47%_4%/0.08)] border border-[var(--border-color)] bg-[var(--card-bg)] backdrop-blur-2xl p-4",
               children: [/*#__PURE__*/_jsx("p", {
                 className: "text-[10px] font-bold text-[var(--muted-light)] uppercase tracking-[0.12em] mb-3 px-1",
-                children: "Ch\u1EC9nh s\u1EEDa n\u1ED9i dung"
+                children: INTERACTIVE_MINDMAP_TEXTS.nodeEditor.title
               }), /*#__PURE__*/_jsx("input", {
                 autoFocus: true,
                 value: editText,
@@ -1497,17 +1498,17 @@ const InteractiveMindmap = /*#__PURE__*/forwardRef(({
                   e.stopPropagation();
                 },
                 className: "w-full px-4 py-2.5 rounded-xl bg-[var(--surface)] border border-[var(--border-color)] text-[13px] text-[var(--foreground)] font-medium outline-none focus:ring-2 focus:ring-[hsl(239_68%_58%/0.35)] focus:border-[hsl(239_68%_58%/0.5)] transition-all placeholder:text-[var(--muted-light)]",
-                placeholder: "Nh\u1EADp n\u1ED9i dung\u2026"
+                placeholder: INTERACTIVE_MINDMAP_TEXTS.nodeEditor.placeholder
               }), /*#__PURE__*/_jsxs("div", {
                 className: "flex gap-2 mt-3",
                 children: [/*#__PURE__*/_jsx("button", {
                   onClick: doCommitEdit,
                   className: "flex-1 py-2.5 bg-[hsl(239_68%_58%)] hover:bg-[hsl(239_62%_50%)] active:scale-95 text-white rounded-xl text-[11px] font-bold shadow-[0_4px_12px_hsl(239_68%_58%/0.30)] transition-all",
-                  children: "L\u01B0u thay \u0111\u1ED5i"
+                  children: INTERACTIVE_MINDMAP_TEXTS.nodeEditor.save
                 }), /*#__PURE__*/_jsx("button", {
                   onClick: () => setMenuMode('main'),
                   className: "px-4 py-2.5 bg-[var(--surface)] hover:bg-[var(--card-bg-hover)] text-[var(--muted)] rounded-xl text-[11px] font-bold transition-all",
-                  children: "H\u1EE7y"
+                  children: INTERACTIVE_MINDMAP_TEXTS.nodeEditor.cancel
                 })]
               })]
             }), /*#__PURE__*/_jsx("div", {
@@ -1530,7 +1531,7 @@ const InteractiveMindmap = /*#__PURE__*/forwardRef(({
               className: "rounded-2xl shadow-[0_24px_48px_hsl(222_47%_4%/0.14),0_4px_12px_hsl(222_47%_4%/0.08)] border border-[var(--border-color)] bg-[var(--card-bg)] backdrop-blur-2xl p-4",
               children: [/*#__PURE__*/_jsx("p", {
                 className: "text-[10px] font-bold text-[var(--muted-light)] uppercase tracking-[0.12em] mb-3 px-1",
-                children: "M\xE0u nh\xE1nh"
+                children: INTERACTIVE_MINDMAP_TEXTS.colorPicker.title
               }), /*#__PURE__*/_jsx("div", {
                 className: "grid grid-cols-6 gap-2",
                 children: NODE_COLORS.map(c => /*#__PURE__*/_jsx("button", {
@@ -1551,7 +1552,7 @@ const InteractiveMindmap = /*#__PURE__*/forwardRef(({
                   setMenuMode('main');
                 },
                 className: "w-full mt-3 py-2 text-[10px] font-bold text-[var(--muted-light)] hover:text-[var(--foreground)] transition-colors",
-                children: "\u2190 Quay l\u1EA1i"
+                children: INTERACTIVE_MINDMAP_TEXTS.backBtn
               })]
             }), /*#__PURE__*/_jsx("div", {
               className: "w-3 h-1.5 bg-[var(--card-bg)] border-x border-b border-[var(--border-color)]",
@@ -1578,7 +1579,7 @@ const InteractiveMindmap = /*#__PURE__*/forwardRef(({
                 doStartEdit();
               },
               className: "group w-9 h-9 flex items-center justify-center rounded-xl text-[var(--muted)] hover:text-[hsl(239_68%_58%)] hover:bg-[hsl(239_68%_58%/0.08)] transition-all active:scale-90",
-              title: "S\u1EEDa n\u1ED9i dung",
+              title: INTERACTIVE_MINDMAP_TEXTS.contextMenu.editContent,
               children: /*#__PURE__*/_jsx("span", {
                 className: "material-symbols-outlined text-[18px]",
                 children: "edit"
@@ -1602,7 +1603,7 @@ const InteractiveMindmap = /*#__PURE__*/forwardRef(({
                 setMenuMode('color');
               },
               className: "group w-9 h-9 flex items-center justify-center rounded-xl hover:bg-[hsl(263_70%_62%/0.08)] transition-all active:scale-90",
-              title: "\u0110\u1ED5i m\xE0u",
+              title: INTERACTIVE_MINDMAP_TEXTS.contextMenu.changeColor,
               children: /*#__PURE__*/_jsx("span", {
                 className: "material-symbols-outlined text-[18px] transition-colors",
                 style: {

@@ -218,13 +218,13 @@ export default function InteractiveQuizPage() {
         children: error
       }), /*#__PURE__*/_jsx("p", {
         className: "text-[var(--muted)] text-[13px] mb-6",
-        children: "Vui l\xF2ng th\u1EED t\u1EA1o l\u1EA1i ho\u1EB7c quay v\u1EC1"
+        children: QUIZ_PAGE_TEXTS.status.error.retry
       }), /*#__PURE__*/_jsxs("div", {
         className: "flex items-center gap-3",
         children: [/*#__PURE__*/_jsx("button", {
           onClick: () => loadQuiz(true),
           className: "px-5 py-2.5 rounded-xl bg-[hsl(239_68%_58%)] text-white text-[13px] font-bold hover:bg-[hsl(239_55%_50%)] transition-all active:scale-95",
-          children: "T\u1EA1o l\u1EA1i"
+          children: QUIZ_PAGE_TEXTS.status.error.retryBtn
         }), /*#__PURE__*/_jsx("button", {
           onClick: () => navigate(-1),
           className: "px-5 py-2.5 rounded-xl bg-[var(--surface)] text-[var(--muted)] text-[13px] font-bold border border-[var(--border-color)] hover:bg-[var(--card-bg)] transition-all active:scale-95",
@@ -264,11 +264,11 @@ export default function InteractiveQuizPage() {
           children: [/*#__PURE__*/_jsxs("button", {
             onClick: () => setShowRegenConfirm(true),
             className: "flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-[var(--border-color)] text-[var(--muted)] hover:text-[hsl(343_72%_48%)] hover:border-[hsl(343_85%_58%/0.25)] hover:bg-[hsl(343_85%_58%/0.04)] text-[11px] font-bold transition-all active:scale-95",
-            title: "T\u1EA1o l\u1EA1i b\xE0i ki\u1EC3m tra m\u1EDBi",
+            title: QUIZ_PAGE_TEXTS.actions.regenTooltip,
             children: [/*#__PURE__*/_jsx("span", {
               className: "material-symbols-outlined icon-thin text-[14px]",
               children: "refresh"
-            }), "T\u1EA1o l\u1EA1i"]
+            }), QUIZ_PAGE_TEXTS.actions.regenBtn]
           }), isSubmitted ? /*#__PURE__*/_jsxs("div", {
             className: "flex items-center gap-2",
             children: [/*#__PURE__*/_jsx("div", {
@@ -362,7 +362,7 @@ export default function InteractiveQuizPage() {
               className: "text-[15px] font-bold text-[var(--foreground)] leading-snug",
               children: [/*#__PURE__*/_jsxs("span", {
                 className: "text-[hsl(239_55%_50%)] mr-2",
-                children: ["C\xE2u ", qIdx + 1, ":"]
+                children: [QUIZ_PAGE_TEXTS.question(qIdx + 1)]
               }), item.question]
             }), /*#__PURE__*/_jsxs("div", {
               className: "grid grid-cols-1 gap-2.5 md:pl-10",
@@ -426,10 +426,10 @@ export default function InteractiveQuizPage() {
       })]
     }), /*#__PURE__*/_jsx(ConfirmDialog, {
       open: showSubmitConfirm,
-      title: "N\u1ED9p b\xE0i ch\u01B0a ho\xE0n th\xE0nh",
-      message: `Bạn còn ${quiz.length - Object.keys(userAnswers).length} câu chưa trả lời. Bạn có chắc muốn nộp bài không?`,
-      confirmLabel: "N\u1ED9p b\xE0i",
-      cancelLabel: "Ti\u1EBFp t\u1EE5c l\xE0m",
+      title: QUIZ_PAGE_TEXTS.confirm.submitTitle,
+      message: QUIZ_PAGE_TEXTS.confirm.submitMessage(quiz.length - Object.keys(userAnswers).length),
+      confirmLabel: QUIZ_PAGE_TEXTS.confirm.submitConfirm,
+      cancelLabel: QUIZ_PAGE_TEXTS.confirm.submitCancel,
       variant: "warning",
       onConfirm: () => {
         setShowSubmitConfirm(false);
@@ -438,10 +438,10 @@ export default function InteractiveQuizPage() {
       onCancel: () => setShowSubmitConfirm(false)
     }), /*#__PURE__*/_jsx(ConfirmDialog, {
       open: showRegenConfirm,
-      title: "T\u1EA1o l\u1EA1i b\xE0i ki\u1EC3m tra",
-      message: "AI s\u1EBD t\u1EA1o m\u1ED9t b\u1ED9 c\xE2u h\u1ECFi m\u1EDBi ho\xE0n to\xE0n kh\xE1c. Ti\u1EBFn tr\xECnh l\xE0m b\xE0i hi\u1EC7n t\u1EA1i s\u1EBD b\u1ECB m\u1EA5t.",
-      confirmLabel: "T\u1EA1o l\u1EA1i",
-      cancelLabel: "Gi\u1EEF l\u1EA1i",
+      title: QUIZ_PAGE_TEXTS.confirm.regenTitle,
+      message: QUIZ_PAGE_TEXTS.confirm.regenMessage,
+      confirmLabel: QUIZ_PAGE_TEXTS.confirm.regenConfirm,
+      cancelLabel: QUIZ_PAGE_TEXTS.confirm.regenCancel,
       variant: "info",
       onConfirm: () => {
         setShowRegenConfirm(false);

@@ -56,12 +56,24 @@ export const DOCUMENT_TABLE_TEXTS = {
   colName: "Tên tài liệu",
   colDate: "Ngày tải lên",
   colStatus: "Trạng thái",
+  colSize: "Quy mô",
   colActions: "Thao tác",
+  searchPlaceholder: "Tìm tên tài liệu, chủ đề...",
+  retryBtn: "Thử lại",
   status: {
     processed: "Đã xử lý",
     extracting: "AI đang phân tích...",
     uploading: "Đang tải lên...",
     failed: "Thất bại"
+  },
+  actions: {
+    chat: "Hỏi AI",
+    practice: "Luyện tập",
+    mindmap: "Sơ đồ tư duy"
+  },
+  deleteConfirm: {
+    title: "Xóa tài liệu",
+    cancel: "Giữ lại"
   },
   empty: {
     title: "Thư viện đang trống",
@@ -371,6 +383,8 @@ export const QUIZ_PAGE_TEXTS = {
       desc: "AI đang trích xuất câu hỏi từ tài liệu của bạn"
     },
     error: {
+      retry: "Vui lòng thử tạo lại hoặc quay về",
+      retryBtn: "Tạo lại",
       title: "Lỗi tải bài thi",
       back: "Quay lại"
     }
@@ -378,15 +392,28 @@ export const QUIZ_PAGE_TEXTS = {
   results: {
     title: "Kết quả bài thi",
     expertExplanation: "Giải thích chi tiết",
-    perfect: "Tuyệt vời Bạn đã nắm vững kiến thức từ tài liệu này.",
-    good: "Khá tốt Bạn đã hiểu phần lớn nội dung quan trọng.",
+    perfect: "Tuyệt vời! Bạn đã nắm vững kiến thức từ tài liệu này.",
+    good: "Khá tốt! Bạn đã hiểu phần lớn nội dung quan trọng.",
     keepTrying: "Cần cố gắng thêm. Hãy xem lại phần giải thích để củng cố kiến thức.",
     correct: "Đúng",
     incorrect: "Sai"
   },
+  question: (n) => `Câu ${n}:`,
   actions: {
     submit: "Nộp bài và xem đáp án",
+    regenBtn: "Tạo lại",
+    regenTooltip: "Tạo lại bài kiểm tra mới",
     confirmIncomplete: "Bạn chưa hoàn thành hết tất cả câu hỏi. Vẫn muốn nộp bài?"
+  },
+  confirm: {
+    submitTitle: "Nộp bài chưa hoàn thành",
+    submitMessage: (remaining) => `Bạn còn ${remaining} câu chưa trả lời. Bạn có chắc muốn nộp bài không?`,
+    submitConfirm: "Nộp bài",
+    submitCancel: "Tiếp tục làm",
+    regenTitle: "Tạo lại bài kiểm tra",
+    regenMessage: "AI sẽ tạo một bộ câu hỏi mới hoàn toàn khác. Tiến trình làm bài hiện tại sẽ bị mất.",
+    regenConfirm: "Tạo lại",
+    regenCancel: "Giữ lại"
   }
 };
 export const HELP_PAGE_TEXTS = {
@@ -598,5 +625,22 @@ export const MINDMAP_PAGE_TEXTS = {
     MESSAGE: "Toàn bộ sơ đồ hiện tại sẽ bị xóa và AI sẽ tạo lại từ đầu. Thao tác này không thể hoàn tác.",
     CONFIRM: "Đặt lại",
     CANCEL: "Giữ lại"
+  }
+};
+export const INTERACTIVE_MINDMAP_TEXTS = {
+  building: "Đang xây dựng…",
+  backBtn: "← Quay lại",
+  nodeEditor: {
+    title: "Chỉnh sửa nội dung",
+    placeholder: "Nhập nội dung…",
+    save: "Lưu thay đổi",
+    cancel: "Hủy"
+  },
+  colorPicker: {
+    title: "Màu nhánh"
+  },
+  contextMenu: {
+    editContent: "Sửa nội dung",
+    changeColor: "Đổi màu"
   }
 };
