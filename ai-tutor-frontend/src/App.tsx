@@ -1,4 +1,4 @@
-﻿import { Routes, Route, Navigate } from 'react-router-dom'
+import { Routes, Route, Navigate } from 'react-router-dom'
 import { AuthProvider, useAuth } from '@/context/AuthContext'
 import { ThemeProvider } from '@/components/ThemeProvider'
 
@@ -14,6 +14,7 @@ import LearningPage from '@/app/(dashboard)/learning/page'
 import ChatPage from '@/app/(dashboard)/chat/[documentId]/page'
 import QuizPage from '@/app/(dashboard)/quiz/[documentId]/page'
 import MindmapPage from '@/app/(dashboard)/mindmap/[documentId]/page'
+import MindmapListPage from '@/app/(dashboard)/mindmap/page'
 import PracticePage from '@/app/(dashboard)/practice/page'
 import SettingsPage from '@/app/(dashboard)/settings/page'
 import HelpPage from '@/app/(dashboard)/help/page'
@@ -52,6 +53,7 @@ export default function App() {
             <Route path="/learning" element={<LearningPage />} />
             <Route path="/chat/:documentId" element={<ChatPage />} />
             <Route path="/quiz/:documentId" element={<QuizPage />} />
+            <Route path="/mindmap" element={<MindmapListPage />} />
             <Route path="/mindmap/:documentId" element={<MindmapPage />} />
             <Route path="/practice" element={<PracticePage />} />
             <Route path="/settings" element={<SettingsPage />} />

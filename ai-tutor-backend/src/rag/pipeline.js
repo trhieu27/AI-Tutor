@@ -157,24 +157,40 @@ async function* mindmap(collectionName) {
 
 Yêu cầu sơ đồ:
 - Chủ đề trung tâm là tiêu đề hoặc chủ đề chính của tài liệu
-- Có 3-6 nhánh chính
-- Mỗi nhánh có 2-4 nhánh con
-- Nhãn ngắn gọn, súc tích (tối đa 5-6 từ mỗi nhãn)
+- Có 4-6 nhánh chính
+- Mỗi nhánh chính PHẢI có 2-4 nhánh con (bắt buộc)
+- Nhãn ngắn gọn, súc tích (tối đa 6 từ mỗi nhãn)
 - Viết bằng tiếng Việt
 
-Trả về ĐÚNG định dạng Mermaid mindmap, không thêm text nào ngoài code:
+Trả về ĐÚNG định dạng Mermaid mindmap, chỉ code thuần không thêm gì khác:
+
 mindmap
   root((Chủ đề chính))
     Nhánh 1
       Nhánh con 1.1
       Nhánh con 1.2
+      Nhánh con 1.3
     Nhánh 2
       Nhánh con 2.1
+      Nhánh con 2.2
+    Nhánh 3
+      Nhánh con 3.1
+      Nhánh con 3.2
+      Nhánh con 3.3
+    Nhánh 4
+      Nhánh con 4.1
+      Nhánh con 4.2
+
+QUY TẮC BẮT BUỘC:
+- Mỗi nhánh chính PHẢI có ít nhất 2 nhánh con, KHÔNG được để nhánh chính không có con
+- Dùng đúng 2 dấu cách (spaces) để thụt lề mỗi cấp (root=2, nhánh chính=4, nhánh con=6)
+- Không dùng dấu ngoặc đơn (), ngoặc vuông [], hay ký tự đặc biệt trong tên nhánh
+- Chỉ trả về code mindmap thuần, không có markdown fence, không có giải thích
 
 NỘI DUNG TÀI LIỆU:
 ${context}`;
 
-  yield* generateStream(prompt, { temperature: 0.3, maxTokens: 2048 });
+  yield* generateStream(prompt, { temperature: 0.3, maxTokens: 4096 });
 }
 
 // ── Study Questions ───────────────────────────────────────────────────────────

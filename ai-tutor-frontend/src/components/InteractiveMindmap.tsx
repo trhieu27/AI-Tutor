@@ -24,8 +24,8 @@ const DEPTH_COLORS = [
   'hsl(199 89% 48%)', 'hsl(158 64% 44%)', 'hsl(38 92% 50%)',
   'hsl(263 70% 62%)', 'hsl(328 81% 58%)'
 ];
-const V_GAP = 180;
-const H_PADDING = 220;
+const V_GAP = 140;
+const H_PADDING = 280;
 const NODE_H = 60;
 const NODE_MIN_W = 180;
 const PAD = 200;
@@ -394,7 +394,8 @@ const InteractiveMindmap = forwardRef<any, any>(({ chart, onCodeChange, document
   const [positions, setPositions] = useState({});
   const lastExportedRef = useRef('');
   const lastStructureRef = useRef('');
-  const storageKey = `mindmap-pos-${documentId || 'default'}`;
+  const LAYOUT_VERSION = 'v3'; // bump when layout constants change to force fresh calculation
+  const storageKey = `mindmap-pos-${documentId || 'default'}-${LAYOUT_VERSION}`;
 
   // UI state
   const [selectedNodeId, setSelectedNodeId] = useState(null);
@@ -411,10 +412,19 @@ const InteractiveMindmap = forwardRef<any, any>(({ chart, onCodeChange, document
     onUndoRedoStateChange?.(historyRef.current.length > 0, redoRef.current.length > 0);
   }, [onUndoRedoStateChange]);
 
+
   // Notify parent of initial state on mount
   useEffect(() => {
     updateUndoRedoState();
   }, [updateUndoRedoState]);
+
+  // Cleanup stale layout cache from old versions on mount
+  useEffect(() => {
+    const prefix = `mindmap-pos-${documentId || 'default'}`;
+    Object.keys(localStorage)
+      .filter(k => k.startsWith(prefix) && k !== storageKey)
+      .forEach(k => localStorage.removeItem(k));
+  }, [documentId, storageKey]);
 
   const pushSnapshot = useCallback(() => {
     if (!treeRef.current) return;
@@ -1097,7 +1107,8 @@ const InteractiveMindmap = forwardRef<any, any>(({ chart, onCodeChange, document
     );
   }
 
-  const allNodes = flattenTree(tree);
+  // Render deepest nodes first so parent nodes paint on top (correct SVG z-order)
+  const allNodes = flattenTree(tree).sort((a, b) => b.depth - a.depth);
 
   return (
     <div className="relative mindmap-container" style={{ width: viewBox.w, height: viewBox.h }}>
