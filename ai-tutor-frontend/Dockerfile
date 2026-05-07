@@ -1,44 +1,43 @@
 # ============================================================
-# Stage 1: Dependencies
+# Stage 1: Build Vite app
 # ============================================================
-FROM node:20-alpine AS deps
+FROM node:20-alpine AS builder
 WORKDIR /app
 
 COPY package.json package-lock.json ./
 RUN npm ci --prefer-offline
 
-# ============================================================
-# Stage 2: Builder
-# ============================================================
-FROM node:20-alpine AS builder
-WORKDIR /app
-
-COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 
-# Nhận API URL lúc build (được truyền từ docker-compose)
-ARG NEXT_PUBLIC_API_URL
-ARG NEXT_PUBLIC_GOOGLE_CLIENT_ID
-ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
-ENV NEXT_PUBLIC_GOOGLE_CLIENT_ID=$NEXT_PUBLIC_GOOGLE_CLIENT_ID
+# Build-time env vars (truyền từ docker-compose args)
+ARG VITE_API_URL
+ARG VITE_GOOGLE_CLIENT_ID
+ARG VITE_WS_URL
+ENV VITE_API_URL=$VITE_API_URL
+ENV VITE_GOOGLE_CLIENT_ID=$VITE_GOOGLE_CLIENT_ID
+ENV VITE_WS_URL=$VITE_WS_URL
 
 RUN npm run build
 
 # ============================================================
-# Stage 3: Runner (production image nhỏ gọn)
+# Stage 2: Serve với nginx (nhẹ, nhanh)
 # ============================================================
-FROM node:20-alpine AS runner
-WORKDIR /app
+FROM nginx:alpine AS runner
 
-ENV NODE_ENV=production
+# Copy static build output
+COPY --from=builder /app/dist /usr/share/nginx/html
 
-# Chỉ copy những gì cần thiết để chạy
-COPY --from=builder /app/public ./public
-COPY --from=builder /app/.next/standalone ./
-COPY --from=builder /app/.next/static ./.next/static
+# Config nginx để handle React Router (SPA fallback)
+RUN printf 'server {\n\
+    listen 3000;\n\
+    root /usr/share/nginx/html;\n\
+    index index.html;\n\
+    location / {\n\
+        try_files $uri $uri/ /index.html;\n\
+    }\n\
+    gzip on;\n\
+    gzip_types text/plain text/css application/json application/javascript text/xml application/xml application/xml+rss text/javascript;\n\
+}\n' > /etc/nginx/conf.d/default.conf
 
 EXPOSE 3000
-ENV PORT=3000
-ENV HOSTNAME="0.0.0.0"
-
-CMD ["node", "server.js"]
+CMD ["nginx", "-g", "daemon off;"]
