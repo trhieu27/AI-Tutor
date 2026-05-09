@@ -1,1641 +1,668 @@
 import React, { useState, useCallback, useRef, useEffect, useMemo, forwardRef, useImperativeHandle } from 'react';
 import { INTERACTIVE_MINDMAP_TEXTS } from '@/constants/texts';
 
-// ===== TYPES =====
+// ── Palette ──────────────────────────────────────────────────────────────────
+const NODE_COLORS = [
+  { name: 'Indigo',   value: 'hsl(239 68% 58%)' },
+  { name: 'Rose',     value: 'hsl(343 85% 58%)' },
+  { name: 'Sky',      value: 'hsl(199 89% 48%)' },
+  { name: 'Emerald',  value: 'hsl(158 64% 44%)' },
+  { name: 'Amber',    value: 'hsl(38 92% 50%)'  },
+  { name: 'Violet',   value: 'hsl(263 70% 62%)' },
+  { name: 'Pink',     value: 'hsl(328 81% 58%)' },
+  { name: 'Teal',     value: 'hsl(173 58% 42%)' },
+  { name: 'Red',      value: 'hsl(4 86% 58%)'   },
+  { name: 'Blue',     value: 'hsl(217 91% 60%)' },
+  { name: 'Lime',     value: 'hsl(84 81% 44%)'  },
+  { name: 'Orange',   value: 'hsl(27 96% 54%)'  },
+];
 
-// ===== CONSTANTS =====
-// ── High-contrast SaaS colour palette ──
-import { jsx as _jsx, jsxs as _jsxs, Fragment as _Fragment } from "react/jsx-runtime";
-const NODE_COLORS = [{
-  name: 'Indigo',
-  value: 'hsl(239 68% 58%)'
-}, {
-  name: 'Rose',
-  value: 'hsl(343 85% 58%)'
-}, {
-  name: 'Sky',
-  value: 'hsl(199 89% 48%)'
-}, {
-  name: 'Emerald',
-  value: 'hsl(158 64% 44%)'
-}, {
-  name: 'Amber',
-  value: 'hsl(38 92% 50%)'
-}, {
-  name: 'Violet',
-  value: 'hsl(263 70% 62%)'
-}, {
-  name: 'Pink',
-  value: 'hsl(328 81% 58%)'
-}, {
-  name: 'Teal',
-  value: 'hsl(173 58% 42%)'
-}, {
-  name: 'Red',
-  value: 'hsl(4 86% 58%)'
-}, {
-  name: 'Blue',
-  value: 'hsl(217 91% 60%)'
-}, {
-  name: 'Lime',
-  value: 'hsl(84 81% 44%)'
-}, {
-  name: 'Orange',
-  value: 'hsl(27 96% 54%)'
-}];
-const DEPTH_COLORS = ['hsl(239 62% 50%)', 'hsl(239 68% 58%)', 'hsl(343 85% 58%)', 'hsl(199 89% 48%)', 'hsl(158 64% 44%)', 'hsl(38 92% 50%)', 'hsl(263 70% 62%)', 'hsl(328 81% 58%)'];
-const V_GAP = 140;
-const H_PADDING = 280;
-const NODE_H = 60;
-const NODE_MIN_W = 180;
-const PAD = 200;
-function wrapText(text, width, height, fontSize) {
-  const charWidth = fontSize * 0.55;
-  const padding = 30;
-  const availW = width - padding;
-  const availH = height - 20;
-  const lineHeight = fontSize * 1.2;
-  const maxLines = Math.max(1, Math.floor(availH / lineHeight));
-  const maxCharsPerLine = Math.max(5, Math.floor(availW / charWidth));
-  const words = text.split(' ');
+// ── Layout constants ──────────────────────────────────────────────────────────
+const V_GAP     = 48;   // gap between sibling bounding-boxes (accounts for shadow bleed ~12px each side)
+const H_GAP     = 60;   // horizontal gap between depth columns
+const NODE_H    = 44;
+const NODE_MIN_W= 140;
+const PAD       = 180;
+const LAYOUT_VER= 'v14';
+
+// ── Text wrap ─────────────────────────────────────────────────────────────────
+function wrapText(text, w, h, fs) {
+  const cw = fs * 0.58, pad = 28;
+  const maxCh = Math.max(6, Math.floor((w - pad) / cw));
+  const maxLn = Math.max(1, Math.floor((h - 16) / (fs * 1.25)));
+  const words = (text || '').split(' ');
   const lines = [];
-  let currentLine = "";
+  let cur = '';
   for (const word of words) {
-    if ((currentLine + word).length <= maxCharsPerLine) {
-      currentLine += (currentLine === "" ? "" : " ") + word;
-    } else {
-      if (lines.length + 1 >= maxLines) {
-        // This would be the last allowed line, so we must truncate
-        if (currentLine.length > maxCharsPerLine - 3) {
-          currentLine = currentLine.substring(0, maxCharsPerLine - 3) + "...";
-        } else {
-          currentLine += "...";
-        }
-        lines.push(currentLine);
+    if ((cur + word).length <= maxCh) { cur += (cur ? ' ' : '') + word; }
+    else {
+      if (lines.length + 1 >= maxLn) {
+        lines.push((cur + '...').slice(0, maxCh));
         return lines;
       }
-      lines.push(currentLine);
-      currentLine = word;
+      if (cur) lines.push(cur);
+      cur = word;
     }
   }
-  if (currentLine) {
-    if (lines.length >= maxLines) {
-      lines[lines.length - 1] = lines[lines.length - 1].substring(0, maxCharsPerLine - 3) + "...";
-    } else {
-      lines.push(currentLine);
-    }
-  }
-  return lines;
+  if (cur) lines.push(lines.length >= maxLn ? lines.pop().slice(0, maxCh - 3) + '...' : cur);
+  return lines.length ? lines : [text || ''];
 }
 
-// ===== PARSER =====
-function extractText(raw) {
-  let t = raw.trim();
-  t = t.replace(/^\(\((.+)\)\)$/, '$1').replace(/^\((.+)\)$/, '$1').replace(/^\[(.+)\]$/, '$1').replace(/^\{\{(.+)\}\}$/, '$1');
-  return t;
-}
-function getIndent(line) {
-  const m = line.match(/^(\s*)/);
-  return m ? m[1].length : 0;
-}
+// ── Estimated node width ──────────────────────────────────────────────────────
 function estW(text) {
-  const safeText = text || "";
-  const textW = safeText.length * 16;
-  return Math.max(NODE_MIN_W + 60, textW + 140);
+  return Math.max(NODE_MIN_W, (text || '').length * 8.5 + NODE_H + 20);
 }
+
+// ── Parser ────────────────────────────────────────────────────────────────────
 function parseMermaid(code) {
-  const lines = code.split('\n').filter(l => l.trim().length > 0);
-  let start = -1;
+  const lines = code.split('\n').filter(l => l.trim());
+  let si = -1;
   for (let i = 0; i < lines.length; i++) {
-    if (lines[i].trim().toLowerCase() === 'mindmap') {
-      start = i + 1;
-      break;
-    }
+    if (lines[i].trim().toLowerCase() === 'mindmap') { si = i + 1; break; }
   }
-  if (start === -1 || start >= lines.length) return null;
+  if (si < 0) return null;
+
   const stack = [];
   let root = null;
-  let localNid = 0;
-  const usedIds = new Set();
-  // Track how many times a name has appeared under a specific parent path to create stable index-based IDs
-  const pathNameCounts = new Map();
-  const ensureUnique = baseId => {
-    const count = pathNameCounts.get(baseId) || 0;
-    pathNameCounts.set(baseId, count + 1);
-    return count === 0 ? baseId : `${baseId}-${count}`;
+  let nid = 0;
+  const seen = new Map();
+  const uid = base => {
+    const n = (seen.get(base) || 0) + 1;
+    seen.set(base, n);
+    return n === 1 ? base : `${base}-${n - 1}`;
   };
-  for (let i = start; i < lines.length; i++) {
+
+  for (let i = si; i < lines.length; i++) {
     const line = lines[i];
-    const indent = getIndent(line);
-    const raw = line.trim();
+    const indent = line.match(/^(\s*)/)[1].length;
+    let raw = line.trim();
     if (!raw) continue;
-    let id = `node-${++localNid}`;
-    let text = raw;
-    let color = '';
-    let width = undefined;
-    let height = undefined;
 
-    // Extract metadata — supports both hex (#abc) and hsl(h s% l%) color formats
-    const colorMatch = raw.match(/:::color-(hsl\([^)]+\)|#?[a-fA-F0-9]{3,6})/);
-    if (colorMatch) {
-      const raw_color = colorMatch[1];
-      // Normalise: add # prefix only for bare hex strings
-      color = raw_color.startsWith('hsl') ? raw_color : `#${raw_color.replace('#', '')}`;
-    }
-    const widthMatch = raw.match(/:::w-(\d+)/);
-    if (widthMatch) width = parseInt(widthMatch[1]);
-    const heightMatch = raw.match(/:::h-(\d+)/);
-    if (heightMatch) height = parseInt(heightMatch[1]);
+    // strip metadata
+    const colorM = raw.match(/:::color-(hsl\([^)]+\)|#?[a-fA-F0-9]{3,6})/);
+    const color = colorM ? (colorM[1].startsWith('hsl') ? colorM[1] : `#${colorM[1].replace('#','')}`) : '';
+    const wM = raw.match(/:::w-(\d+)/); const width  = wM  ? +wM[1]  : undefined;
+    const hM = raw.match(/:::h-(\d+)/); const height = hM  ? +hM[1]  : undefined;
+    raw = raw.replace(/:::color-(?:hsl\([^)]+\)|#?[a-fA-F0-9]{3,6})/g,'').replace(/:::w-\d+/g,'').replace(/:::h-\d+/g,'').trim();
 
-    // 1. Cleanup text from metadata tags FIRST (strips hsl AND hex color variants)
-    let cleanText = raw.replace(/:::color-(?:hsl\([^)]+\)|#?[a-fA-F0-9]{3,6})/g, '').replace(/:::w-\d+/g, '').replace(/:::h-\d+/g, '').trim();
-
-    // 2. Extract ID and Content with Hyper-Robust Recursive Cleanup
-    // 2a. Strip ID prefix if polymorphic (id((text)) -((text)))
-    let contentOnly = cleanText.replace(/^[a-zA-Z0-9_-]+\s*(?=[\(\[\{])/, '');
-
-    // 2b. Identify ID if present for structural purposes
-    const idExtractMatch = cleanText.match(/^([a-zA-Z0-9_-]+)\s*[\(\[\{]/);
-    if (idExtractMatch) id = idExtractMatch[1];
-
-    // 2c. Recursive Outer Shape Peeling
-    let finalizedText = contentOnly.trim();
-    let changed = true;
-    while (changed) {
-      changed = false;
-      const start = finalizedText;
-      if (finalizedText.startsWith('((') && finalizedText.endsWith('))')) {
-        finalizedText = finalizedText.substring(2, finalizedText.length - 2).trim();
-        changed = true;
-      } else if (finalizedText.startsWith('{{') && finalizedText.endsWith('}}')) {
-        finalizedText = finalizedText.substring(2, finalizedText.length - 2).trim();
-        changed = true;
-      } else if (finalizedText.startsWith('(') && finalizedText.endsWith(')')) {
-        finalizedText = finalizedText.substring(1, finalizedText.length - 1).trim();
-        changed = true;
-      } else if (finalizedText.startsWith('[') && finalizedText.endsWith(']')) {
-        finalizedText = finalizedText.substring(1, finalizedText.length - 1).trim();
-        changed = true;
-      }
-      if (start === finalizedText) changed = false;
-    }
-
-    // 2d. Final Aggressive Boundary Purge (Safety for asymmetrical markers)
-    text = finalizedText.replace(/^[\(\[\{]+/, '').replace(/[\)\]\}]+$/, '').trim();
-
-    // ID Assignment explicit IDs from mermaid code, only generate for missing ones
-    const hasExplicitId = idExtractMatch && idExtractMatch[1];
-    if (hasExplicitId) {
-      // The mermaid code had an explicit ID (e.g., u-abc123 or n-some-slug)
-      // Preserve it exactly — this is critical for localStorage position matching
-      id = idExtractMatch[1];
-      if (usedIds.has(id)) {
-        // Only add suffix if there's a genuine collision
-        let counter = 1;
-        while (usedIds.has(`${id}-${counter}`)) counter++;
-        id = `${id}-${counter}`;
-      }
-      usedIds.add(id);
-    } else if (!text) {
-      id = ensureUnique(`node-${++localNid}`);
-    } else {
-      // No explicit ID in source — generate a stable content-based slug
-      const parentPath = stack.length > 0 ? stack[stack.length - 1].path : '';
-      const textSlug = text.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/đ/g, 'd').replace(/[^a-z0-9]/g, '-').replace(/-+/g, '-').slice(0, 15);
-      const baseId = `n-${parentPath ? parentPath + '-' : ''}${textSlug}`;
-      id = ensureUnique(baseId);
-    }
-    if (!text || text.toLowerCase().includes('undefined') || text === '') {
-      text = stack.length === 0 ? 'Chủ đề chính' : 'Nhánh mới';
-    }
-    const newNode = {
-      id,
-      text,
-      children: [],
-      color,
-      width,
-      height
-    };
-    while (stack.length > 0 && stack[stack.length - 1].indent >= indent) {
-      stack.pop();
-    }
-    if (stack.length === 0) {
-      if (!root) root = newNode;
-      if (!newNode.color) newNode.color = '#4338ca';
-      stack.push({
-        node: newNode,
-        indent,
-        depth: 0,
-        path: id.replace(/^n-/, '').slice(0, 15)
-      });
-    } else {
-      const parentEntry = stack[stack.length - 1];
-      parentEntry.node.children.push(newNode);
-      const depth = parentEntry.depth + 1;
-      const currentPath = parentEntry.path + '-' + id.replace(/^n-/, '').slice(0, 15);
-
-      // Default color if not explicitly set
-      if (!newNode.color) {
-        if (depth === 1) {
-          newNode.color = NODE_COLORS[(parentEntry.node.children.length - 1) % NODE_COLORS.length].value;
-        } else {
-          newNode.color = parentEntry.node.color;
+    // strip shape brackets
+    const idM = raw.match(/^([a-zA-Z0-9_-]+)\s*[\(\[\{]/);
+    let id  = idM ? idM[1] : `node-${++nid}`;
+    let txt = raw.replace(/^[a-zA-Z0-9_-]+\s*(?=[\(\[\{])/, '');
+    let ch = true;
+    while (ch) {
+      ch = false;
+      for (const [o,c] of [['((','))'],['{{','}}'],['(',')'],['[',']']]) {
+        if (txt.startsWith(o) && txt.endsWith(c)) {
+          txt = txt.slice(o.length, txt.length - c.length).trim(); ch = true; break;
         }
       }
-      stack.push({
-        node: newNode,
-        indent,
-        depth,
-        path: currentPath
-      });
+    }
+    txt = txt.replace(/^[\(\[\{]+/,'').replace(/[\)\]\}]+$/,'').trim() || (stack.length === 0 ? 'Chủ đề chính' : 'Nhánh mới');
+
+    // unique id
+    const slug = txt.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/đ/g,'d').replace(/[^a-z0-9]/g,'-').replace(/-+/g,'-').slice(0,12);
+    const parentPath = stack.length ? stack[stack.length-1].path : '';
+    id = idM ? uid(id) : uid(`n-${parentPath ? parentPath+'-' : ''}${slug}`);
+
+    const node = { id, text: txt, children: [], color, width, height };
+
+    while (stack.length && stack[stack.length-1].indent >= indent) stack.pop();
+
+    if (!stack.length) {
+      if (!root) root = node;
+      if (!node.color) node.color = '#4338ca';
+      stack.push({ node, indent, depth: 0, path: id.slice(0,12) });
+    } else {
+      const pe = stack[stack.length-1];
+      pe.node.children.push(node);
+      const depth = pe.depth + 1;
+      if (!node.color) node.color = depth === 1
+        ? NODE_COLORS[(pe.node.children.length - 1) % NODE_COLORS.length].value
+        : pe.node.color;
+      stack.push({ node, indent, depth, path: (pe.path+'-'+id).slice(0,24) });
     }
   }
   return root;
 }
+
 function toMermaid(root) {
-  let r = 'mindmap\n';
-  function w(n, d) {
+  let out = 'mindmap\n';
+  const w = (n, d) => {
     if (!n) return;
-    const safeText = !n.text || n.text === 'undefined' ? d === 1 ? 'Chủ đề chính' : 'Nhánh mới' : n.text;
-    const shape = d === 1 ? `((${safeText}))` : `(${safeText})`;
+    const t = n.text || (d===1 ? 'Chủ đề chính' : 'Nhánh mới');
+    const shape = d===1 ? `((${t}))` : `(${t})`;
     let meta = '';
-    const cleanId = n.id;
-    // Store HSL colors as-is; strip # only from hex colors
-    if (n.color) meta += `:::color-${n.color.startsWith('hsl') ? n.color : n.color.replace('#', '')}`;
-    if (n.width) meta += `:::w-${n.width}`;
+    if (n.color) meta += `:::color-${n.color.startsWith('hsl') ? n.color : n.color.replace('#','')}`;
+    if (n.width)  meta += `:::w-${n.width}`;
     if (n.height) meta += `:::h-${n.height}`;
-    r += '  '.repeat(d) + `${cleanId}${shape}${meta}\n`;
-    if (n.children && Array.isArray(n.children)) {
-      n.children.forEach(c => w(c, d + 1));
-    }
-  }
+    out += '  '.repeat(d) + `${n.id}${shape}${meta}\n`;
+    (n.children || []).forEach(c => w(c, d+1));
+  };
   w(root, 1);
-  return r;
+  return out;
 }
 
-// ===== TREE OPS =====
+// ── Tree ops ──────────────────────────────────────────────────────────────────
+const ch = n => Array.isArray(n.children) ? n.children : [];
 function updateNode(root, id, upd) {
-  if (root.id === id) return {
-    ...root,
-    ...upd
-  };
-  const children = Array.isArray(root.children) ? root.children : [];
-  return {
-    ...root,
-    children: children.map(c => updateNode(c, id, upd))
-  };
+  if (root.id === id) return { ...root, ...upd };
+  return { ...root, children: ch(root).map(c => updateNode(c, id, upd)) };
 }
-function addChild(root, pid, depth) {
-  const children = Array.isArray(root.children) ? root.children : [];
+function addChild(root, pid) {
   if (root.id === pid) {
-    const id = `u-${Math.random().toString(36).substr(2, 9)}`;
-    const text = 'Nhánh mới';
-    return {
-      ...root,
-      children: [...children, {
-        id,
-        text,
-        children: [],
-        color: root.color || DEPTH_COLORS[(depth + 1) % DEPTH_COLORS.length]
-      }]
-    };
+    const id = `u-${Math.random().toString(36).slice(2,9)}`;
+    return { ...root, children: [...ch(root), { id, text: 'Nhánh mới', children: [], color: root.color }] };
   }
-  return {
-    ...root,
-    children: children.map(c => addChild(c, pid, depth + 1))
-  };
+  return { ...root, children: ch(root).map(c => addChild(c, pid)) };
 }
 function removeNode(root, id) {
-  const children = Array.isArray(root.children) ? root.children : [];
-  return {
-    ...root,
-    children: children.filter(c => c.id !== id).map(c => removeNode(c, id))
-  };
+  return { ...root, children: ch(root).filter(c => c.id !== id).map(c => removeNode(c, id)) };
 }
-function findDepth(root, id, d = 0) {
+function findDepth(root, id, d=0) {
   if (root.id === id) return d;
-  const children = Array.isArray(root.children) ? root.children : [];
-  for (const c of children) {
-    const r = findDepth(c, id, d + 1);
-    if (r >= 0) return r;
-  }
+  for (const c of ch(root)) { const r = findDepth(c, id, d+1); if (r>=0) return r; }
   return -1;
 }
-function flattenTree(node, depth = 0) {
-  const r = [{
-    id: node.id,
-    text: node.text,
-    depth,
-    color: node.color,
-    width: node.width,
-    height: node.height
-  }];
-  const children = Array.isArray(node.children) ? node.children : [];
-  children.forEach(c => r.push(...flattenTree(c, depth + 1)));
-  return r;
+function flattenTree(node, depth=0) {
+  return [{ id: node.id, text: node.text, depth, color: node.color, width: node.width, height: node.height },
+    ...ch(node).flatMap(c => flattenTree(c, depth+1))];
 }
 function findNode(root, id) {
   if (root.id === id) return root;
-  const children = Array.isArray(root.children) ? root.children : [];
-  for (const c of children) {
-    const r = findNode(c, id);
-    if (r) return r;
-  }
+  for (const c of ch(root)) { const r = findNode(c, id); if (r) return r; }
   return null;
 }
 function getDescendantIds(node) {
-  const ids = [node.id];
-  const children = Array.isArray(node.children) ? node.children : [];
-  children.forEach(c => ids.push(...getDescendantIds(c)));
-  return ids;
+  return [node.id, ...ch(node).flatMap(getDescendantIds)];
 }
 
-// ===== LAYOUT =====
-function stH(node, sizeMap) {
-  const children = Array.isArray(node.children) ? node.children : [];
-  const h = sizeMap?.[node.id]?.h || node.height || NODE_H;
-  if (children.length === 0) return h;
-  const childSum = children.reduce((acc, c) => acc + stH(c, sizeMap), 0);
-  const gapSum = (children.length - 1) * V_GAP;
-  return Math.max(h, childSum + gapSum);
-}
-
-// Pure auto-layout: computes ideal positions based only on tree structure and node sizes.
-// Does NOT use stored x/y positions — that's mergeRecursive's job.
+// ── Layout ────────────────────────────────────────────────────────────────────
 function computePositions(root, sizeMap) {
+  if (!root) return {};
   const pos = {};
-  if (!root) return pos;
-  const rw = sizeMap?.[root.id]?.w || root.width || Math.max(estW(root.text || ""), 140);
-  const rh = sizeMap?.[root.id]?.h || root.height || Math.max(NODE_H, 80);
-  pos[root.id] = {
-    x: 0,
-    y: 0,
-    w: rw,
-    h: rh,
-    depth: 0,
-    text: root.text
-  };
-  const left = [];
-  const right = [];
-  root.children.forEach((c, i) => {
-    if (i % 2 === 0) right.push(c);else left.push(c);
-  });
-  function layoutSide(parent, children, dir, depth) {
-    const pp = pos[parent.id];
-    const px = pp.x,
-      py = pp.y;
-    const totalH = children.reduce((s, c) => s + stH(c, sizeMap) + V_GAP, 0) - V_GAP;
-    let cy = py - totalH / 2;
-    const widths = children.map(c => sizeMap?.[c.id]?.w || c.width || estW(c.text));
-    const maxCW = Math.max(...widths, NODE_MIN_W);
-    for (let i = 0; i < children.length; i++) {
-      const child = children[i];
-      const sh = stH(child, sizeMap);
-      const cw = widths[i];
-      const ch = sizeMap?.[child.id]?.h || child.height || NODE_H;
-      const centerY = cy + sh / 2;
-      const baseDist = pp.w / 2 + H_PADDING + maxCW / 2;
-      const cx = px + dir * (baseDist - (maxCW - cw) / 2);
-      pos[child.id] = {
-        x: cx,
-        y: centerY,
-        w: cw,
-        h: ch,
-        depth,
-        text: child.text
-      };
-      if (child.children.length) {
-        layoutSide(child, child.children, dir, depth + 1);
-      }
-      cy += sh + V_GAP;
-    }
+  const gW = n => sizeMap?.[n.id]?.w || n.width  || estW(n.text||'');
+  const gH = n => sizeMap?.[n.id]?.h || n.height || NODE_H;
+
+  // subtreeH: bounding-box height needed for node + all descendants
+  function subtreeH(node) {
+    const kids = node.children || [];
+    const nh = gH(node);
+    if (!kids.length) return nh;
+    const span = kids.reduce((s,c) => s + subtreeH(c), 0) + (kids.length - 1) * V_GAP;
+    return Math.max(span, nh);
   }
-  if (left.length) layoutSide(root, left, -1, 1);
-  if (right.length) layoutSide(root, right, 1, 1);
+
+  // assignY: recursively place node within its allocated band [topY, topY+subtreeH)
+  function assignY(node, topY) {
+    const kids = node.children || [];
+    const nh = gH(node);
+    if (!kids.length) {
+      pos[node.id] = { x: 0, y: topY + nh/2, w: gW(node), h: nh, depth: 0, text: node.text };
+      return;
+    }
+    let cursor = topY;
+    kids.forEach(c => { assignY(c, cursor); cursor += subtreeH(c) + V_GAP; });
+    // center parent between first and last child midpoints
+    const fy = pos[kids[0].id].y;
+    const ly = pos[kids[kids.length-1].id].y;
+    pos[node.id] = { x: 0, y: (fy + ly) / 2, w: gW(node), h: nh, depth: 0, text: node.text };
+  }
+
+  // split children alternating right/left: 0→right, 1→left, 2→right ...
+  const left = [], right = [];
+  (root.children || []).forEach((c,i) => (i%2===0 ? right : left).push(c));
+
+  const rw = gW(root), rh = gH(root);
+  pos[root.id] = { x: 0, y: 0, w: rw, h: rh, depth: 0, text: root.text };
+
+  function layoutSide(branches, dir) {
+    if (!branches.length) return;
+    const totalH = branches.reduce((s,b) => s + subtreeH(b), 0) + (branches.length-1) * V_GAP;
+    let cy = -totalH / 2;
+    branches.forEach(b => { assignY(b, cy); cy += subtreeH(b) + V_GAP; });
+
+    // Post-process: shift so that midpoint of first and last branch CENTERS = 0 (root y)
+    // Without this, unequal subtree sizes shift the visual center away from root
+    if (branches.length > 1) {
+      const firstY = pos[branches[0].id]?.y ?? 0;
+      const lastY  = pos[branches[branches.length-1].id]?.y ?? 0;
+      const offset = (firstY + lastY) / 2;
+      if (Math.abs(offset) > 1) {
+        const shiftNode = n => {
+          if (pos[n.id]) pos[n.id].y -= offset;
+          (n.children||[]).forEach(shiftNode);
+        };
+        branches.forEach(shiftNode);
+      }
+    }
+
+    // collect all nodes DFS with depth
+    const all = [];
+    const dfs = (n, d) => { all.push({n,d}); (n.children||[]).forEach(c => dfs(c,d+1)); };
+    branches.forEach(b => dfs(b, 1));
+
+    // one x-column per depth, widest node wins
+    const maxW = {};
+    all.forEach(({n,d}) => { maxW[d] = Math.max(maxW[d]||0, gW(n)); });
+    const colX = {};
+    let xAcc = rw/2;
+    const maxD = Math.max(...Object.keys(maxW).map(Number));
+    for (let d=1; d<=maxD; d++) {
+      xAcc += H_GAP + (maxW[d]||NODE_MIN_W)/2;
+      colX[d] = dir * xAcc;
+      xAcc += (maxW[d]||NODE_MIN_W)/2;
+    }
+    all.forEach(({n,d}) => { if (pos[n.id]) { pos[n.id].x = colX[d]; pos[n.id].depth = d; } });
+  }
+
+  layoutSide(left, -1);
+  layoutSide(right, 1);
   return pos;
 }
 
-// ===== SVG CONNECTION PATH — Smooth organic cubic Bézier =====
-// Uses asymmetric tension: high initial tangent pull (0.55) + subtle
-// mid-curve S-bend that avoids the robotic 90-degree elbow feel.
+// ── Bezier path ───────────────────────────────────────────────────────────────
 function bezierPath(x1, y1, x2, y2) {
-  const dx = x2 - x1;
-  const dy = y2 - y1;
-  const absDx = Math.abs(dx);
-  const absDy = Math.abs(dy);
-
-  // Tension scales with both axes for a more natural arc
-  const tensionX = Math.max(30, absDx * 0.55);
-  const tensionY = absDy * 0.12; // slight S-curve lift
-
-  const signX = dx > 0 ? 1 : -1;
-
-  // CP1: depart from parent with horizontal bias + subtle vertical drift
-  const cp1x = x1 + signX * tensionX;
-  const cp1y = y1 + tensionY;
-  // CP2: arrive at child with horizontal bias + mirror drift
-  const cp2x = x2 - signX * tensionX;
-  const cp2y = y2 - tensionY;
-  return `M ${x1} ${y1} C ${cp1x} ${cp1y}, ${cp2x} ${cp2y}, ${x2} ${y2}`;
+  const dx = Math.abs(x2-x1), signX = x2>x1 ? 1 : -1;
+  const tx = Math.max(30, dx*0.45);
+  return `M ${x1} ${y1} C ${x1+signX*tx} ${y1}, ${x2-signX*tx} ${y2}, ${x2} ${y2}`;
 }
 
-// ===== COMPONENT =====
-const InteractiveMindmap = /*#__PURE__*/forwardRef(({
-  chart,
-  onCodeChange,
-  documentId,
-  zoom = 1,
-  onUndoRedoStateChange
-}, ref) => {
-  const [tree, setTree] = useState(null);
-  const [positions, setPositions] = useState({});
-  const lastExportedRef = useRef('');
-  const lastStructureRef = useRef('');
-  const LAYOUT_VERSION = 'v3'; // bump when layout constants change to force fresh calculation
-  const storageKey = `mindmap-pos-${documentId || 'default'}-${LAYOUT_VERSION}`;
+const InteractiveMindmap = forwardRef(({chart,onCodeChange,documentId,zoom=1,onUndoRedoStateChange},ref)=>{
+  const [tree,setTree]=useState(null);
+  const [positions,setPositions]=useState({});
+  const [selId,setSelId]=useState(null);
+  const [menuMode,setMenuMode]=useState(null);
+  const [menuPos,setMenuPos]=useState({x:0,y:0});
+  const [editText,setEditText]=useState('');
+  const svgRef=useRef(null),treeRef=useRef(null),posRef=useRef({});
+  const dragRef=useRef(null),resizeDragRef=useRef(null),histRef=useRef([]),redoRef=useRef([]);
+  const lastCodeRef=useRef(''),lastStructRef=useRef('');
+  const SK=`mindmap-pos-${documentId||'default'}-${LAYOUT_VER}`;
 
-  // UI state
-  const [selectedNodeId, setSelectedNodeId] = useState(null);
-  const [menuPos, setMenuPos] = useState({
-    x: 0,
-    y: 0
-  });
-  const [menuMode, setMenuMode] = useState(null);
-  const [editText, setEditText] = useState('');
+  const notifyUR=useCallback(()=>onUndoRedoStateChange?.(histRef.current.length>0,redoRef.current.length>0),[onUndoRedoStateChange]);
 
-  // Unified Undo/Redo tracking both Structure (Code) and Layout (Positions)
-  const historyRef = useRef([]);
-  const redoRef = useRef([]);
-  const MAX_HISTORY = 40;
-  const updateUndoRedoState = useCallback(() => {
-    onUndoRedoStateChange?.(historyRef.current.length > 0, redoRef.current.length > 0);
-  }, [onUndoRedoStateChange]);
+  useEffect(()=>{
+    const pfx=`mindmap-pos-${documentId||'default'}`;
+    Object.keys(localStorage).filter(k=>k.startsWith(pfx)&&k!==SK).forEach(k=>localStorage.removeItem(k));
+  },[SK]);
 
-  // Notify parent of initial state on mount
-  useEffect(() => {
-    updateUndoRedoState();
-  }, [updateUndoRedoState]);
+  const pushSnap=useCallback(()=>{
+    if(!treeRef.current)return;
+    const snap={code:toMermaid(treeRef.current),pos:{...posRef.current}};
+    const last=histRef.current[histRef.current.length-1];
+    if(last&&last.code===snap.code)return;
+    histRef.current=[...histRef.current.slice(-39),snap];
+    redoRef.current=[];
+    notifyUR();
+  },[notifyUR]);
 
-  // Cleanup stale layout cache from old versions on mount
-  useEffect(() => {
-    const prefix = `mindmap-pos-${documentId || 'default'}`;
-    Object.keys(localStorage).filter(k => k.startsWith(prefix) && k !== storageKey).forEach(k => localStorage.removeItem(k));
-  }, [documentId, storageKey]);
-  const pushSnapshot = useCallback(() => {
-    if (!treeRef.current) return;
-    const currentCode = toMermaid(treeRef.current);
-    const snapshot = {
-      code: currentCode,
-      positions: {
-        ...posRef.current
-      }
-    };
+  const applySnap=useCallback((snap)=>{
+    const p=parseMermaid(snap.code);
+    if(p){setTree(p);treeRef.current=p;lastCodeRef.current=snap.code;onCodeChange?.(snap.code);}
+    setPositions(snap.pos);posRef.current=snap.pos;notifyUR();
+  },[onCodeChange,notifyUR]);
 
-    // Prevent duplicate consecutive snapshots
-    const last = historyRef.current[historyRef.current.length - 1];
-    if (last && last.code === snapshot.code && JSON.stringify(last.positions) === JSON.stringify(snapshot.positions)) {
-      return;
-    }
-    historyRef.current = [...historyRef.current.slice(-(MAX_HISTORY - 1)), snapshot];
-    redoRef.current = []; // Clear redo on action
-    updateUndoRedoState();
-  }, [updateUndoRedoState]);
-  const undo = useCallback(() => {
-    if (historyRef.current.length === 0) return;
-    const currentSnapshot = {
-      code: toMermaid(treeRef.current),
-      positions: {
-        ...posRef.current
-      }
-    };
-    const prev = historyRef.current[historyRef.current.length - 1];
-    historyRef.current = historyRef.current.slice(0, -1);
-    redoRef.current = [currentSnapshot, ...redoRef.current.slice(0, MAX_HISTORY - 1)];
-
-    // Apply previous state
-    const parsed = parseMermaid(prev.code);
-    if (parsed) {
-      setTree(parsed);
-      treeRef.current = parsed;
-      lastExportedRef.current = prev.code;
-      if (onCodeChange) onCodeChange(prev.code);
-    }
-    setPositions(prev.positions);
-    posRef.current = prev.positions;
-    updateUndoRedoState();
-  }, [onCodeChange, updateUndoRedoState]);
-  const redo = useCallback(() => {
-    if (redoRef.current.length === 0) return;
-    const currentSnapshot = {
-      code: toMermaid(treeRef.current),
-      positions: {
-        ...posRef.current
-      }
-    };
-    const next = redoRef.current[0];
-    redoRef.current = redoRef.current.slice(1);
-    historyRef.current = [...historyRef.current, currentSnapshot];
-
-    // Apply next state
-    const parsed = parseMermaid(next.code);
-    if (parsed) {
-      setTree(parsed);
-      treeRef.current = parsed;
-      lastExportedRef.current = next.code;
-      if (onCodeChange) onCodeChange(next.code);
-    }
-    setPositions(next.positions);
-    posRef.current = next.positions;
-    updateUndoRedoState();
-  }, [onCodeChange, updateUndoRedoState]);
-
-  // EXPORT ENGINE
-  useImperativeHandle(ref, () => ({
-    downloadImage: () => {
-      if (!svgRef.current || Object.keys(positions).length === 0) return;
-      const svg = svgRef.current;
-      const posValues = Object.values(positions);
-      const minX = Math.min(...posValues.map(p => p.x - p.w / 2)) - 100;
-      const maxX = Math.max(...posValues.map(p => p.x + p.w / 2)) + 100;
-      const minY = Math.min(...posValues.map(p => p.y - p.h / 2)) - 100;
-      const maxY = Math.max(...posValues.map(p => p.y + p.h / 2)) + 100;
-      const exportW = maxX - minX;
-      const exportH = maxY - minY;
-      const clone = svg.cloneNode(true);
-
-      // Clean up UI elements from clone
-      clone.querySelectorAll('.resize-handles').forEach(el => el.remove());
-      clone.querySelectorAll('.animate-pulse').forEach(el => el.remove());
-
-      // Setup export dimensions
-      clone.setAttribute('width', exportW.toString());
-      clone.setAttribute('height', exportH.toString());
-      clone.setAttribute('viewBox', `${minX} ${minY} ${exportW} ${exportH}`);
-
-      // Background and Styles
-      const bg = document.body.classList.contains('dark') ? '#0f172a' : '#f8fafc';
-      const style = document.createElementNS('http://www.w3.org/2000/svg', 'style');
-      style.textContent = `
-        svg { background: ${bg}; font-family: 'Inter', sans-serif; }
-        .mindmap-bg { fill: ${bg}; }
-      `;
-      clone.prepend(style);
-      const svgData = new XMLSerializer().serializeToString(clone);
-      const canvas = document.createElement('canvas');
-      const ctx = canvas.getContext('2d');
-      const img = new Image();
-      const svgBlob = new Blob([svgData], {
-        type: 'image/svg+xml;charset=utf-8'
-      });
-      const url = URL.createObjectURL(svgBlob);
-      canvas.width = exportW * 2; // High DPI
-      canvas.height = exportH * 2;
-      img.onload = () => {
-        if (!ctx) return;
-        ctx.fillStyle = bg;
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
-        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-        const pngUrl = canvas.toDataURL('image/png');
-        const downloadLink = document.createElement('a');
-        downloadLink.href = pngUrl;
-        downloadLink.download = `mindmap-${documentId || 'export'}.png`;
-        document.body.appendChild(downloadLink);
-        downloadLink.click();
-        document.body.removeChild(downloadLink);
-        URL.revokeObjectURL(url);
+  useImperativeHandle(ref,()=>({
+    undo:()=>{if(!histRef.current.length)return;const cur={code:toMermaid(treeRef.current),pos:{...posRef.current}};const prev=histRef.current.pop();redoRef.current=[cur,...redoRef.current.slice(0,39)];applySnap(prev);},
+    redo:()=>{if(!redoRef.current.length)return;const cur={code:toMermaid(treeRef.current),pos:{...posRef.current}};const nxt=redoRef.current.shift();histRef.current=[...histRef.current,cur];applySnap(nxt);},
+    pushSnapshot:pushSnap,
+    resetLayout:()=>{localStorage.removeItem(SK);setTree(null);setPositions({});treeRef.current=null;posRef.current={};lastCodeRef.current='';histRef.current=[];redoRef.current=[];notifyUR();},
+    downloadImage:()=>{
+      if(!svgRef.current)return;
+      const pv=Object.values(posRef.current);
+      if(!pv.length)return;
+      const mx=Math.min(...pv.map(p=>p.x-p.w/2))-80,MX=Math.max(...pv.map(p=>p.x+p.w/2))+80;
+      const my=Math.min(...pv.map(p=>p.y-p.h/2))-80,MY=Math.max(...pv.map(p=>p.y+p.h/2))+80;
+      const W=MX-mx,H=MY-my;
+      const scale=2; // 2x for retina quality
+      const cl=svgRef.current.cloneNode(true);
+      cl.setAttribute('width',W*scale);cl.setAttribute('height',H*scale);
+      cl.setAttribute('viewBox',`${mx} ${my} ${W} ${H}`);
+      // Inline a basic background rect so PNG has a background
+      const bg=document.createElementNS('http://www.w3.org/2000/svg','rect');
+      bg.setAttribute('x',mx);bg.setAttribute('y',my);
+      bg.setAttribute('width',W);bg.setAttribute('height',H);
+      bg.setAttribute('fill','hsl(222 47% 8%)');
+      cl.insertBefore(bg,cl.firstChild);
+      const svgStr=new XMLSerializer().serializeToString(cl);
+      const dataUrl='data:image/svg+xml;base64,'+btoa(unescape(encodeURIComponent(svgStr)));
+      const canvas=document.createElement('canvas');
+      canvas.width=W*scale;canvas.height=H*scale;
+      const ctx=canvas.getContext('2d');
+      const img=new Image();
+      img.onload=()=>{
+        ctx.drawImage(img,0,0);
+        const a=document.createElement('a');
+        a.href=canvas.toDataURL('image/png');
+        a.download=`mindmap-${documentId||'export'}.png`;
+        a.click();
       };
-      img.src = url;
+      img.src=dataUrl;
     },
-    resetLayout: () => {
-      localStorage.removeItem(storageKey);
-      setPositions({});
-      historyRef.current = [];
-      redoRef.current = [];
-      updateUndoRedoState();
-    },
-    undo: undo,
-    redo: redo,
-    pushSnapshot: pushSnapshot,
-    getPositions: () => ({
-      ...posRef.current
-    }),
-    forceSetPositions: newPos => {
-      setPositions(newPos);
-      posRef.current = newPos;
-      isManualChangeRef.current = true;
-    }
+    getPositions:()=>({...posRef.current}),
+    forceSetPositions:p=>{setPositions(p);posRef.current=p;},
   }));
 
-  // Refs for listeners
-  const svgRef = useRef(null);
-  const treeRef = useRef(null);
-  const posRef = useRef({});
-  const dragRef = useRef(null);
-  const resizeRef = useRef(null);
-  useEffect(() => {
-    treeRef.current = tree;
-  }, [tree]);
-  useEffect(() => {
-    posRef.current = positions;
-  }, [positions]);
-  const isManualChangeRef = useRef(false);
+  useEffect(()=>{treeRef.current=tree;},[tree]);
+  useEffect(()=>{posRef.current=positions;},[positions]);
 
-  // AUTO-PERSIST LAYOUT every change instantly
-  useEffect(() => {
-    if (Object.keys(positions).length > 0 && lastStructureRef.current) {
-      const layoutWithMeta = {};
-      const flat = tree ? flattenTree(tree) : [];
-      Object.keys(positions).forEach(id => {
-        const node = flat.find(n => n.id === id);
-        layoutWithMeta[id] = {
-          ...positions[id],
-          text: node?.text || ''
-        };
-      });
-      localStorage.setItem(storageKey, JSON.stringify({
-        layout: layoutWithMeta,
-        hash: lastStructureRef.current
-      }));
-      isManualChangeRef.current = false;
-    }
-  }, [positions, storageKey, tree]);
+  useEffect(()=>{
+    if(!chart){setTree(null);lastCodeRef.current='';return;}
+    if(chart!==lastCodeRef.current){const p=parseMermaid(chart);if(p){setTree(p);lastCodeRef.current=chart;}}
+  },[chart]);
 
-  // Parse chart -> tree
-  useEffect(() => {
-    if (chart && chart !== lastExportedRef.current) {
-      const parsed = parseMermaid(chart);
-      if (parsed) setTree(parsed);
-    }
-  }, [chart]);
-
-  // Update layout when tree structure changes
-  useEffect(() => {
-    if (!tree) return;
-    const currentStructure = flattenTree(tree).map(n => n.id).join('|');
-    lastStructureRef.current = currentStructure;
-    setPositions(prev => {
-      // Step 1 stored layout data
-      const savedData = localStorage.getItem(storageKey);
-      let stored = {};
-      if (savedData) {
-        try {
-          const parsed = JSON.parse(savedData);
-          stored = parsed.layout || {};
-        } catch (e) {}
-      }
-
-      // Step 2 with current in-memory state (handles rapid successive adds)
-      const treeIds = new Set(flattenTree(tree).map(n => n.id));
-      Object.keys(prev).forEach(id => {
-        if (treeIds.has(id) && prev[id]) {
-          stored[id] = {
-            ...stored[id],
-            ...prev[id]
-          };
+  useEffect(()=>{
+    if(!tree)return;
+    const struct=flattenTree(tree).map(n=>n.id).join('|');
+    lastStructRef.current=struct;
+    setPositions(()=>{
+      // Only restore manual drag positions when the tree structure is identical
+      let stored={};
+      try{
+        const d=localStorage.getItem(SK);
+        if(d){const j=JSON.parse(d);
+          // Hash must match exactly — prevents old positions from polluting a new diagram
+          if(j.hash===struct) stored=j.layout||{};
         }
-      });
-
-      // Step 3 a size-only map for auto-layout computation
-      const sizeMap = {};
-      Object.keys(stored).forEach(id => {
-        if (stored[id]) {
-          sizeMap[id] = {
-            w: stored[id].w,
-            h: stored[id].h
-          };
-        }
-      });
-
-      // Step 4 pure auto-layout (determines ideal positions based on tree structure)
-      const autoLayout = computePositions(tree, sizeMap);
-
-      // Step 5 auto-layout with stored positions + recursive parent shifts
-      const final = {};
-      const mergeRecursive = (node, parentShift = {
-        dx: 0,
-        dy: 0
-      }) => {
-        const auto = autoLayout[node.id];
-        if (!auto) return;
-        let currentShift = {
-          ...parentShift
-        };
-        let finalPos;
-        const saved = stored[node.id];
-        if (saved && typeof saved.x === 'number' && typeof saved.y === 'number') {
-          // Absolute position recovery
-          finalPos = {
-            x: saved.x,
-            y: saved.y,
-            w: saved.w || auto.w,
-            h: saved.h || auto.h,
-            depth: auto.depth,
-            text: saved.text || node.text
-          };
-          // Update shift for children: how much does THIS manual pos differ from its IDEAL auto pos?
-          currentShift = {
-            dx: finalPos.x - auto.x,
-            dy: finalPos.y - auto.y
-          };
+      }catch(e){}
+      const sizeMap={};
+      Object.keys(stored).forEach(id=>{if(stored[id])sizeMap[id]={w:stored[id].w,h:stored[id].h};});
+      const auto=computePositions(tree,sizeMap);
+      const final={};
+      // merge: for existing nodes use stored pos; for NEW nodes, offset relative to parent's actual pos
+      const merge=(node,parentId)=>{
+        const a=auto[node.id];if(!a)return;
+        const s=stored[node.id];
+        if(s&&typeof s.x==='number'){
+          // Existing node with manual position — restore it
+          final[node.id]={...a,x:s.x,y:s.y,w:s.w||a.w,h:s.h||a.h};
+        } else if(parentId&&final[parentId]&&auto[parentId]){
+          // New node — place relative to parent's ACTUAL position using auto-layout offset
+          const autoParent=auto[parentId];
+          const dx=a.x-autoParent.x, dy=a.y-autoParent.y;
+          final[node.id]={...a,x:final[parentId].x+dx,y:final[parentId].y+dy};
         } else {
-          // Relative recovery: use auto-layout + parent's shift
-          finalPos = {
-            ...auto,
-            x: auto.x + parentShift.dx,
-            y: auto.y + parentShift.dy,
-            text: node.text
-          };
+          final[node.id]={...a};
         }
-        final[node.id] = finalPos;
-        node.children?.forEach(child => mergeRecursive(child, currentShift));
+        (node.children||[]).forEach(c=>merge(c,node.id));
       };
-      if (tree) mergeRecursive(tree);
-      const flat = tree ? flattenTree(tree) : [];
-
-      // Step 6 persistence — save to localStorage right now
-      // We merge with 'stored' to preserve positions of nodes that might be 
-      // temporarily missing from the tree (due to Undo/Redo or structural edits).
-      const layoutToSave = {
-        ...stored
-      };
-      Object.keys(final).forEach(id => {
-        const n = flat.find(n => n.id === id);
-        layoutToSave[id] = {
-          ...final[id],
-          text: n?.text || layoutToSave[id]?.text || ''
-        };
-      });
-      localStorage.setItem(storageKey, JSON.stringify({
-        layout: layoutToSave,
-        hash: currentStructure
-      }));
-      posRef.current = final;
+      merge(tree,null);
+      const save={};
+      flattenTree(tree).forEach(n=>{if(final[n.id])save[n.id]={...final[n.id],text:n.text};});
+      localStorage.setItem(SK,JSON.stringify({layout:save,hash:struct}));
+      posRef.current=final;
       return final;
     });
-  }, [tree, storageKey]);
+  },[tree,SK]);
 
-  // Shared update wrapper that handles both full tree replacement and partial node updates
-  const applyUpdate = useCallback((target, updates = null, skipHistory = false) => {
-    if (!tree) return;
-    if (!skipHistory) {
-      pushSnapshot();
-    }
-    let newTree;
-    if (typeof target === 'string') {
-      newTree = JSON.parse(JSON.stringify(tree));
-      const node = findNode(newTree, target);
-      if (node && updates) {
-        Object.assign(node, updates);
+  // Persist dragged positions. Intentionally omits 'tree' from deps:
+  // If 'tree' were included, this would fire with old positions + new tree on the same
+  // commit cycle as the layout effect — writing stale positions under the new hash.
+  // Using treeRef.current gives us the current tree without making it a trigger.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(()=>{
+    const t=treeRef.current;
+    if(!t||!Object.keys(positions).length||!lastStructRef.current)return;
+    const save={};
+    flattenTree(t).forEach(n=>{if(positions[n.id])save[n.id]={...positions[n.id],text:n.text};});
+    localStorage.setItem(SK,JSON.stringify({layout:save,hash:lastStructRef.current}));
+  },[positions,SK]);
+
+  const toSvg=useCallback((cx,cy)=>{
+    if(!svgRef.current)return{x:0,y:0};
+    const pt=svgRef.current.createSVGPoint();pt.x=cx;pt.y=cy;
+    return pt.matrixTransform(svgRef.current.getScreenCTM().inverse());
+  },[]);
+
+  useEffect(()=>{
+    const onMove=e=>{
+      // Resize handle drag
+      const rs=resizeDragRef.current;
+      if(rs){
+        const pt=toSvg(e.clientX,e.clientY);
+        const next={...posRef.current};
+        const p=next[rs.id];
+        if(p){
+          const newW=Math.max(NODE_MIN_W,Math.abs(pt.x-p.x)*2);
+          const newH=Math.max(NODE_H,Math.abs(pt.y-p.y)*2);
+          next[rs.id]={...p,w:newW,h:newH};
+          setPositions(next);posRef.current=next;
+        }
+        return;
       }
-    } else {
-      newTree = target;
-    }
+      // Node drag
+      const ds=dragRef.current;if(!ds)return;
+      const pt=toSvg(e.clientX,e.clientY);
+      const dx=pt.x-ds.sx,dy=pt.y-ds.sy;
+      const next={...ds.snap};
+      ds.ids.forEach(id=>{if(next[id])next[id]={...next[id],x:next[id].x+dx,y:next[id].y+dy};});
+      setPositions(next);posRef.current=next;
+    };
+    const onUp=e=>{
+      if(resizeDragRef.current){
+        const snap={code:toMermaid(treeRef.current),pos:resizeDragRef.current.snap};
+        histRef.current=[...histRef.current.slice(-39),snap];redoRef.current=[];notifyUR();
+        resizeDragRef.current=null;document.body.classList.remove('select-none');return;
+      }
+      const ds=dragRef.current;if(!ds){document.body.classList.remove('select-none');return;}
+      const pt=toSvg(e.clientX,e.clientY);
+      const dx=Math.abs(pt.x-ds.sx),dy=Math.abs(pt.y-ds.sy);
+      if(dx>5||dy>5){const snap={code:toMermaid(treeRef.current),pos:ds.snap};histRef.current=[...histRef.current.slice(-39),snap];redoRef.current=[];notifyUR();}
+      if(dx<6&&dy<6){
+        const p=posRef.current[ds.id];
+        if(p&&svgRef.current){const vb=svgRef.current.viewBox.baseVal;setSelId(ds.id);setMenuPos({x:p.x-vb.x,y:p.y-p.h/2-vb.y});setMenuMode('main');}
+      }
+      dragRef.current=null;document.body.classList.remove('select-none');
+    };
+    document.addEventListener('mousemove',onMove);document.addEventListener('mouseup',onUp);
+    return()=>{document.removeEventListener('mousemove',onMove);document.removeEventListener('mouseup',onUp);};
+  },[toSvg,notifyUR]);
+
+  useEffect(()=>{
+    if(!selId)return;
+    const h=()=>{setSelId(null);setMenuMode(null);};
+    const t=setTimeout(()=>window.addEventListener('click',h),100);
+    return()=>{clearTimeout(t);window.removeEventListener('click',h);};
+  },[selId]);
+
+  const startDrag=useCallback((e,id)=>{
+    if(e.button!==0)return;
+    e.stopPropagation();e.preventDefault();
+    if(!treeRef.current)return;
+    const node=findNode(treeRef.current,id);if(!node)return;
+    const pt=toSvg(e.clientX,e.clientY);
+    dragRef.current={id,ids:getDescendantIds(node),sx:pt.x,sy:pt.y,snap:{...posRef.current}};
+    document.body.classList.add('select-none');
+  },[toSvg]);
+
+  // applyUpdate: mutate tree while preserving current positions.
+  // Pre-saves current posRef positions under the NEW tree's hash so that
+  // useEffect([tree,SK]) restores them instead of resetting to auto-layout.
+  const applyUpdate=useCallback((newTree,skipSnap=false)=>{
+    if(!skipSnap)pushSnap();
+    // Build new struct hash and pre-save live positions for existing nodes
+    const newStruct=flattenTree(newTree).map(n=>n.id).join('|');
+    const save={};
+    flattenTree(newTree).forEach(n=>{
+      const lp=posRef.current[n.id];
+      if(lp) save[n.id]={...lp,text:n.text};
+    });
+    localStorage.setItem(SK,JSON.stringify({layout:save,hash:newStruct}));
     setTree(newTree);
-    const code = toMermaid(newTree);
-    lastExportedRef.current = code;
-    if (onCodeChange) onCodeChange(code);
-  }, [tree, onCodeChange, pushSnapshot]);
+    treeRef.current=newTree;
+    const code=toMermaid(newTree);
+    lastCodeRef.current=code;
+    if(typeof onCodeChange==='function') onCodeChange(code);
+  },[pushSnap,SK,onCodeChange]);
 
-  // === DRAG HANDLERS ===
-  const toSvgCoords = useCallback((clientX, clientY) => {
-    if (!svgRef.current) return {
-      x: 0,
-      y: 0
-    };
-    const ctm = svgRef.current.getScreenCTM();
-    if (!ctm) return {
-      x: 0,
-      y: 0
-    };
-    const pt = svgRef.current.createSVGPoint();
-    pt.x = clientX;
-    pt.y = clientY;
-    const svgPt = pt.matrixTransform(ctm.inverse());
-    return {
-      x: svgPt.x,
-      y: svgPt.y
-    };
-  }, []);
-  const handleNodeMouseDown = useCallback((e, nodeId) => {
-    if (e.button !== 0) return;
+  const doEdit=()=>{const n=findNode(treeRef.current,selId);if(n){setEditText(n.text);setMenuMode('edit');}};
+  const doSave=()=>{if(treeRef.current&&selId&&editText.trim()){applyUpdate(updateNode(treeRef.current,selId,{text:editText.trim()}));}setMenuMode(null);setSelId(null);};
+  const doAdd=()=>{if(treeRef.current&&selId)applyUpdate(addChild(treeRef.current,selId));};
+  const doDel=()=>{if(treeRef.current&&selId&&selId!==treeRef.current.id)applyUpdate(removeNode(treeRef.current,selId));};
+  const doColor=c=>{if(treeRef.current&&selId)applyUpdate(updateNode(treeRef.current,selId,{color:c}));};
 
-    // Stop propagation to prevent page-level canvas drag or UI toggle
-    e.stopPropagation();
-    if (e.nativeEvent) e.nativeEvent.stopImmediatePropagation();
-    e.preventDefault();
-    if (!treeRef.current || resizeRef.current) return;
-    const node = findNode(treeRef.current, nodeId);
-    if (!node) return;
+  const vb=useMemo(()=>{
+    const ids=Object.keys(positions);
+    if(!ids.length)return{x:-600,y:-400,w:1200,h:800};
+    let x0=Infinity,x1=-Infinity,y0=Infinity,y1=-Infinity;
+    ids.forEach(id=>{const p=positions[id];x0=Math.min(x0,p.x-p.w/2);x1=Math.max(x1,p.x+p.w/2);y0=Math.min(y0,p.y-p.h/2);y1=Math.max(y1,p.y+p.h/2);});
+    return{x:x0-PAD,y:y0-PAD,w:Math.max(x1-x0+PAD*2,1200),h:Math.max(y1-y0+PAD*2,800)};
+  },[positions]);
 
-    // Snapshot CTM at start of drag to keep coordinates stable
-    const ctm = svgRef.current?.getScreenCTM()?.inverse() || null;
-    const svgPt = toSvgCoords(e.clientX, e.clientY);
-    dragRef.current = {
-      nodeId,
-      descendantIds: getDescendantIds(node),
-      startX: svgPt.x,
-      startY: svgPt.y,
-      snapPositions: {
-        ...posRef.current
-      },
-      startCTM: ctm
-    };
+  const conns=useMemo(()=>{
+    if(!tree)return[];
+    const r=[];
+    const w=(n,d)=>{(n.children||[]).forEach(c=>{r.push({pid:n.id,cid:c.id,d});w(c,d+1);});};
+    w(tree,1);return r;
+  },[tree]);
 
-    // Add global no-select during drag
-    document.body.classList.add('select-none');
-  }, [toSvgCoords]);
-
-  // Touch equivalent of handleNodeMouseDown
-  const handleNodeTouchStart = useCallback((e, nodeId) => {
-    if (e.touches.length !== 1) return;
-    e.stopPropagation();
-    // Don't preventDefault here to allow scrolling until we confirm it's a drag
-    if (!treeRef.current || resizeRef.current) return;
-    const node = findNode(treeRef.current, nodeId);
-    if (!node) return;
-    const touch = e.touches[0];
-    const ctm = svgRef.current?.getScreenCTM()?.inverse() || null;
-    const svgPt = toSvgCoords(touch.clientX, touch.clientY);
-    dragRef.current = {
-      nodeId,
-      descendantIds: getDescendantIds(node),
-      startX: svgPt.x,
-      startY: svgPt.y,
-      snapPositions: {
-        ...posRef.current
-      },
-      startCTM: ctm
-    };
-    document.body.classList.add('select-none');
-  }, [toSvgCoords]);
-  const handleResizeMouseDown = useCallback((e, nodeId, dir) => {
-    e.stopPropagation();
-    e.preventDefault();
-    if (!treeRef.current) return;
-    const node = findNode(treeRef.current, nodeId);
-    const p = posRef.current[nodeId];
-    if (!node || !p) return;
-    const ctm = svgRef.current?.getScreenCTM()?.inverse() || null;
-    const svgPt = toSvgCoords(e.clientX, e.clientY);
-    resizeRef.current = {
-      nodeId,
-      direction: dir,
-      startX: svgPt.x,
-      startY: svgPt.y,
-      startW: p.w,
-      startH: p.h,
-      startCTM: ctm,
-      startSnapshot: {
-        ...posRef.current
-      }
-    };
-    dragRef.current = null;
-    document.body.classList.add('select-none');
-  }, [toSvgCoords]);
-  useEffect(() => {
-    const onMouseMove = e => {
-      const rs = resizeRef.current;
-      if (rs && rs.startCTM) {
-        const ctm = rs.startCTM;
-        const curX = e.clientX * ctm.a + e.clientY * ctm.c + ctm.e;
-        const curY = e.clientX * ctm.b + e.clientY * ctm.d + ctm.f;
-        const dx = curX - rs.startX;
-        const dy = curY - rs.startY;
-        let nw = rs.startW;
-        let nh = rs.startH;
-        if (rs.direction.includes('r')) nw = Math.max(100, rs.startW + dx * 2);
-        if (rs.direction.includes('l')) nw = Math.max(100, rs.startW - dx * 2);
-        if (rs.direction.includes('b')) nh = Math.max(60, rs.startH + dy * 2);
-        if (rs.direction.includes('t')) nh = Math.max(60, rs.startH - dy * 2);
-
-        // Performance FIX ONLY the local positions state during mouse move
-        // This avoids heavy JSON stringify/parse on every frame
-        setPositions(prev => {
-          const updated = {
-            ...prev,
-            [rs.nodeId]: {
-              ...prev[rs.nodeId],
-              w: nw,
-              h: nh
-            }
-          };
-          posRef.current = updated;
-          isManualChangeRef.current = true;
-          return updated;
-        });
-
-        // Keep menu pinned to top of node during resize
-        if (selectedNodeId === rs.nodeId && svgRef.current) {
-          const vb = svgRef.current.viewBox.baseVal;
-          const p = posRef.current[rs.nodeId];
-          setMenuPos({
-            x: p.x - vb.x,
-            y: p.y - nh / 2 - vb.y
-          });
-        }
-        return;
-      }
-      const ds = dragRef.current;
-      if (!ds || !ds.startCTM) return;
-
-      // Use snapshot CTM to ensure stable movement even if viewBox changes
-      const ctm = ds.startCTM;
-      const curX = e.clientX * ctm.a + e.clientY * ctm.c + ctm.e;
-      const curY = e.clientX * ctm.b + e.clientY * ctm.d + ctm.f;
-      const dx = curX - ds.startX;
-      const dy = curY - ds.startY;
-      const nextPos = {
-        ...ds.snapPositions
-      };
-      for (const id of ds.descendantIds) {
-        if (nextPos[id]) {
-          nextPos[id] = {
-            ...nextPos[id],
-            x: nextPos[id].x + dx,
-            y: nextPos[id].y + dy
-          };
-        }
-      }
-      setPositions(nextPos);
-      posRef.current = nextPos;
-      isManualChangeRef.current = true; // MARK
-    };
-    const onMouseUp = e => {
-      isManualChangeRef.current = true;
-
-      // 1. Handle Resize Completion
-      if (resizeRef.current) {
-        const rs = resizeRef.current;
-        const finalPos = posRef.current[rs.nodeId];
-
-        // Push pre-resize state to history
-        const snapshot = {
-          code: toMermaid(treeRef.current),
-          positions: rs.startSnapshot
-        };
-        historyRef.current = [...historyRef.current.slice(-(MAX_HISTORY - 1)), snapshot];
-        redoRef.current = [];
-        updateUndoRedoState();
-        if (finalPos) {
-          applyUpdate(rs.nodeId, {
-            width: finalPos.w,
-            height: finalPos.h
-          }, true);
-        }
-        resizeRef.current = null;
-        dragRef.current = null;
-        document.body.classList.remove('select-none');
-        return;
-      }
-
-      // 2. Handle Drag Completion
-      const ds = dragRef.current;
-      if (!ds) {
-        document.body.classList.remove('select-none');
-        return;
-      }
-      const svgPt = toSvgCoords(e.clientX, e.clientY);
-      const dx = Math.abs(svgPt.x - ds.startX);
-      const dy = Math.abs(svgPt.y - ds.startY);
-
-      // If actually dragged (not just a click), push to undo history
-      if (dx > 5 || dy > 5) {
-        const snapshot = {
-          code: toMermaid(treeRef.current),
-          positions: ds.snapPositions
-        };
-        historyRef.current = [...historyRef.current.slice(-(MAX_HISTORY - 1)), snapshot];
-        redoRef.current = [];
-        updateUndoRedoState();
-      }
-
-      // Handle Click (Select)
-      if (dx < 6 && dy < 6) {
-        const p = posRef.current[ds.nodeId];
-        if (p && svgRef.current) {
-          const vb = svgRef.current.viewBox.baseVal;
-          setSelectedNodeId(ds.nodeId);
-          setMenuPos({
-            x: p.x - vb.x,
-            y: p.y - p.h / 2 - vb.y
-          });
-          setMenuMode('main');
-        }
-      }
-      dragRef.current = null;
-      document.body.classList.remove('select-none');
-    };
-    const onTouchMove = e => {
-      if (!dragRef.current && !resizeRef.current) return;
-      if (e.touches.length !== 1) return;
-      e.preventDefault();
-      const touch = e.touches[0];
-      const ds = dragRef.current;
-      if (ds) {
-        // Compute SVG delta using toSvgCoords — avoids CTM matrix bug on Safari mobile
-        const svgPt = toSvgCoords(touch.clientX, touch.clientY);
-        const dx = svgPt.x - ds.startX;
-        const dy = svgPt.y - ds.startY;
-        const nextPos = {
-          ...ds.snapPositions
-        };
-        for (const id of ds.descendantIds) {
-          if (nextPos[id]) {
-            nextPos[id] = {
-              ...nextPos[id],
-              x: nextPos[id].x + dx,
-              y: nextPos[id].y + dy
-            };
-          }
-        }
-        setPositions(nextPos);
-        posRef.current = nextPos;
-        isManualChangeRef.current = true;
-      }
-    };
-    const onTouchEnd = e => {
-      const ds = dragRef.current;
-      if (!ds && !resizeRef.current) return;
-      if (ds) {
-        const touch = e.changedTouches[0];
-        const svgPt = toSvgCoords(touch.clientX, touch.clientY);
-        const dx = Math.abs(svgPt.x - ds.startX);
-        const dy = Math.abs(svgPt.y - ds.startY);
-        // Push undo snapshot if actually dragged
-        if (dx > 5 || dy > 5) {
-          const snapshot = {
-            code: toMermaid(treeRef.current),
-            positions: ds.snapPositions
-          };
-          historyRef.current = [...historyRef.current.slice(-(40 - 1)), snapshot];
-          redoRef.current = [];
-          updateUndoRedoState();
-        }
-        // Tap = show context menu
-        if (dx < 6 && dy < 6) {
-          const p = posRef.current[ds.nodeId];
-          if (p && svgRef.current) {
-            const vb = svgRef.current.viewBox.baseVal;
-            setSelectedNodeId(ds.nodeId);
-            setMenuPos({
-              x: p.x - vb.x,
-              y: p.y - p.h / 2 - vb.y
-            });
-            setMenuMode('main');
-          }
-        }
-        dragRef.current = null;
-        document.body.classList.remove('select-none');
-      }
-    };
-    document.addEventListener('mousemove', onMouseMove);
-    document.addEventListener('mouseup', onMouseUp);
-    document.addEventListener('touchmove', onTouchMove, {
-      passive: false
-    });
-    document.addEventListener('touchend', onTouchEnd);
-    return () => {
-      document.removeEventListener('mousemove', onMouseMove);
-      document.removeEventListener('mouseup', onMouseUp);
-      document.removeEventListener('touchmove', onTouchMove);
-      document.removeEventListener('touchend', onTouchEnd);
-    };
-  }, [toSvgCoords]);
-
-  // Close menu
-  useEffect(() => {
-    if (!selectedNodeId) return;
-    const handler = () => {
-      setSelectedNodeId(null);
-      setMenuMode(null);
-    };
-    const t = setTimeout(() => window.addEventListener('click', handler), 100);
-    return () => {
-      clearTimeout(t);
-      window.removeEventListener('click', handler);
-    };
-  }, [selectedNodeId]);
-
-  // === ACTIONS ===
-  const doAddChild = () => {
-    if (tree && selectedNodeId) applyUpdate(addChild(tree, selectedNodeId, findDepth(tree, selectedNodeId)), null);
-  };
-  const doDelete = () => {
-    if (tree && selectedNodeId && selectedNodeId !== tree.id) applyUpdate(removeNode(tree, selectedNodeId), null);
-  };
-  const doStartEdit = () => {
-    const flat = tree ? flattenTree(tree) : [];
-    const n = flat.find(n => n.id === selectedNodeId);
-    if (n) {
-      setEditText(n.text);
-      setMenuMode('edit');
-    }
-  };
-  const doCommitEdit = () => {
-    if (tree && selectedNodeId && editText.trim()) {
-      applyUpdate(updateNode(tree, selectedNodeId, {
-        text: editText.trim()
-      }), null);
-    }
-    setMenuMode(null);
-    setSelectedNodeId(null);
-  };
-  const doColorChange = c => {
-    if (tree && selectedNodeId) applyUpdate(updateNode(tree, selectedNodeId, {
-      color: c
-    }), null);
-  };
-
-  // === COMPUTE VIEW ===
-  const viewBox = useMemo(() => {
-    const ids = Object.keys(positions);
-    if (!ids.length) return {
-      minX: -500,
-      minY: -400,
-      w: 1000,
-      h: 800
-    };
-
-    // Fixed viewBox calculation to allow root/overall movement to be perceptible
-    let minX = Infinity,
-      maxX = -Infinity,
-      minY = Infinity,
-      maxY = -Infinity;
-    for (const id of ids) {
-      const p = positions[id];
-      minX = Math.min(minX, p.x - p.w / 2);
-      maxX = Math.max(maxX, p.x + p.w / 2);
-      minY = Math.min(minY, p.y - p.h / 2);
-      maxY = Math.max(maxY, p.y + p.h / 2);
-    }
-    const w = maxX - minX + PAD * 2;
-    const h = maxY - minY + PAD * 2;
-
-    // We keep minX/minY slightly more stable relative to the initial layout
-    return {
-      minX: minX - PAD,
-      minY: minY - PAD,
-      w: Math.max(w, 1200),
-      h: Math.max(h, 900)
-    };
-  }, [positions]);
-
-  // Connections from tree + positions
-  const connections = useMemo(() => {
-    if (!tree) return [];
-    const conns = [];
-    function walk(node, depth) {
-      if (!node.children || !Array.isArray(node.children)) return;
-      for (const c of node.children) {
-        conns.push({
-          parentId: node.id,
-          childId: c.id,
-          depth
-        });
-        walk(c, depth + 1);
-      }
-    }
-    walk(tree, 1);
-    return conns;
-  }, [tree]);
-  if (!tree || !Object.keys(positions).length) {
-    return /*#__PURE__*/_jsx("div", {
-      className: "flex items-center justify-center p-20",
-      children: /*#__PURE__*/_jsxs("div", {
-        className: "flex flex-col items-center gap-4",
-        children: [/*#__PURE__*/_jsxs("div", {
-          className: "relative w-14 h-14",
-          children: [/*#__PURE__*/_jsx("div", {
-            className: "absolute inset-0 border-[1.5px] border-[hsl(239_68%_58%/0.15)] rounded-full"
-          }), /*#__PURE__*/_jsx("div", {
-            className: "absolute inset-0 border-[1.5px] border-t-[hsl(239_68%_58%)] border-r-[hsl(239_68%_58%/0.3)] rounded-full animate-spin"
-          }), /*#__PURE__*/_jsx("div", {
-            className: "absolute inset-[4px] border-[1.5px] border-[hsl(263_70%_62%/0.12)] rounded-full"
-          }), /*#__PURE__*/_jsx("div", {
-            className: "absolute inset-[4px] border-[1.5px] border-b-[hsl(263_70%_62%)] border-l-[hsl(263_70%_62%/0.3)] rounded-full animate-spin [animation-direction:reverse] [animation-duration:1.2s]"
-          })]
-        }), /*#__PURE__*/_jsx("p", {
-          className: "text-[10px] font-bold uppercase tracking-[0.25em] text-[var(--muted-light)]",
-          children: INTERACTIVE_MINDMAP_TEXTS.building
-        })]
-      })
-    });
+  if(!tree||!Object.keys(positions).length){
+    return(
+      <div className="flex items-center justify-center p-20">
+        <div className="flex flex-col items-center gap-4">
+          <div className="relative w-14 h-14">
+            <div className="absolute inset-0 border-[1.5px] border-[hsl(239_68%_58%/0.15)] rounded-full"/>
+            <div className="absolute inset-0 border-[1.5px] border-t-[hsl(239_68%_58%)] rounded-full animate-spin"/>
+          </div>
+          <p className="text-[10px] font-bold uppercase tracking-[0.25em] text-[var(--muted-light)]">{INTERACTIVE_MINDMAP_TEXTS.building}</p>
+        </div>
+      </div>
+    );
   }
 
-  // Render deepest nodes first so parent nodes paint on top (correct SVG z-order)
-  const allNodes = flattenTree(tree).sort((a, b) => b.depth - a.depth);
-  return /*#__PURE__*/_jsxs("div", {
-    className: "relative mindmap-container",
-    style: {
-      width: viewBox.w,
-      height: viewBox.h
-    },
-    children: [/*#__PURE__*/_jsxs("svg", {
-      ref: svgRef,
-      viewBox: `${viewBox.minX} ${viewBox.minY} ${viewBox.w} ${viewBox.h}`,
-      width: viewBox.w,
-      height: viewBox.h,
-      className: "select-none",
-      style: {
-        overflow: 'visible'
-      },
-      children: [/*#__PURE__*/_jsxs("defs", {
-        children: [connections.map(c => {
-          const pn = findNode(tree, c.parentId);
-          const cn = findNode(tree, c.childId);
-          if (!pn || !cn) return null;
-          // Fixed userSpaceOnUse to prevent gradients from disappearing on horizontal/vertical lines
-          const gid = `g-${c.parentId}-${c.childId}`.replace(/[^a-zA-Z0-9-]/g, '_');
-          const pp = positions[c.parentId];
-          const cp = positions[c.childId];
-          if (!pp || !cp) return null;
-          return /*#__PURE__*/_jsxs("linearGradient", {
-            id: gid,
-            gradientUnits: "userSpaceOnUse",
-            x1: pp.x,
-            y1: pp.y,
-            x2: cp.x,
-            y2: cp.y,
-            children: [/*#__PURE__*/_jsx("stop", {
-              offset: "0%",
-              stopColor: pn.color,
-              stopOpacity: 0.5
-            }), /*#__PURE__*/_jsx("stop", {
-              offset: "100%",
-              stopColor: cn.color,
-              stopOpacity: 0.8
-            })]
-          }, gid);
-        }), /*#__PURE__*/_jsxs("filter", {
-          id: "node-shadow",
-          x: "-20%",
-          y: "-20%",
-          width: "140%",
-          height: "140%",
-          children: [/*#__PURE__*/_jsx("feDropShadow", {
-            dx: "0",
-            dy: "2",
-            stdDeviation: "4",
-            floodColor: "hsl(222 47% 4%)",
-            floodOpacity: "0.10"
-          }), /*#__PURE__*/_jsx("feDropShadow", {
-            dx: "0",
-            dy: "8",
-            stdDeviation: "14",
-            floodColor: "hsl(222 47% 4%)",
-            floodOpacity: "0.07"
-          })]
-        }), /*#__PURE__*/_jsxs("filter", {
-          id: "node-glow",
-          x: "-30%",
-          y: "-30%",
-          width: "160%",
-          height: "160%",
-          children: [/*#__PURE__*/_jsx("feDropShadow", {
-            dx: "0",
-            dy: "0",
-            stdDeviation: "10",
-            floodColor: "hsl(239 68% 58%)",
-            floodOpacity: "0.55"
-          }), /*#__PURE__*/_jsx("feDropShadow", {
-            dx: "0",
-            dy: "4",
-            stdDeviation: "6",
-            floodColor: "hsl(239 68% 58%)",
-            floodOpacity: "0.25"
-          })]
-        }), /*#__PURE__*/_jsxs("filter", {
-          id: "root-glow",
-          x: "-30%",
-          y: "-30%",
-          width: "160%",
-          height: "160%",
-          children: [/*#__PURE__*/_jsx("feDropShadow", {
-            dx: "0",
-            dy: "0",
-            stdDeviation: "18",
-            floodColor: "hsl(239 62% 50%)",
-            floodOpacity: "0.30"
-          }), /*#__PURE__*/_jsx("feDropShadow", {
-            dx: "0",
-            dy: "6",
-            stdDeviation: "10",
-            floodColor: "hsl(0 0% 0%)",
-            floodOpacity: "0.12"
-          })]
-        })]
-      }), connections.map(c => {
-        const pp = positions[c.parentId];
-        const cp = positions[c.childId];
-        if (!pp || !cp) return null;
-        const gid = `g-${c.parentId}-${c.childId}`.replace(/[^a-zA-Z0-9-]/g, '_');
-        // Taper stroke: root connectors are heavier, leaf connectors are hairlines
-        const strokeW = Math.max(1.2, 3.2 - c.depth * 0.6);
-        return /*#__PURE__*/_jsx("path", {
-          d: bezierPath(pp.x, pp.y, cp.x, cp.y),
-          fill: "none",
-          stroke: `url(#${gid})`,
-          strokeWidth: strokeW,
-          strokeLinecap: "round",
-          opacity: 0.72
-        }, `e-${c.parentId}-${c.childId}`);
-      }), allNodes.map(n => {
-        const p = positions[n.id];
-        if (!p) return null;
-        const isRoot = p.depth === 0;
-        const isSelected = n.id === selectedNodeId;
-        // Root: larger, bolder; branches: slightly smaller — đều dùng Inter
-        const fSize = isRoot ? 24 : 13;
-        const fontWeight = isRoot ? '700' : '600';
-        const rx = isRoot ? p.h / 2 : Math.min(p.h / 2, 14);
-        const filter = isSelected ? 'url(#node-glow)' : isRoot ? 'url(#root-glow)' : 'url(#node-shadow)';
-        return /*#__PURE__*/_jsxs("g", {
-          "data-node-id": n.id,
-          "data-mindmap-node": "true",
-          onMouseDown: e => handleNodeMouseDown(e, n.id),
-          onTouchStart: e => handleNodeTouchStart(e, n.id),
-          onClick: e => e.stopPropagation(),
-          style: {
-            cursor: dragRef.current ? 'grabbing' : 'grab'
-          },
-          children: [isSelected && /*#__PURE__*/_jsx("rect", {
-            x: p.x - p.w / 2 - 6,
-            y: p.y - p.h / 2 - 6,
-            width: p.w + 12,
-            height: p.h + 12,
-            rx: rx + 4,
-            ry: rx + 4,
-            fill: "none",
-            stroke: "hsl(239 68% 68%)",
-            strokeWidth: 1.5,
-            strokeDasharray: "5 4",
-            opacity: 0.9,
-            className: "animate-pulse"
-          }), /*#__PURE__*/_jsx("rect", {
-            x: p.x - p.w / 2,
-            y: p.y - p.h / 2,
-            width: p.w,
-            height: p.h,
-            rx: rx,
-            ry: rx,
-            fill: n.color,
-            filter: filter
-          }), /*#__PURE__*/_jsx("rect", {
-            x: p.x - p.w / 2 + 1,
-            y: p.y - p.h / 2 + 1,
-            width: p.w - 2,
-            height: Math.min(p.h * 0.45, 28),
-            rx: rx - 1,
-            ry: rx - 1,
-            fill: "white",
-            opacity: isRoot ? 0.12 : 0.09,
-            className: "pointer-events-none"
-          }), /*#__PURE__*/_jsx("text", {
-            x: p.x,
-            y: p.y,
-            textAnchor: "middle",
-            dominantBaseline: "central",
-            fill: "white",
-            fontSize: fSize,
-            fontWeight: fontWeight,
-            fontFamily: "'Inter', system-ui, -apple-system, sans-serif",
-            letterSpacing: isRoot ? '-0.02em' : '-0.015em',
-            className: "pointer-events-none select-none",
-            children: (() => {
-              const lines = wrapText(n.text || '', p.w, p.h, fSize);
-              const lineHeight = fSize * 1.35;
-              const totalH = lines.length * lineHeight;
-              const firstLineY = -(totalH / 2) + lineHeight / 2;
-              return lines.map((line, i) => /*#__PURE__*/_jsx("tspan", {
-                x: p.x,
-                dy: i === 0 ? firstLineY : lineHeight,
-                children: line
-              }, i));
-            })()
-          }), isSelected && (() => {
-            const off = 10;
-            const len = 14;
-            return /*#__PURE__*/_jsxs("g", {
-              className: "resize-handles",
-              stroke: "hsl(239 68% 68%)",
-              strokeWidth: 2,
-              fill: "none",
-              strokeLinecap: "round",
-              children: [/*#__PURE__*/_jsx("path", {
-                d: `M ${p.x - p.w / 2 - off} ${p.y - p.h / 2 - off + len} V ${p.y - p.h / 2 - off} H ${p.x - p.w / 2 - off + len}`,
-                stroke: "transparent",
-                strokeWidth: 24,
-                cursor: "nwse-resize",
-                onMouseDown: e => handleResizeMouseDown(e, n.id, 'tl')
-              }), /*#__PURE__*/_jsx("path", {
-                d: `M ${p.x - p.w / 2 - off} ${p.y - p.h / 2 - off + len} V ${p.y - p.h / 2 - off} H ${p.x - p.w / 2 - off + len}`,
-                pointerEvents: "none"
-              }), /*#__PURE__*/_jsx("path", {
-                d: `M ${p.x + p.w / 2 + off - len} ${p.y - p.h / 2 - off} H ${p.x + p.w / 2 + off} V ${p.y - p.h / 2 - off + len}`,
-                stroke: "transparent",
-                strokeWidth: 24,
-                cursor: "nesw-resize",
-                onMouseDown: e => handleResizeMouseDown(e, n.id, 'tr')
-              }), /*#__PURE__*/_jsx("path", {
-                d: `M ${p.x + p.w / 2 + off - len} ${p.y - p.h / 2 - off} H ${p.x + p.w / 2 + off} V ${p.y - p.h / 2 - off + len}`,
-                pointerEvents: "none"
-              }), /*#__PURE__*/_jsx("path", {
-                d: `M ${p.x - p.w / 2 - off} ${p.y + p.h / 2 + off - len} V ${p.y + p.h / 2 + off} H ${p.x - p.w / 2 - off + len}`,
-                stroke: "transparent",
-                strokeWidth: 24,
-                cursor: "nesw-resize",
-                onMouseDown: e => handleResizeMouseDown(e, n.id, 'bl')
-              }), /*#__PURE__*/_jsx("path", {
-                d: `M ${p.x - p.w / 2 - off} ${p.y + p.h / 2 + off - len} V ${p.y + p.h / 2 + off} H ${p.x - p.w / 2 - off + len}`,
-                pointerEvents: "none"
-              }), /*#__PURE__*/_jsx("path", {
-                d: `M ${p.x + p.w / 2 + off - len} ${p.y + p.h / 2 + off} H ${p.x + p.w / 2 + off} V ${p.y + p.h / 2 + off - len}`,
-                stroke: "transparent",
-                strokeWidth: 24,
-                cursor: "nwse-resize",
-                onMouseDown: e => handleResizeMouseDown(e, n.id, 'br')
-              }), /*#__PURE__*/_jsx("path", {
-                d: `M ${p.x + p.w / 2 + off - len} ${p.y + p.h / 2 + off} H ${p.x + p.w / 2 + off} V ${p.y + p.h / 2 + off - len}`,
-                pointerEvents: "none"
-              })]
-            });
-          })()]
-        }, n.id);
-      })]
-    }), selectedNodeId && menuMode && (() => {
-      const flat = tree ? flattenTree(tree) : [];
-      const node = flat.find(n => n.id === selectedNodeId);
-      if (!node) return null;
-      const isRoot = node.depth === 0;
-      const menuBaseStyle = {
-        left: menuPos.x,
-        top: menuPos.y,
-        transform: `translate(-50%, calc(-100% - 14px)) scale(${Math.sqrt(1 / zoom)})`,
-        transformOrigin: 'bottom center'
-      };
-      if (menuMode === 'edit') {
-        return /*#__PURE__*/_jsx("div", {
-          className: "absolute z-[999] animate-fade-up",
-          style: menuBaseStyle,
-          onClick: e => e.stopPropagation(),
-          children: /*#__PURE__*/_jsxs("div", {
-            className: "flex flex-col items-center",
-            children: [/*#__PURE__*/_jsxs("div", {
-              className: "w-[300px] rounded-2xl shadow-[0_24px_48px_hsl(222_47%_4%/0.14),0_4px_12px_hsl(222_47%_4%/0.08)] border border-[var(--border-color)] bg-[var(--card-bg)] backdrop-blur-2xl p-4",
-              children: [/*#__PURE__*/_jsx("p", {
-                className: "text-[10px] font-bold text-[var(--muted-light)] uppercase tracking-[0.12em] mb-3 px-1",
-                children: INTERACTIVE_MINDMAP_TEXTS.nodeEditor.title
-              }), /*#__PURE__*/_jsx("input", {
-                autoFocus: true,
-                value: editText,
-                onChange: e => setEditText(e.target.value),
-                onKeyDown: e => {
-                  if (e.key === 'Enter') doCommitEdit();
-                  if (e.key === 'Escape') {
-                    setMenuMode(null);
-                    setSelectedNodeId(null);
-                  }
-                  e.stopPropagation();
-                },
-                className: "w-full px-4 py-2.5 rounded-xl bg-[var(--surface)] border border-[var(--border-color)] text-[13px] text-[var(--foreground)] font-medium outline-none focus:ring-2 focus:ring-[hsl(239_68%_58%/0.35)] focus:border-[hsl(239_68%_58%/0.5)] transition-all placeholder:text-[var(--muted-light)]",
-                placeholder: INTERACTIVE_MINDMAP_TEXTS.nodeEditor.placeholder
-              }), /*#__PURE__*/_jsxs("div", {
-                className: "flex gap-2 mt-3",
-                children: [/*#__PURE__*/_jsx("button", {
-                  onClick: doCommitEdit,
-                  className: "flex-1 py-2.5 bg-[hsl(239_68%_58%)] hover:bg-[hsl(239_62%_50%)] active:scale-95 text-white rounded-xl text-[11px] font-bold shadow-[0_4px_12px_hsl(239_68%_58%/0.30)] transition-all",
-                  children: INTERACTIVE_MINDMAP_TEXTS.nodeEditor.save
-                }), /*#__PURE__*/_jsx("button", {
-                  onClick: () => setMenuMode('main'),
-                  className: "px-4 py-2.5 bg-[var(--surface)] hover:bg-[var(--card-bg-hover)] text-[var(--muted)] rounded-xl text-[11px] font-bold transition-all",
-                  children: INTERACTIVE_MINDMAP_TEXTS.nodeEditor.cancel
-                })]
-              })]
-            }), /*#__PURE__*/_jsx("div", {
-              className: "w-3 h-1.5 bg-[var(--card-bg)] border-x border-b border-[var(--border-color)] clip-arrow",
-              style: {
-                clipPath: 'polygon(0 0, 100% 0, 50% 100%)'
-              }
-            })]
-          })
-        });
-      }
-      if (menuMode === 'color') {
-        return /*#__PURE__*/_jsx("div", {
-          className: "absolute z-[999] animate-fade-up",
-          style: menuBaseStyle,
-          onClick: e => e.stopPropagation(),
-          children: /*#__PURE__*/_jsxs("div", {
-            className: "flex flex-col items-center",
-            children: [/*#__PURE__*/_jsxs("div", {
-              className: "rounded-2xl shadow-[0_24px_48px_hsl(222_47%_4%/0.14),0_4px_12px_hsl(222_47%_4%/0.08)] border border-[var(--border-color)] bg-[var(--card-bg)] backdrop-blur-2xl p-4",
-              children: [/*#__PURE__*/_jsx("p", {
-                className: "text-[10px] font-bold text-[var(--muted-light)] uppercase tracking-[0.12em] mb-3 px-1",
-                children: INTERACTIVE_MINDMAP_TEXTS.colorPicker.title
-              }), /*#__PURE__*/_jsx("div", {
-                className: "grid grid-cols-6 gap-2",
-                children: NODE_COLORS.map(c => /*#__PURE__*/_jsx("button", {
-                  onClick: e => {
-                    e.stopPropagation();
-                    doColorChange(c.value);
-                  },
-                  title: c.name,
-                  className: "w-7 h-7 rounded-lg transition-all duration-150 hover:scale-110 active:scale-90",
-                  style: {
-                    background: c.value,
-                    boxShadow: c.value === node.color ? `0 0 0 2px var(--card-bg), 0 0 0 3.5px ${c.value}` : `0 1px 3px hsl(0 0% 0% / 0.15)`
-                  }
-                }, c.value))
-              }), /*#__PURE__*/_jsx("button", {
-                onClick: e => {
-                  e.stopPropagation();
-                  setMenuMode('main');
-                },
-                className: "w-full mt-3 py-2 text-[10px] font-bold text-[var(--muted-light)] hover:text-[var(--foreground)] transition-colors",
-                children: INTERACTIVE_MINDMAP_TEXTS.backBtn
-              })]
-            }), /*#__PURE__*/_jsx("div", {
-              className: "w-3 h-1.5 bg-[var(--card-bg)] border-x border-b border-[var(--border-color)]",
-              style: {
-                clipPath: 'polygon(0 0, 100% 0, 50% 100%)'
-              }
-            })]
-          })
-        });
-      }
+  const allNodes=flattenTree(tree).sort((a,b)=>a.depth-b.depth);
+  const selNode=selId?findNode(tree,selId):null;
 
-      // Main toolbar menu
-      return /*#__PURE__*/_jsx("div", {
-        className: "absolute z-[999] animate-fade-up",
-        style: menuBaseStyle,
-        onClick: e => e.stopPropagation(),
-        children: /*#__PURE__*/_jsxs("div", {
-          className: "flex flex-col items-center",
-          children: [/*#__PURE__*/_jsxs("div", {
-            className: "rounded-2xl shadow-[0_24px_48px_hsl(222_47%_4%/0.14),0_4px_12px_hsl(222_47%_4%/0.08)] border border-[var(--border-color)] bg-[var(--card-bg)] backdrop-blur-2xl p-1.5 flex items-center gap-0.5",
-            children: [/*#__PURE__*/_jsx("button", {
-              onClick: e => {
-                e.stopPropagation();
-                doStartEdit();
-              },
-              className: "group w-9 h-9 flex items-center justify-center rounded-xl text-[var(--muted)] hover:text-[hsl(239_68%_58%)] hover:bg-[hsl(239_68%_58%/0.08)] transition-all active:scale-90",
-              title: INTERACTIVE_MINDMAP_TEXTS.contextMenu.editContent,
-              children: /*#__PURE__*/_jsx("span", {
-                className: "material-symbols-outlined text-[18px]",
-                children: "edit"
-              })
-            }), /*#__PURE__*/_jsx("button", {
-              onClick: e => {
-                e.stopPropagation();
-                doAddChild();
-              },
-              className: "group w-9 h-9 flex items-center justify-center rounded-xl text-[var(--muted)] hover:text-[hsl(158_64%_44%)] hover:bg-[hsl(158_64%_44%/0.08)] transition-all active:scale-90",
-              title: "Th\xEAm nh\xE1nh con",
-              children: /*#__PURE__*/_jsx("span", {
-                className: "material-symbols-outlined text-[18px]",
-                children: "add_circle"
-              })
-            }), /*#__PURE__*/_jsx("div", {
-              className: "w-px h-5 bg-[var(--border-color)] mx-0.5"
-            }), /*#__PURE__*/_jsx("button", {
-              onClick: e => {
-                e.stopPropagation();
-                setMenuMode('color');
-              },
-              className: "group w-9 h-9 flex items-center justify-center rounded-xl hover:bg-[hsl(263_70%_62%/0.08)] transition-all active:scale-90",
-              title: INTERACTIVE_MINDMAP_TEXTS.contextMenu.changeColor,
-              children: /*#__PURE__*/_jsx("span", {
-                className: "material-symbols-outlined text-[18px] transition-colors",
-                style: {
-                  color: node.color
-                },
-                children: "palette"
-              })
-            }), !isRoot && /*#__PURE__*/_jsxs(_Fragment, {
-              children: [/*#__PURE__*/_jsx("div", {
-                className: "w-px h-5 bg-[var(--border-color)] mx-0.5"
-              }), /*#__PURE__*/_jsx("button", {
-                onClick: e => {
-                  e.stopPropagation();
-                  doDelete();
-                },
-                className: "group w-9 h-9 flex items-center justify-center rounded-xl text-[var(--muted)] hover:text-[hsl(343_85%_58%)] hover:bg-[hsl(343_85%_58%/0.08)] transition-all active:scale-90",
-                title: "X\xF3a nh\xE1nh",
-                children: /*#__PURE__*/_jsx("span", {
-                  className: "material-symbols-outlined text-[18px]",
-                  children: "delete"
-                })
-              })]
-            })]
-          }), /*#__PURE__*/_jsx("div", {
-            className: "w-3 h-1.5 bg-[var(--card-bg)] border-x border-b border-[var(--border-color)]",
-            style: {
-              clipPath: 'polygon(0 0, 100% 0, 50% 100%)'
-            }
-          })]
-        })
-      });
-    })()]
-  });
+  return(
+    <div className="relative" style={{width:vb.w,height:vb.h}}>
+      <svg ref={svgRef} viewBox={`${vb.x} ${vb.y} ${vb.w} ${vb.h}`} width={vb.w} height={vb.h} className="select-none" style={{overflow:'visible'}}>
+        <defs>
+          {conns.map(c=>{
+            const pp=positions[c.pid],cp=positions[c.cid];
+            const pn=findNode(tree,c.pid),cn=findNode(tree,c.cid);
+            if(!pp||!cp||!pn||!cn)return null;
+            const gid=`g-${c.pid}-${c.cid}`.replace(/[^a-zA-Z0-9-]/g,'_');
+            const lft=cp.x<pp.x;
+            return(<linearGradient key={gid} id={gid} gradientUnits="userSpaceOnUse"
+              x1={pp.x+(lft?-pp.w/2:pp.w/2)} y1={pp.y}
+              x2={cp.x+(lft?cp.w/2:-cp.w/2)} y2={cp.y}>
+              <stop offset="0%" stopColor={pn.color} stopOpacity={0.5}/>
+              <stop offset="100%" stopColor={cn.color} stopOpacity={0.8}/>
+            </linearGradient>);
+          })}
+          <filter id="ns"><feDropShadow dx="0" dy="2" stdDeviation="4" floodColor="hsl(222 47% 4%)" floodOpacity="0.1"/></filter>
+          <filter id="ng" x="-30%" y="-30%" width="160%" height="160%"><feDropShadow dx="0" dy="0" stdDeviation="10" floodColor="hsl(239 68% 58%)" floodOpacity="0.5"/></filter>
+          <filter id="nr" x="-30%" y="-30%" width="160%" height="160%"><feDropShadow dx="0" dy="0" stdDeviation="18" floodColor="hsl(239 62% 50%)" floodOpacity="0.3"/></filter>
+        </defs>
+
+        {conns.map(c=>{
+          const pp=positions[c.pid],cp=positions[c.cid];
+          if(!pp||!cp)return null;
+          const gid=`g-${c.pid}-${c.cid}`.replace(/[^a-zA-Z0-9-]/g,'_');
+          const lft=cp.x<pp.x;
+          return(<path key={`e-${c.pid}-${c.cid}`}
+            d={bezierPath(pp.x+(lft?-pp.w/2:pp.w/2),pp.y,cp.x+(lft?cp.w/2:-cp.w/2),cp.y)}
+            fill="none" stroke={`url(#${gid})`} strokeWidth={Math.max(1.2,3-c.d*0.5)} strokeLinecap="round" opacity={0.75}/>);
+        })}
+
+        {allNodes.map(n=>{
+          const p=positions[n.id];if(!p)return null;
+          const isRoot=p.depth===0,isSel=n.id===selId;
+          const fs=isRoot?20:13,rx=p.h/2;
+          const flt=isSel?'url(#ng)':isRoot?'url(#nr)':'url(#ns)';
+          const lines=wrapText(n.text||'',p.w,p.h,fs);
+          const lh=fs*1.35,th=lines.length*lh,fy=-(th/2)+lh/2;
+          return(
+            <g key={n.id} data-mindmap-node="true"
+              onMouseDown={e=>startDrag(e,n.id)}
+              onClick={e=>e.stopPropagation()}
+              style={{cursor:'grab'}}>
+              {isSel&&<rect x={p.x-p.w/2-6} y={p.y-p.h/2-6} width={p.w+12} height={p.h+12} rx={rx+4} fill="none" stroke="hsl(239 68% 68%)" strokeWidth={1.5} strokeDasharray="5 4" className="animate-pulse"/>}
+              {isSel&&[['nw',-1,-1],['ne',1,-1],['sw',-1,1],['se',1,1]].map(([corner,sx,sy])=>{
+                const hx=p.x+sx*p.w/2,hy=p.y+sy*p.h/2,hs=10,arm=7;
+                const hPath=sx<0
+                  ?`M ${hx+arm} ${hy} L ${hx} ${hy} L ${hx} ${hy-sy*arm}`
+                  :`M ${hx-arm} ${hy} L ${hx} ${hy} L ${hx} ${hy-sy*arm}`;
+                return(<path key={corner} d={hPath} fill="none" stroke="white" strokeWidth={2} strokeLinecap="round"
+                  style={{cursor:'nwse-resize',pointerEvents:'stroke'}}
+                  onMouseDown={e=>{
+                    e.stopPropagation();e.preventDefault();
+                    resizeDragRef.current={id:n.id,snap:{...posRef.current}};
+                    document.body.classList.add('select-none');
+                  }}/>);
+              })}
+              <rect x={p.x-p.w/2} y={p.y-p.h/2} width={p.w} height={p.h} rx={rx} fill={n.color||'#4338ca'} filter={flt}/>
+              <rect x={p.x-p.w/2+1} y={p.y-p.h/2+1} width={p.w-2} height={Math.min(p.h*.45,28)} rx={rx-1} fill="white" opacity={isRoot?.12:.09} className="pointer-events-none"/>
+              <text x={p.x} y={p.y} textAnchor="middle" dominantBaseline="central" fill="white" fontSize={fs} fontWeight={isRoot?'700':'600'} fontFamily="'Inter',system-ui,sans-serif" className="pointer-events-none select-none">
+                {lines.map((l,i)=><tspan key={i} x={p.x} dy={i===0?fy:lh}>{l}</tspan>)}
+              </text>
+            </g>
+          );
+        })}
+      </svg>
+
+      {selId&&menuMode&&selNode&&(()=>{
+        const isRoot=selNode.depth===0;
+        const ms={left:menuPos.x,top:menuPos.y,transform:`translate(-50%,calc(-100% - 14px)) scale(${Math.sqrt(1/zoom)})`,transformOrigin:'bottom center'};
+        const arrow=<div className="w-3 h-1.5 bg-[var(--card-bg)] border-x border-b border-[var(--border-color)]" style={{clipPath:'polygon(0 0,100% 0,50% 100%)'}}/>;
+        if(menuMode==='edit')return(
+          <div className="absolute z-[999]" style={ms} onClick={e=>e.stopPropagation()}>
+            <div className="flex flex-col items-center">
+              <div className="w-[280px] rounded-2xl shadow-xl border border-[var(--border-color)] bg-[var(--card-bg)] p-4">
+                <p className="text-[10px] font-bold text-[var(--muted-light)] uppercase tracking-widest mb-3">{INTERACTIVE_MINDMAP_TEXTS.nodeEditor.title}</p>
+                <input autoFocus value={editText} onChange={e=>setEditText(e.target.value)}
+                  onKeyDown={e=>{if(e.key==='Enter')doSave();if(e.key==='Escape'){setMenuMode(null);setSelId(null);}e.stopPropagation();}}
+                  className="w-full px-3 py-2 rounded-xl bg-[var(--surface)] border border-[var(--border-color)] text-[13px] text-[var(--foreground)] outline-none focus:ring-2 focus:ring-[hsl(239_68%_58%/0.35)]"
+                  placeholder={INTERACTIVE_MINDMAP_TEXTS.nodeEditor.placeholder}/>
+                <div className="flex gap-2 mt-3">
+                  <button onClick={doSave} className="flex-1 py-2 bg-[hsl(239_68%_58%)] hover:bg-[hsl(239_62%_50%)] text-white rounded-xl text-[11px] font-bold transition-all">{INTERACTIVE_MINDMAP_TEXTS.nodeEditor.save}</button>
+                  <button onClick={()=>setMenuMode('main')} className="px-3 py-2 bg-[var(--surface)] text-[var(--muted)] rounded-xl text-[11px] font-bold transition-all">{INTERACTIVE_MINDMAP_TEXTS.nodeEditor.cancel}</button>
+                </div>
+              </div>{arrow}
+            </div>
+          </div>
+        );
+        if(menuMode==='color')return(
+          <div className="absolute z-[999]" style={ms} onClick={e=>e.stopPropagation()}>
+            <div className="flex flex-col items-center">
+              <div className="rounded-2xl shadow-xl border border-[var(--border-color)] bg-[var(--card-bg)] p-4">
+                <p className="text-[10px] font-bold text-[var(--muted-light)] uppercase tracking-widest mb-3">{INTERACTIVE_MINDMAP_TEXTS.colorPicker.title}</p>
+                <div className="grid grid-cols-6 gap-2">
+                  {NODE_COLORS.map(c=><button key={c.value} onClick={e=>{e.stopPropagation();doColor(c.value);}} title={c.name}
+                    className="w-7 h-7 rounded-lg hover:scale-110 transition-all"
+                    style={{background:c.value,boxShadow:c.value===selNode.color?`0 0 0 2px var(--card-bg),0 0 0 3.5px ${c.value}`:'none'}}/>)}
+                </div>
+                <button onClick={e=>{e.stopPropagation();setMenuMode('main');}} className="w-full mt-3 py-1.5 text-[10px] font-bold text-[var(--muted-light)] hover:text-[var(--foreground)] transition-colors">{INTERACTIVE_MINDMAP_TEXTS.backBtn}</button>
+              </div>{arrow}
+            </div>
+          </div>
+        );
+        return(
+          <div className="absolute z-[999]" style={ms} onClick={e=>e.stopPropagation()}>
+            <div className="flex flex-col items-center">
+              <div className="rounded-2xl shadow-xl border border-[var(--border-color)] bg-[var(--card-bg)] p-1.5 flex items-center gap-0.5">
+                <button onClick={e=>{e.stopPropagation();doEdit();}} className="w-9 h-9 flex items-center justify-center rounded-xl text-[var(--muted)] hover:text-[hsl(239_68%_58%)] hover:bg-[hsl(239_68%_58%/0.08)] transition-all" title={INTERACTIVE_MINDMAP_TEXTS.contextMenu.editContent}>
+                  <span className="material-symbols-outlined text-[18px]">edit</span>
+                </button>
+                <button onClick={e=>{e.stopPropagation();doAdd();}} className="w-9 h-9 flex items-center justify-center rounded-xl text-[var(--muted)] hover:text-[hsl(158_64%_44%)] hover:bg-[hsl(158_64%_44%/0.08)] transition-all" title="Thêm nhánh con">
+                  <span className="material-symbols-outlined text-[18px]">add_circle</span>
+                </button>
+                <div className="w-px h-5 bg-[var(--border-color)] mx-0.5"/>
+                <button onClick={e=>{e.stopPropagation();setMenuMode('color');}} className="w-9 h-9 flex items-center justify-center rounded-xl hover:bg-[hsl(263_70%_62%/0.08)] transition-all" title={INTERACTIVE_MINDMAP_TEXTS.contextMenu.changeColor}>
+                  <span className="material-symbols-outlined text-[18px]" style={{color:selNode.color}}>palette</span>
+                </button>
+                {!isRoot&&<><div className="w-px h-5 bg-[var(--border-color)] mx-0.5"/>
+                <button onClick={e=>{e.stopPropagation();doDel();}} className="w-9 h-9 flex items-center justify-center rounded-xl text-[var(--muted)] hover:text-[hsl(343_85%_58%)] hover:bg-[hsl(343_85%_58%/0.08)] transition-all" title="Xóa nhánh">
+                  <span className="material-symbols-outlined text-[18px]">delete</span>
+                </button></>}
+              </div>{arrow}
+            </div>
+          </div>
+        );
+      })()}
+    </div>
+  );
 });
+
 export default InteractiveMindmap;
