@@ -20,6 +20,7 @@ import MindmapListPage from '@/app/(dashboard)/mindmap/page';
 import PracticePage from '@/app/(dashboard)/practice/page';
 import SettingsPage from '@/app/(dashboard)/settings/page';
 import HelpPage from '@/app/(dashboard)/help/page';
+import PricingPage from '@/app/(dashboard)/pricing/page';
 import { jsx as _jsx, Fragment as _Fragment, jsxs as _jsxs } from "react/jsx-runtime";
 function PrivateRoute({
   children
@@ -64,60 +65,63 @@ export default function App() {
       children: /*#__PURE__*/_jsx(UploadProvider, {
         children: /*#__PURE__*/_jsx(DocumentProvider, {
           children: /*#__PURE__*/_jsxs(Routes, {
-        children: [/*#__PURE__*/_jsx(Route, {
-          path: "/login",
-          element: /*#__PURE__*/_jsx(PublicRoute, {
-            children: /*#__PURE__*/_jsx(LoginPage, {})
-          })
-        }), /*#__PURE__*/_jsx(Route, {
-          path: "/register",
-          element: /*#__PURE__*/_jsx(PublicRoute, {
-            children: /*#__PURE__*/_jsx(RegisterPage, {})
-          })
-        }), /*#__PURE__*/_jsx(Route, {
-          path: "/forgot-password",
-          element: /*#__PURE__*/_jsx(PublicRoute, {
-            children: /*#__PURE__*/_jsx(ForgotPasswordPage, {})
-          })
-        }), /*#__PURE__*/_jsxs(Route, {
-          element: /*#__PURE__*/_jsx(PrivateRoute, {
-            children: /*#__PURE__*/_jsx(DashboardLayout, {})
-          }),
-          children: [/*#__PURE__*/_jsx(Route, {
-            path: "/",
-            element: /*#__PURE__*/_jsx(DashboardPage, {})
-          }), /*#__PURE__*/_jsx(Route, {
-            path: "/learning",
-            element: /*#__PURE__*/_jsx(LearningPage, {})
-          }), /*#__PURE__*/_jsx(Route, {
-            path: "/chat/:documentId",
-            element: /*#__PURE__*/_jsx(ChatPage, {})
-          }), /*#__PURE__*/_jsx(Route, {
-            path: "/quiz/:documentId",
-            element: /*#__PURE__*/_jsx(QuizPage, {})
-          }), /*#__PURE__*/_jsx(Route, {
-            path: "/mindmap",
-            element: /*#__PURE__*/_jsx(MindmapListPage, {})
-          }), /*#__PURE__*/_jsx(Route, {
-            path: "/mindmap/:documentId",
-            element: /*#__PURE__*/_jsx(MindmapPage, {})
-          }), /*#__PURE__*/_jsx(Route, {
-            path: "/practice",
-            element: /*#__PURE__*/_jsx(PracticePage, {})
-          }), /*#__PURE__*/_jsx(Route, {
-            path: "/settings",
-            element: /*#__PURE__*/_jsx(SettingsPage, {})
-          }), /*#__PURE__*/_jsx(Route, {
-            path: "/help",
-            element: /*#__PURE__*/_jsx(HelpPage, {})
-          })]
-        }), /*#__PURE__*/_jsx(Route, {
-          path: "*",
-          element: /*#__PURE__*/_jsx(Navigate, {
-            to: "/",
-            replace: true
-          })
-        })]
+            children: [/*#__PURE__*/_jsx(Route, {
+              path: "/login",
+              element: /*#__PURE__*/_jsx(PublicRoute, {
+                children: /*#__PURE__*/_jsx(LoginPage, {})
+              })
+            }), /*#__PURE__*/_jsx(Route, {
+              path: "/register",
+              element: /*#__PURE__*/_jsx(PublicRoute, {
+                children: /*#__PURE__*/_jsx(RegisterPage, {})
+              })
+            }), /*#__PURE__*/_jsx(Route, {
+              path: "/forgot-password",
+              element: /*#__PURE__*/_jsx(PublicRoute, {
+                children: /*#__PURE__*/_jsx(ForgotPasswordPage, {})
+              })
+            }), /*#__PURE__*/_jsxs(Route, {
+              element: /*#__PURE__*/_jsx(PrivateRoute, {
+                children: /*#__PURE__*/_jsx(DashboardLayout, {})
+              }),
+              children: [/*#__PURE__*/_jsx(Route, {
+                path: "/",
+                element: /*#__PURE__*/_jsx(DashboardPage, {})
+              }), /*#__PURE__*/_jsx(Route, {
+                path: "/learning",
+                element: /*#__PURE__*/_jsx(LearningPage, {})
+              }), /*#__PURE__*/_jsx(Route, {
+                path: "/chat/:documentId",
+                element: /*#__PURE__*/_jsx(ChatPage, {})
+              }), /*#__PURE__*/_jsx(Route, {
+                path: "/quiz/:documentId",
+                element: /*#__PURE__*/_jsx(QuizPage, {})
+              }), /*#__PURE__*/_jsx(Route, {
+                path: "/mindmap",
+                element: /*#__PURE__*/_jsx(MindmapListPage, {})
+              }), /*#__PURE__*/_jsx(Route, {
+                path: "/mindmap/:documentId",
+                element: /*#__PURE__*/_jsx(MindmapPage, {})
+              }), /*#__PURE__*/_jsx(Route, {
+                path: "/practice",
+                element: /*#__PURE__*/_jsx(PracticePage, {})
+              }), /*#__PURE__*/_jsx(Route, {
+                path: "/settings",
+                element: /*#__PURE__*/_jsx(SettingsPage, {})
+              }), /*#__PURE__*/_jsx(Route, {
+                path: "/help",
+                element: /*#__PURE__*/_jsx(HelpPage, {})
+              }), /*#__PURE__*/_jsx(Route, {
+                path: "/pricing",
+                element: /*#__PURE__*/_jsx(PricingPage, {})
+              })]
+            }), /*#__PURE__*/_jsx(Route, {
+              path: "*",
+              element: /*#__PURE__*/_jsx(Navigate, {
+                to: "/",
+                replace: true
+              })
+            })]
           })
         })
       })

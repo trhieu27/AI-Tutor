@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from "react";
+﻿import { useState, useCallback, useEffect } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { SETTINGS_PAGE_TEXTS, QUOTA_TEXTS } from "@/constants/texts";
 
@@ -14,8 +14,8 @@ const T = SETTINGS_PAGE_TEXTS;
 function parseUA(ua) {
   let browser = "Trình duyệt không rõ",
     os = "Hệ điều hành không rõ";
-  if (/Chrome/i.test(ua) && !/Edg/i.test(ua)) browser = "Chrome";else if (/Firefox/i.test(ua)) browser = "Firefox";else if (/Safari/i.test(ua) && !/Chrome/i.test(ua)) browser = "Safari";else if (/Edg/i.test(ua)) browser = "Edge";
-  if (/Windows/i.test(ua)) os = "Windows";else if (/Mac/i.test(ua)) os = "macOS";else if (/Linux/i.test(ua)) os = "Linux";else if (/Android/i.test(ua)) os = "Android";else if (/iPhone|iPad/i.test(ua)) os = "iOS";
+  if (/Chrome/i.test(ua) && !/Edg/i.test(ua)) browser = "Chrome"; else if (/Firefox/i.test(ua)) browser = "Firefox"; else if (/Safari/i.test(ua) && !/Chrome/i.test(ua)) browser = "Safari"; else if (/Edg/i.test(ua)) browser = "Edge";
+  if (/Windows/i.test(ua)) os = "Windows"; else if (/Mac/i.test(ua)) os = "macOS"; else if (/Linux/i.test(ua)) os = "Linux"; else if (/Android/i.test(ua)) os = "Android"; else if (/iPhone|iPad/i.test(ua)) os = "iOS";
   return {
     browser,
     os

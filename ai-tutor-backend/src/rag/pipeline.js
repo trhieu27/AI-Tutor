@@ -6,10 +6,10 @@
  */
 
 const { v4: uuidv4 } = require('uuid');
-const { extractText }    = require('./extractor');
-const { chunkText }      = require('./chunker');
+const { extractText } = require('./extractor');
+const { chunkText } = require('./chunker');
 const { embedTexts, embedQuery, generateText, generateStream } = require('./gemini');
-const vectorstore        = require('./vectorstore');
+const vectorstore = require('./vectorstore');
 
 // ── Ingest ────────────────────────────────────────────────────────────────────
 
@@ -53,7 +53,7 @@ async function ingest(filePath, documentId) {
 async function ask(collectionName, question, chatHistory = []) {
   // Retrieve relevant context
   const queryVec = await embedQuery(question);
-  const chunks   = await vectorstore.queryCollection(collectionName, queryVec, 6);
+  const chunks = await vectorstore.queryCollection(collectionName, queryVec, 6);
 
   const context = chunks.join('\n\n---\n\n');
 
@@ -157,8 +157,9 @@ async function* mindmap(collectionName) {
 
 Yêu cầu sơ đồ:
 - Chủ đề trung tâm là tiêu đề hoặc chủ đề chính của tài liệu
-- Có 4-6 nhánh chính
+- Có ĐÚNG 6 nhánh chính (để đảm bảo cân bằng trái/phải: 3 nhánh bên phải, 3 nhánh bên trái)
 - Mỗi nhánh chính PHẢI có 2-4 nhánh con (bắt buộc)
+- Sắp xếp các nhánh chính xen kẽ: nhánh 1 → phải, nhánh 2 → trái, nhánh 3 → phải, ...
 - Nhãn ngắn gọn, súc tích (tối đa 6 từ mỗi nhãn)
 - Viết bằng tiếng Việt
 
@@ -166,26 +167,32 @@ Trả về ĐÚNG định dạng Mermaid mindmap, chỉ code thuần không thê
 
 mindmap
   root((Chủ đề chính))
-    Nhánh 1
+    Nhánh 1 (phải)
       Nhánh con 1.1
       Nhánh con 1.2
-      Nhánh con 1.3
-    Nhánh 2
+    Nhánh 2 (trái)
       Nhánh con 2.1
       Nhánh con 2.2
-    Nhánh 3
+    Nhánh 3 (phải)
       Nhánh con 3.1
       Nhánh con 3.2
-      Nhánh con 3.3
-    Nhánh 4
+    Nhánh 4 (trái)
       Nhánh con 4.1
       Nhánh con 4.2
+    Nhánh 5 (phải)
+      Nhánh con 5.1
+      Nhánh con 5.2
+    Nhánh 6 (trái)
+      Nhánh con 6.1
+      Nhánh con 6.2
 
 QUY TẮC BẮT BUỘC:
+- Có ĐÚNG 6 nhánh chính để cân bằng trái/phải
 - Mỗi nhánh chính PHẢI có ít nhất 2 nhánh con, KHÔNG được để nhánh chính không có con
 - Dùng đúng 2 dấu cách (spaces) để thụt lề mỗi cấp (root=2, nhánh chính=4, nhánh con=6)
 - Không dùng dấu ngoặc đơn (), ngoặc vuông [], hay ký tự đặc biệt trong tên nhánh
 - Chỉ trả về code mindmap thuần, không có markdown fence, không có giải thích
+- Tên nhánh trong ví dụ chỉ là mẫu, hãy thay bằng nội dung thực từ tài liệu
 
 NỘI DUNG TÀI LIỆU:
 ${context}`;

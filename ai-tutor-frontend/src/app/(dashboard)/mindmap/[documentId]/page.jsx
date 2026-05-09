@@ -24,6 +24,7 @@ export default function InteractiveMindmapPage() {
   const isStreamingRef = useRef(false);
   const abortRef = useRef(null);
   const [quotaExceeded, setQuotaExceeded] = useState(false);
+  const [errorMessage, setErrorMessage] = useState(null);
   const syncToDB = useCallback(async code => {
     try {
       const {
@@ -114,7 +115,7 @@ export default function InteractiveMindmapPage() {
         } = JSON.parse(stored);
         setZoom(sz);
         setPosition(sp);
-      } catch (e) {}
+      } catch (e) { }
     }
   }, [documentId]);
   const cleanMermaidCode = code => {
@@ -123,7 +124,7 @@ export default function InteractiveMindmapPage() {
     // Remove markdown code blocks
     if (clean.includes("```")) {
       const match = clean.match(/```(?:mermaid)?\n?([\s\S]*?)\n?```/);
-      if (match) clean = match[1].trim();else clean = clean.replace(/```(?:mermaid)?/g, "").replace(/```/g, "").trim();
+      if (match) clean = match[1].trim(); else clean = clean.replace(/```(?:mermaid)?/g, "").replace(/```/g, "").trim();
     }
 
     // Ensure it starts with mindmap
@@ -142,6 +143,7 @@ export default function InteractiveMindmapPage() {
     const isActive = () => abortRef.current === controller;
     setIsLoading(true);
     setMindmapCode("");
+    setErrorMessage(null);
     isStreamingRef.current = false;
     try {
       const doc = await fetchDocument(documentId);
@@ -172,6 +174,7 @@ export default function InteractiveMindmapPage() {
         return;
       }
       console.error("Error loading mindmap:", error);
+      setErrorMessage(error.message || 'Không thể tạo sơ đồ tư duy. Vui lòng thử lại.');
     } finally {
       if (isActive()) {
         setIsLoading(false);
@@ -473,6 +476,35 @@ export default function InteractiveMindmapPage() {
                 onClick: () => navigate(-1),
                 className: "px-5 py-2 rounded-xl bg-[var(--surface)] border border-[var(--border-color)] text-[var(--muted)] text-[12px] font-bold hover:bg-[var(--card-bg)] transition-all active:scale-95",
                 children: QUOTA_TEXTS.exceeded.laterBtn
+              })]
+            })]
+          }) : errorMessage ? /*#__PURE__*/_jsxs("div", {
+            className: "flex flex-col items-center gap-6 bg-[var(--surface-overlay)] backdrop-blur-xl px-14 py-10 rounded-[28px] border border-[hsl(343_85%_58%/0.25)] shadow-[0_8px_32px_hsl(222_47%_4%/0.08)] pointer-events-auto max-w-md",
+            children: [/*#__PURE__*/_jsx("div", {
+              className: "w-14 h-14 rounded-2xl bg-gradient-to-br from-red-400/20 to-rose-400/20 flex items-center justify-center border border-red-400/20",
+              children: /*#__PURE__*/_jsx("span", {
+                className: "material-symbols-outlined text-[28px] text-red-500",
+                children: "error_outline"
+              })
+            }), /*#__PURE__*/_jsxs("div", {
+              className: "text-center space-y-2",
+              children: [/*#__PURE__*/_jsx("p", {
+                className: "text-[13px] font-bold text-[var(--foreground)]",
+                children: "Không thể tải sơ đồ tư duy"
+              }), /*#__PURE__*/_jsx("p", {
+                className: "text-[11px] text-[var(--muted)] font-medium font-mono bg-[var(--surface)] px-3 py-2 rounded-xl border border-[var(--border-color)] text-left break-all",
+                children: errorMessage
+              })]
+            }), /*#__PURE__*/_jsxs("div", {
+              className: "flex gap-3",
+              children: [/*#__PURE__*/_jsxs("button", {
+                onClick: () => loadData(false),
+                className: "px-5 py-2 rounded-xl bg-gradient-to-r from-[hsl(239_68%_58%)] to-[hsl(263_70%_62%)] text-white text-[12px] font-bold hover:opacity-90 transition-all active:scale-95 shadow-[0_4px_16px_hsl(239_68%_58%/0.3)] flex items-center gap-2",
+                children: [/*#__PURE__*/_jsx("span", { className: "material-symbols-outlined icon-thin text-[14px]", children: "refresh" }), "Thử lại"]
+              }), /*#__PURE__*/_jsx("button", {
+                onClick: () => navigate(-1),
+                className: "px-5 py-2 rounded-xl bg-[var(--surface)] border border-[var(--border-color)] text-[var(--muted)] text-[12px] font-bold hover:bg-[var(--card-bg)] transition-all active:scale-95",
+                children: "Quay lại"
               })]
             })]
           }) : isLoading ? /*#__PURE__*/_jsxs("div", {
