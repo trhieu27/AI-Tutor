@@ -52,17 +52,25 @@ async function processDocumentBackground(documentId, filePath, ownerId) {
     );
     console.log(`✅ Document ${documentId} processed successfully`);
 
-    await sendNotification(ownerId, 'document_ready', 'Xử lý thành công',
-      `Tài liệu "${doc.file_name}" đã sẵn sàng để chat với AI.`,
-      { document_id: documentId }
-    );
+    try {
+      await sendNotification(ownerId, 'document_ready', 'Xử lý thành công',
+        `Tài liệu "${doc.file_name}" đã sẵn sàng để chat với AI.`,
+        { document_id: documentId }
+      );
+    } catch (notifErr) {
+      console.warn('[Notif] Failed to send document_ready notification:', notifErr.message);
+    }
   } catch (err) {
-    console.error(`❌ Document ${documentId} processing failed:`, err.message);
-    await Document.updateOne({ id: documentId }, { $set: { status: 'FAILED' } });
-    await sendNotification(ownerId, 'document_failed', 'Xử lý thất bại',
-      `Tài liệu "${doc.file_name}" gặp lỗi. Vui lòng thử lại.`,
-      { document_id: documentId }
-    );
+    console.error(`❌ Document ${documentId} processing failed:`, err.message, err.cause ?? '');
+    try {
+      await Document.updateOne({ id: documentId }, { $set: { status: 'FAILED' } });
+      await sendNotification(ownerId, 'document_failed', 'Xử lý thất bại',
+        `Tài liệu "${doc.file_name}" gặp lỗi. Vui lòng thử lại.`,
+        { document_id: documentId }
+      );
+    } catch (notifErr) {
+      console.warn('[Notif] Failed to send document_failed notification:', notifErr.message);
+    }
   }
 }
 

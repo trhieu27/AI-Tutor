@@ -52,6 +52,7 @@ ai-tutor-backend/storage/
 # ── ChromaDB (vector database) ────────────────────────────────────────────────
 **/chroma_db/
 **/chroma_data/
+**/chroma-data/
 **/.chroma/
 
 # ── Storage & Runtime data ────────────────────────────────────────────────────

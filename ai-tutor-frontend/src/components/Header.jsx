@@ -99,17 +99,17 @@ export default function Header({
   }
   if (!mounted || isInitialLoading) {
     return /*#__PURE__*/_jsxs("header", {
-      className: "h-14 bg-[var(--card-bg)] border-b border-[var(--border-color)] flex items-center px-4 gap-3",
-      children: [/*#__PURE__*/_jsx("div", {
-        className: "w-8 h-8 rounded-full bg-[var(--surface)] animate-pulse"
-      }), /*#__PURE__*/_jsx("div", {
-        className: "flex-1 h-5 bg-[var(--surface)] rounded animate-pulse max-w-xs"
-      })]
+      className: "h-16 bg-[var(--card-bg)] border-b border-[var(--border-color)] flex items-center px-4 gap-3",
+      children: [
+        /*#__PURE__*/_jsx("div", { className: "flex-1" }),
+        /*#__PURE__*/_jsx("div", { className: "w-8 h-8 rounded-full bg-[var(--surface)] animate-pulse" }),
+        /*#__PURE__*/_jsx("div", { className: "w-20 h-5 bg-[var(--surface)] rounded-lg animate-pulse" })
+      ]
     });
   }
   const initials = user?.full_name ? user.full_name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2) : '?';
   return /*#__PURE__*/_jsxs("header", {
-    className: "h-14 bg-[var(--card-bg)] border-b border-[var(--border-color)] flex items-center px-4 gap-3 sticky top-0 z-40",
+    className: "h-16 bg-[var(--card-bg)] border-b border-[var(--border-color)] flex items-center px-4 gap-3 sticky top-0 z-40",
     children: [/*#__PURE__*/_jsx("button", {
       onClick: onMenuClick,
       className: "lg:hidden w-9 h-9 flex items-center justify-center rounded-xl text-[var(--muted)] hover:bg-[var(--surface)] transition-colors",

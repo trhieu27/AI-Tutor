@@ -156,15 +156,21 @@ async function readStream(res, onChunk) {
   const reader = res.body?.getReader();
   const decoder = new TextDecoder();
   if (reader) {
+    let buffer = '';
     while (true) {
-      const {
-        done,
-        value
-      } = await reader.read();
+      const { done, value } = await reader.read();
       if (done) break;
-      onChunk(decoder.decode(value, {
-        stream: true
-      }));
+      const chunk = decoder.decode(value, { stream: true });
+      buffer += chunk;
+      // Detect error marker written by backend mid-stream
+      if (buffer.includes('__ERROR__:')) {
+        const errMsg = buffer.split('__ERROR__:')[1]?.trim() || 'Đã xảy ra lỗi';
+        if (errMsg.includes('quá tải') || errMsg.includes('quota') || errMsg.includes('429')) {
+          throw new QuotaError(errMsg);
+        }
+        throw new Error(errMsg);
+      }
+      onChunk(chunk);
     }
   }
 }

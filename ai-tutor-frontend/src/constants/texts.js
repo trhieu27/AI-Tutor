@@ -627,6 +627,114 @@ export const MINDMAP_PAGE_TEXTS = {
     CANCEL: "Giữ lại"
   }
 };
+export const PRICING_PAGE_TEXTS = {
+  hero: {
+    badge: 'Bảng giá',
+    title: 'Chọn gói phù hợp với bạn',
+    subtitle: 'Bắt đầu miễn phí, nâng cấp bất cứ khi nào bạn sẵn sàng. Không có phí ẩn.',
+  },
+  toggle: {
+    monthly: 'Hàng tháng',
+    annual: 'Hàng năm',
+    saveBadge: 'Tiết kiệm 40%',
+  },
+  plans: {
+    free: {
+      name: 'Miễn phí',
+      tagline: 'Hoàn hảo để bắt đầu',
+      cta: 'Dùng miễn phí',
+      ctaActive: 'Gói hiện tại',
+    },
+    pro_monthly: {
+      name: 'Pro',
+      tagline: 'Dành cho học sinh nghiêm túc',
+      cta: 'Đăng ký ngay',
+      ctaActive: 'Gói hiện tại',
+      popularBadge: 'Phổ biến nhất',
+    },
+    pro_annual: {
+      name: 'Pro Năm',
+      tagline: 'Tiết kiệm nhất cho năm học',
+      cta: 'Đăng ký tiết kiệm',
+      ctaActive: 'Gói hiện tại',
+    },
+  },
+  price: {
+    free: 'Miễn phí',
+    perMonth: '/tháng',
+    perYear: '/năm',
+    billedAnnually: 'Thanh toán hàng năm',
+    billedMonthly: 'Thanh toán hàng tháng',
+    originalPrice: 'Giá gốc',
+    savePercent: (n) => `Tiết kiệm ${n}%`,
+  },
+  features: {
+    sectionTitle: 'So sánh tính năng',
+    included: 'Có',
+    notIncluded: 'Không có',
+  },
+  // Payment modal
+  payment: {
+    title: 'Hoàn tất đăng ký',
+    subtitle: (planName) => `Bạn đang đăng ký gói ${planName}`,
+    orderSummary: 'Tóm tắt đơn hàng',
+    plan: 'Gói',
+    billingCycle: 'Chu kỳ',
+    total: 'Tổng thanh toán',
+    monthly: 'Hàng tháng',
+    annual: 'Hàng năm',
+    method: {
+      title: 'Phương thức thanh toán',
+      momo: 'Ví MoMo',
+      vnpay: 'VNPay QR',
+      credit_card: 'Thẻ tín dụng / ghi nợ',
+    },
+    creditCard: {
+      number: 'Số thẻ',
+      numberPlaceholder: '1234 5678 9012 3456',
+      expiry: 'Ngày hết hạn',
+      expiryPlaceholder: 'MM/YY',
+      cvv: 'CVV',
+      cvvPlaceholder: '•••',
+      holder: 'Tên chủ thẻ',
+      holderPlaceholder: 'NGUYEN VAN A',
+    },
+    submitBtn: 'Xác nhận thanh toán',
+    submitting: 'Đang xử lý...',
+    cancelBtn: 'Hủy',
+    successTitle: 'Thanh toán thành công! 🎉',
+    successMsg: (planName) => `Bạn đã nâng cấp lên ${planName}. Tận hưởng trải nghiệm học tập không giới hạn!`,
+    successBtn: 'Bắt đầu học ngay',
+    errors: {
+      selectMethod: 'Vui lòng chọn phương thức thanh toán',
+      fillCard: 'Vui lòng điền đầy đủ thông tin thẻ',
+    },
+    secureNote: '🔒 Thông tin thanh toán được mã hóa và bảo mật tuyệt đối',
+    mockNote: '⚠️ Đây là môi trường demo. Không nhập thông tin thật.',
+  },
+  faq: {
+    title: 'Câu hỏi thường gặp',
+    items: [
+      {
+        q: 'Tôi có thể hủy bất cứ lúc nào không?',
+        a: 'Có, bạn có thể hủy gói Pro bất cứ lúc nào. Sau khi hủy, bạn vẫn được dùng tính năng Pro đến hết chu kỳ thanh toán hiện tại.',
+      },
+      {
+        q: 'Có thể nâng cấp từ tháng lên năm không?',
+        a: 'Hoàn toàn được! Bạn chỉ cần chọn gói Pro Năm và xác nhận. Phần còn lại của chu kỳ tháng sẽ được tính vào khoản thanh toán mới.',
+      },
+      {
+        q: '"Không giới hạn" có nghĩa là gì?',
+        a: 'Không giới hạn số lượt chat, tạo nội dung AI, sơ đồ tư duy và bài kiểm tra trong một ngày. Bạn học đến đâu, AI hỗ trợ đến đó.',
+      },
+      {
+        q: 'Phương thức thanh toán nào được hỗ trợ?',
+        a: 'Hiện tại chúng tôi hỗ trợ Ví MoMo, VNPay QR và thẻ tín dụng/ghi nợ quốc tế (Visa, Mastercard, JCB).',
+      },
+    ],
+  },
+};
+
 export const INTERACTIVE_MINDMAP_TEXTS = {
   building: "Đang xây dựng…",
   backBtn: "← Quay lại",

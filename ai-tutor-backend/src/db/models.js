@@ -91,6 +91,71 @@ const rateLimitSchema = new mongoose.Schema({
   locked_until: { type: Date, default: null },
 });
 
+// ── Subscription Plan ────────────────────────────────────────────────────────
+// Mô tả các gói đăng ký (seed sẵn vào DB hoặc dùng hằng số).
+
+const subscriptionPlanSchema = new mongoose.Schema({
+  id: { type: String, required: true, unique: true, index: true },
+  name: { type: String, required: true },          // 'free' | 'pro_monthly' | 'pro_annual'
+  display_name: { type: String, required: true },  // 'Miễn phí' | 'Pro Hàng tháng' | 'Pro Hàng năm'
+  price_vnd: { type: Number, default: 0 },          // Giá gốc (VND)
+  price_usd: { type: Number, default: 0 },          // Giá gốc (USD)
+  billing_cycle: {
+    type: String,
+    enum: ['none', 'monthly', 'annual'],
+    default: 'none',
+  },
+  // Giảm giá – nếu > 0 thì hiển thị badge.
+  discount_percent: { type: Number, default: 0 },   // ví dụ: 40 → 40% OFF
+  // Giá sau giảm (tính sẵn để tiện dùng)
+  discounted_price_vnd: { type: Number, default: 0 },
+  discounted_price_usd: { type: Number, default: 0 },
+  // Danh sách tính năng kèm theo gói
+  features: [
+    {
+      icon: { type: String, default: 'check_circle' },
+      text: { type: String, required: true },
+      included: { type: Boolean, default: true },
+    },
+  ],
+  // Giới hạn quota
+  quota: {
+    chat_per_day: { type: Number, default: 30 },         // -1 = unlimited
+    ai_generations_per_day: { type: Number, default: 10 }, // -1 = unlimited
+    max_documents: { type: Number, default: 3 },          // -1 = unlimited
+    max_file_size_mb: { type: Number, default: 50 },
+  },
+  is_active: { type: Boolean, default: true },
+  is_popular: { type: Boolean, default: false },     // hiển thị badge "Phổ biến nhất"
+  sort_order: { type: Number, default: 0 },
+  created_at: { type: Date, default: Date.now },
+  updated_at: { type: Date, default: Date.now },
+});
+
+// ── User Subscription ────────────────────────────────────────────────────────
+// Lưu trạng thái đăng ký hiện tại của từng người dùng.
+
+const userSubscriptionSchema = new mongoose.Schema({
+  id: { type: String, required: true, unique: true, index: true },
+  user_id: { type: String, required: true, unique: true, index: true },
+  plan_id: { type: String, required: true },         // ref → subscriptionPlan.id
+  plan_name: { type: String, required: true },       // snapshot
+  status: {
+    type: String,
+    enum: ['active', 'cancelled', 'expired', 'trial'],
+    default: 'active',
+  },
+  // Thông tin thanh toán (mock – chưa tích hợp cổng thật)
+  payment_method: { type: String, default: null },   // 'momo' | 'vnpay' | 'credit_card' | null
+  transaction_id: { type: String, default: null },
+  amount_paid_vnd: { type: Number, default: 0 },
+  started_at: { type: Date, default: Date.now },
+  expires_at: { type: Date, default: null },          // null = forever (free)
+  cancelled_at: { type: Date, default: null },
+  created_at: { type: Date, default: Date.now },
+  updated_at: { type: Date, default: Date.now },
+});
+
 // ── Usage Log ─────────────────────────────────────────────────────────────────
 
 const usageLogSchema = new mongoose.Schema({
@@ -123,5 +188,18 @@ const OTP = mongoose.model('OTP', otpSchema, 'otps');
 const RateLimit = mongoose.model('RateLimit', rateLimitSchema, 'rate_limits');
 const UsageLog = mongoose.model('UsageLog', usageLogSchema, 'usage_logs');
 const Notification = mongoose.model('Notification', notificationSchema, 'notifications');
+const SubscriptionPlan = mongoose.model('SubscriptionPlan', subscriptionPlanSchema, 'subscription_plans');
+const UserSubscription = mongoose.model('UserSubscription', userSubscriptionSchema, 'user_subscriptions');
 
-module.exports = { User, UserSession, Document, ChatSession, OTP, RateLimit, UsageLog, Notification };
+module.exports = {
+  User,
+  UserSession,
+  Document,
+  ChatSession,
+  OTP,
+  RateLimit,
+  UsageLog,
+  Notification,
+  SubscriptionPlan,
+  UserSubscription,
+};

@@ -100,10 +100,12 @@ export default function Sidebar({
             children: "help"
           }), SIDEBAR_TEXTS.support]
         })]
-      }), !isPro && /*#__PURE__*/_jsx("div", {
-        className: "mt-3 px-0.5",
+      }), !isPro && /*#__PURE__*/_jsx(Link, {
+        to: "/pricing",
+        onClick: () => onClose?.(),
+        className: "mt-3 px-0.5 block",
         children: /*#__PURE__*/_jsxs("div", {
-          className: "relative overflow-hidden bg-gradient-to-br from-[hsl(239_68%_58%)] to-[hsl(263_70%_55%)] rounded-3xl p-3.5 shadow-[0_2px_8px_hsl(239_68%_58%/0.20)] cursor-pointer transition-all duration-200 hover:opacity-90",
+          className: "relative overflow-hidden bg-gradient-to-br from-[hsl(239_68%_58%)] to-[hsl(263_70%_55%)] rounded-3xl p-3.5 shadow-[0_2px_8px_hsl(239_68%_58%/0.20)] cursor-pointer transition-all duration-200 hover:opacity-90 hover:scale-[1.02]",
           children: [/*#__PURE__*/_jsx("div", {
             className: "absolute inset-0 opacity-10 rounded-2xl",
             style: {
@@ -120,10 +122,10 @@ export default function Sidebar({
             }), /*#__PURE__*/_jsxs("div", {
               children: [/*#__PURE__*/_jsx("p", {
                 className: "text-[11px] font-bold text-white leading-none",
-                children: "Phi\xEAn b\u1EA3n Pro"
+                children: "Nâng cấp Pro"
               }), /*#__PURE__*/_jsx("p", {
                 className: "text-white/75 text-[10px] font-medium mt-0.5 leading-tight",
-                children: SIDEBAR_TEXTS.upgrade.desc
+                children: "Xem bảng giá →"
               })]
             })]
           })]

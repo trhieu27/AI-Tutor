@@ -21,11 +21,15 @@ router.get('/me', authMiddleware, async (req, res) => {
 
     res.json({
       is_pro: false,
-      limits: config.freeLimits,
+      limits: {
+        documents:     config.freeLimits.documents,
+        chat_messages: config.freeLimits.chatMessages,
+        ai_features:   config.freeLimits.aiFeatures,
+      },
       usage: {
-        documents: docCount,
+        documents:     docCount,
         chat_messages: chatUsed,
-        ai_features: aiUsed,
+        ai_features:   aiUsed,
       },
     });
   } catch (err) {
