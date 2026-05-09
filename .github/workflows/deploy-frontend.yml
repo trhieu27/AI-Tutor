@@ -1,22 +1,22 @@
-name: 🚀 Deploy Backend to EC2
+name: 🚀 Deploy Frontend to EC2
 
 on:
   push:
     branches: [main, develop]
     paths:
-      - 'ai-tutor-backend/**'
+      - 'ai-tutor-frontend/**'
       - 'nginx/**'
       - 'docker-compose.prod.yml'
-      - '.github/workflows/deploy-backend.yml'
+      - '.github/workflows/deploy-frontend.yml'
 
   # Cho phép chạy thủ công từ GitHub Actions tab
   workflow_dispatch:
 
 jobs:
   deploy:
-    name: Deploy to EC2
+    name: Deploy Frontend to EC2
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 20
 
     steps:
       - name: 📥 Checkout code
@@ -27,7 +27,7 @@ jobs:
         with:
           ssh-private-key: ${{ secrets.EC2_SSH_KEY }}
 
-      - name: 📦 Deploy to EC2
+      - name: 📦 Deploy Frontend to EC2
         env:
           EC2_HOST: ${{ secrets.EC2_HOST }}
           EC2_USER: ${{ secrets.EC2_USER }}
@@ -41,22 +41,22 @@ jobs:
             cd ~/DoAn
 
             echo "⬇️  Pulling latest code..."
-            git pull origin main
+            git pull origin $(git rev-parse --abbrev-ref HEAD)
 
-            echo "🔨 Building and restarting backend..."
-            docker compose -f docker-compose.prod.yml build --no-cache backend
-            docker compose -f docker-compose.prod.yml up -d --force-recreate backend nginx
+            echo "🔨 Building and restarting frontend..."
+            docker compose -f docker-compose.prod.yml build --no-cache frontend
+            docker compose -f docker-compose.prod.yml up -d --force-recreate frontend nginx
 
             echo "🧹 Cleaning up unused Docker images..."
             docker image prune -f
 
             echo "✅ Health check..."
-            sleep 10
-            curl -f http://localhost/health || (echo "❌ Health check failed!" && exit 1)
+            sleep 15
+            curl -f http://localhost || (echo "❌ Health check failed!" && exit 1)
 
-            echo "🎉 Deployment successful!"
+            echo "🎉 Frontend deployment successful!"
           ENDSSH
 
       - name: 📢 Notify on failure
         if: failure()
-        run: echo "::error::Deployment to EC2 failed! Check the logs above."
+        run: echo "::error::Frontend deployment to EC2 failed! Check the logs above."
