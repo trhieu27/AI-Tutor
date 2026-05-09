@@ -123,7 +123,7 @@ router.post('/:documentId/ask', authMiddleware, requireChatQuota(), async (req, 
     const { answer, sources } = await rag.ask(doc.chroma_collection_id, questionText, chatHistory);
 
     const userMsg = { id: uuidv4(), session_id: sessionId, role: 'user', content: question, sources: [] };
-    const aiMsg  = { id: uuidv4(), session_id: sessionId, role: 'assistant', content: answer, sources };
+    const aiMsg = { id: uuidv4(), session_id: sessionId, role: 'assistant', content: answer, sources };
 
     await ChatSession.updateOne(
       { id: sessionId },
@@ -257,9 +257,23 @@ router.get('/:documentId/mindmap', authMiddleware, async (req, res) => {
     res.write(' ');
 
     let fullText = '';
-    for await (const chunk of rag.mindmap(doc.chroma_collection_id)) {
-      fullText += chunk;
-      res.write(chunk);
+    try {
+      for await (const chunk of rag.mindmap(doc.chroma_collection_id)) {
+        fullText += chunk;
+        res.write(chunk);
+      }
+    } catch (streamErr) {
+      // Stream already started — signal error via special marker
+      console.error('[Mindmap] Stream error:', streamErr.message, streamErr.stack);
+      const msg = String(streamErr.message);
+      if (msg.includes('429') || msg.includes('RESOURCE_EXHAUSTED') || streamErr.statusCode === 429) {
+        res.write('\n__ERROR__:AI đang quá tải lượt dùng. Vui lòng thử lại sau ít phút. quota');
+      } else if (msg.includes('quota') || msg.includes('quá tải')) {
+        res.write(`\n__ERROR__:${streamErr.message} quota`);
+      } else {
+        res.write(`\n__ERROR__:Lỗi tạo sơ đồ: ${msg.slice(0, 200)}`);
+      }
+      return res.end();
     }
     res.end();
 
@@ -267,15 +281,15 @@ router.get('/:documentId/mindmap', authMiddleware, async (req, res) => {
       await Document.updateOne({ id: req.params.documentId }, { $set: { mindmap: fullText } });
     }
   } catch (err) {
-    console.error('Mindmap error:', err.message);
+    console.error('[Mindmap] Outer error:', err.message, err.stack);
     if (res.headersSent) return res.end();
-    if (err.statusCode === 429) return res.status(429).json({ detail: err.message }); // app quota
+    if (err.statusCode === 429) return res.status(429).json({ detail: err.message });
     if (err.statusCode) return res.status(err.statusCode).json({ detail: err.message });
     const msg = String(err.message);
     if (msg.includes('429') || msg.includes('RESOURCE_EXHAUSTED')) {
       return res.status(503).json({ detail: 'AI đang quá tải. Vui lòng thử lại sau.' });
     }
-    res.status(500).json({ detail: 'Không thể tạo sơ đồ tư duy' });
+    res.status(500).json({ detail: `Không thể tạo sơ đồ tư duy: ${msg.slice(0, 200)}` });
   }
 });
 
