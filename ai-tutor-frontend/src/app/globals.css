@@ -89,7 +89,8 @@ input:autofill {
 
 /* Light mode */
 :root {
-  color-scheme: light;  /* native scrollbar + inputs follow light mode */
+  color-scheme: light;
+  /* native scrollbar + inputs follow light mode */
 
   /* Surfaces */
   --background: hsl(210 40% 98%);
@@ -132,44 +133,45 @@ input:autofill {
 
 /* ── VOID Dark Mode Palette ───────────────────────────────────────────── */
 .dark {
-  color-scheme: dark;  /* fixes native scrollbar, inputs, selects */
+  color-scheme: dark;
+  /* fixes native scrollbar, inputs, selects */
 
   /* Pure zinc/black surfaces — inspired by Linear, Vercel */
-  --background:       hsl(0 0% 4%);
-  --foreground:       hsl(0 0% 93%);
-  --sidebar-bg:       hsl(0 0% 5%);
-  --header-bg:        hsl(0 0% 4% / 0.90);
-  --card-bg:          hsl(0 0% 8%);
-  --card-bg-hover:    hsl(0 0% 10%);
-  --surface:          hsl(0 0% 10%);
-  --surface-raised:   hsl(0 0% 12%);
-  --surface-overlay:  hsl(0 0% 7%);
+  --background: hsl(0 0% 4%);
+  --foreground: hsl(0 0% 93%);
+  --sidebar-bg: hsl(0 0% 5%);
+  --header-bg: hsl(0 0% 4% / 0.90);
+  --card-bg: hsl(0 0% 8%);
+  --card-bg-hover: hsl(0 0% 10%);
+  --surface: hsl(0 0% 10%);
+  --surface-raised: hsl(0 0% 12%);
+  --surface-overlay: hsl(0 0% 7%);
 
   /* Borders */
-  --border-color:     hsl(0 0% 15%);
-  --border-subtle:    hsl(0 0% 11%);
-  --border-emphasis:  hsl(239 68% 58% / 0.40);
+  --border-color: hsl(0 0% 15%);
+  --border-subtle: hsl(0 0% 11%);
+  --border-emphasis: hsl(239 68% 58% / 0.40);
 
   /* Text */
-  --muted:            hsl(0 0% 52%);
-  --muted-light:      hsl(0 0% 35%);
+  --muted: hsl(0 0% 52%);
+  --muted-light: hsl(0 0% 35%);
 
   /* Glows */
-  --accent-glow:      hsl(239 68% 58% / 0.14);
-  --accent-glow-lg:   hsl(239 68% 58% / 0.25);
+  --accent-glow: hsl(239 68% 58% / 0.14);
+  --accent-glow-lg: hsl(239 68% 58% / 0.25);
 
   /* Glass — for floating panels (dropdowns, modals) */
-  --glass-bg:         hsl(0 0% 9% / 0.92);
-  --glass-border:     hsl(0 0% 20% / 0.8);
-  --glass-hover:      hsl(0 0% 12%);
+  --glass-bg: hsl(0 0% 9% / 0.92);
+  --glass-border: hsl(0 0% 20% / 0.8);
+  --glass-hover: hsl(0 0% 12%);
 
   /* Glow */
-  --glow-primary:     hsl(239 68% 58% / 0.22);
-  --glow-accent:      hsl(263 70% 62% / 0.15);
+  --glow-primary: hsl(239 68% 58% / 0.22);
+  --glow-accent: hsl(263 70% 62% / 0.15);
 
   /* Mindmap */
-  --node-root-start:  hsl(239 72% 62%);
-  --node-root-end:    hsl(263 75% 62%);
+  --node-root-start: hsl(239 72% 62%);
+  --node-root-end: hsl(263 75% 62%);
   --connector-opacity: 0.7;
 }
 
@@ -185,21 +187,35 @@ html {
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  /* Match app bg — prevents white flash on Safari address bar appear/disappear */
+  background-color: var(--background);
+  /* contain: keeps bounce within page (pull-to-refresh works), no system bg leak */
+  overscroll-behavior-y: contain;
 }
 
 body {
-  background-color: var(--background);
+  background-color: transparent;
+  /* html layer handles base color */
   color: var(--foreground);
   font-family: var(--font-sans);
-  /* Inter */
   font-weight: 600;
-  /* in đậm toàn bộ mặc định */
   font-feature-settings: "cv02", "cv03", "cv04", "cv11", "liga" 1, "kern" 1;
   letter-spacing: -0.011em;
   line-height: 1.6;
   text-transform: none;
-  transition: background-color var(--duration-slow) var(--ease-in-out-quart),
-    color var(--duration-slow) var(--ease-in-out-quart);
+  transition: color var(--duration-slow) var(--ease-in-out-quart);
+}
+
+/* Fixed background layer — always covers viewport including safe area.
+   When Safari address bar appears/disappears, this fixed div is what shows,
+   not the body default which could flash white. */
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: -999;
+  background: var(--background);
+  pointer-events: none;
 }
 
 /* Tất cả heading đều dùng Inter */

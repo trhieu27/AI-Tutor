@@ -18,8 +18,14 @@ export default defineConfig({
     host: true,   // bind to 0.0.0.0 → accessible via local network IP
     port: 3000,
     proxy: {
+      // WS must be before /api/v1 (more specific path first)
+      '/api/v1/ws': {
+        target: 'ws://127.0.0.1:8081',
+        ws: true,
+        changeOrigin: true,
+      },
       '/api/v1': {
-        target: process.env.VITE_API_TARGET || 'http://127.0.0.1:8081',
+        target: 'http://127.0.0.1:8081',
         changeOrigin: true,
       },
     },

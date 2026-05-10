@@ -123,6 +123,7 @@ export default function HelpPage() {
     try {
       const res = await authFetch(`${API}/users/support`, {
         method: "POST",
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           subject: contactForm.subject,
           message: contactForm.message
@@ -398,14 +399,11 @@ export default function HelpPage() {
           className: "max-w-lg mx-auto",
           children: /*#__PURE__*/_jsxs("div", {
             className: "p-7 rounded-2xl bg-[var(--card-bg)] border border-[var(--border-color)] space-y-5",
-            children: [/*#__PURE__*/_jsxs("div", {
-              children: [/*#__PURE__*/_jsx("h3", {
+            children: [/*#__PURE__*/_jsx("div", {
+              children: /*#__PURE__*/_jsx("h3", {
                 className: "text-[15px] font-semibold text-[var(--foreground)]",
                 children: T.contact.formTitle
-              }), /*#__PURE__*/_jsx("p", {
-                className: "text-[12px] text-[var(--muted)] mt-0.5",
-                children: T.contact.formSubtitle
-              })]
+              })
             }), /*#__PURE__*/_jsxs("div", {
               className: "space-y-4",
               children: [/*#__PURE__*/_jsxs("div", {

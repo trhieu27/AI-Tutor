@@ -111,13 +111,13 @@ export default function Dashboard() {
           <div className="flex items-center gap-3 pt-1">
             <button
               onClick={scrollToUpload}
-              className="px-6 py-3 bg-white text-[hsl(239_68%_50%)] font-bold rounded-xl hover:bg-white/95 active:scale-[0.97] transition-all duration-150 shadow-[0_4px_16px_hsl(0_0%_0%/0.15)] text-[13px] tracking-tight"
+              className="px-6 py-3 bg-white text-[hsl(239_68%_50%)] font-bold rounded-xl hover:bg-white/95 active:scale-[0.97] transition-all duration-150 shadow-[0_4px_16px_hsl(0_0%_0%/0.15)] text-[13px] tracking-tight text-center"
             >
               Bắt đầu học ngay
             </button>
             <Link
               to="/learning"
-              className="px-6 py-3 bg-white/10 text-white font-semibold rounded-xl hover:bg-white/18 border border-white/20 transition-all duration-150 text-[13px]"
+              className="px-6 py-3 bg-white/10 text-white font-semibold rounded-xl hover:bg-white/18 border border-white/20 transition-all duration-150 text-[13px] text-center"
             >
               Khám phá tính năng
             </Link>

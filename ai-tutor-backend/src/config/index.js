@@ -32,7 +32,7 @@ module.exports = {
   corsOrigins: (process.env.CORS_ORIGINS || 'http://localhost:3000,http://localhost:3001').split(',').map(s => s.trim()),
 
   freeLimits: {
-    documents: 3,
+    documents: 9999,
     chatMessages: 30,
     aiFeatures: 10,
     contextMessages: 6,

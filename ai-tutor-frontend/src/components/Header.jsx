@@ -140,7 +140,7 @@ export default function Header({ onMenuClick }) {
 
         {/* Notification dropdown — glass panel (floating = allowed) */}
         {showNotifications && (
-          <div className="absolute right-0 top-full mt-2 w-80 glass border border-[var(--glass-border)] rounded-2xl shadow-[0_16px_48px_hsl(228_25%_5%/0.4)] z-50 overflow-hidden animate-fade-up">
+          <div className="fixed right-4 top-[4.5rem] w-[min(320px,calc(100vw-32px))] bg-[var(--card-bg)] border border-[var(--border-color)] rounded-2xl shadow-[0_16px_48px_hsl(228_25%_5%/0.18)] z-50 overflow-hidden animate-fade-up">
             {/* Header */}
             <div className="flex items-center justify-between px-4 py-3 border-b border-[var(--border-color)]">
               <p className="text-[13px] font-semibold text-[var(--foreground)]">Thông báo</p>
@@ -215,7 +215,7 @@ export default function Header({ onMenuClick }) {
 
         {/* User dropdown — glass panel (floating = allowed) */}
         {showUserMenu && (
-          <div className="absolute right-0 top-full mt-2 w-52 glass border border-[var(--glass-border)] rounded-2xl shadow-[0_16px_48px_hsl(228_25%_5%/0.4)] z-50 overflow-hidden py-1 animate-fade-up">
+          <div className="fixed right-4 top-[4.5rem] w-52 bg-[var(--card-bg)] border border-[var(--border-color)] rounded-2xl shadow-[0_16px_48px_hsl(228_25%_5%/0.18)] z-50 overflow-hidden py-1 animate-fade-up">
             {/* User info */}
             <div className="px-4 py-3 border-b border-[var(--border-color)]">
               <p className="text-[13px] font-semibold text-[var(--foreground)] truncate">{user?.full_name}</p>

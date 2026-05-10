@@ -263,11 +263,11 @@ export default function DocumentTable({
           })]
         })]
       }), /*#__PURE__*/_jsx("div", {
-        className: "overflow-x-auto overflow-y-auto max-h-[50dvh] sm:max-h-[330px] w-full custom-scrollbar overscroll-none",
+        className: "overflow-x-auto overflow-y-auto max-h-[50svh] [touch-action:pan-x_pan-y] sm:max-h-[280px] w-full custom-scrollbar",
         children: /*#__PURE__*/_jsxs("table", {
           className: "w-full text-left border-collapse sm:table-fixed",
           children: [/*#__PURE__*/_jsx("thead", {
-            className: "sticky top-0 z-20",
+            className: "",
             style: {
               backgroundColor: 'var(--sidebar-bg)'
             },
@@ -426,7 +426,8 @@ export default function DocumentTable({
             })
           })]
         })
-      })]
+      })
+      ]   /* closes card children: [headerSection, scrollContainer] */
     }), /*#__PURE__*/_jsx(ConfirmDialog, {
       open: !!pendingDelete,
       title: DOCUMENT_TABLE_TEXTS.deleteConfirm.title,

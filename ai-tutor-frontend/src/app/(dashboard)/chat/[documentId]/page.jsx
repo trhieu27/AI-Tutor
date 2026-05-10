@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from "react";
+import { createPortal } from "react-dom";
 import { useParams, useNavigate, useSearchParams } from "react-router-dom";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -39,6 +40,7 @@ export default function ChatPage() {
   const textareaRef = useRef(null);
   const messagesContainerRef = useRef(null);
   const [isAtBottom, setIsAtBottom] = useState(true);
+  const [isInitialLoading, setIsInitialLoading] = useState(true);
   const scrollToBottom = (force = false) => {
     const container = messagesContainerRef.current;
     if (!container) return;
@@ -77,12 +79,16 @@ export default function ChatPage() {
         setDocData(doc);
         const docSessions = await fetchChatSessions(documentId);
         setSessions(docSessions);
-        if (docSessions.length > 0) loadSession(docSessions[0].id);
+        if (docSessions.length > 0) {
+          await loadSession(docSessions[0].id);
+        }
         if (initialAction === "quiz") handleGetQuiz();else if (initialAction === "summary") handleGetSummary();else if (initialAction === "questions") handleGetStudyQuestions();
         // Load quota
         fetchQuota().then(setQuota).catch(() => {});
       } catch (error) {
         console.error("Error loading chat data:", error);
+      } finally {
+        setIsInitialLoading(false);
       }
     };
     loadInitialData();
@@ -375,15 +381,16 @@ export default function ChatPage() {
     }), /*#__PURE__*/_jsxs("main", {
       className: "flex-1 flex flex-col h-full min-w-0 bg-[var(--background)] relative",
       children: [/*#__PURE__*/_jsxs("header", {
-        className: "h-14 border-b border-[var(--border-color)] bg-[var(--header-bg)] backdrop-blur-xl flex items-center justify-between px-5 shrink-0",
+        className: "h-11 border-b border-[var(--border-color)] bg-[var(--header-bg)] backdrop-blur-xl flex items-center justify-between px-3 sm:px-5 shrink-0",
         children: [/*#__PURE__*/_jsxs("div", {
-          className: "flex items-center gap-3 min-w-0",
+          className: "flex items-center gap-2 min-w-0",
           children: [/*#__PURE__*/_jsx("button", {
             onClick: () => setIsSidebarOpen(!isSidebarOpen),
-            className: "w-8 h-8 rounded-lg flex items-center justify-center text-[var(--muted)] hover:bg-[var(--surface)] hover:text-[var(--foreground)] transition-all",
+            className: "w-8 h-8 rounded-lg flex items-center justify-center text-[var(--muted)] hover:bg-[var(--surface)] hover:text-[var(--foreground)] transition-all shrink-0",
+            title: "Lịch sử hội thoại",
             children: /*#__PURE__*/_jsx("span", {
-              className: "material-symbols-outlined text-[20px]",
-              children: isSidebarOpen ? "menu_open" : "menu"
+              className: "material-symbols-outlined text-[18px]",
+              children: isSidebarOpen ? "close" : "forum"
             })
           }), /*#__PURE__*/_jsxs("div", {
             className: "min-w-0",
@@ -431,7 +438,29 @@ export default function ChatPage() {
         className: "flex-1 overflow-y-auto custom-scrollbar relative",
         children: [/*#__PURE__*/_jsx("div", {
           className: "max-w-2xl mx-auto px-6 md:px-4 py-10",
-          children: messages.length === 0 ?
+          children: isInitialLoading ?
+          /* ── Skeleton shimmer while history loads ── */
+          _jsx("div", {
+            className: "space-y-8 pt-4",
+            children: [
+              // AI bubble
+              ["ai","user","ai","user"].map((role, i) => _jsxs("div", {
+                className: `flex gap-4 ${role === "user" ? "flex-row-reverse" : ""}`,
+                children: [
+                  _jsx("div", { className: "w-8 h-8 rounded-xl shrink-0 shimmer-premium mt-0.5" }),
+                  _jsxs("div", {
+                    className: `flex-1 min-w-0 space-y-2 ${role === "user" ? "flex flex-col items-end" : ""}`,
+                    children: [
+                      _jsx("div", { className: `h-3.5 rounded-lg shimmer-premium ${role === "user" ? "w-[55%]" : "w-[80%]"}` }),
+                      _jsx("div", { className: `h-3.5 rounded-lg shimmer-premium ${role === "user" ? "w-[40%]" : "w-[65%]"}` }),
+                      role === "ai" && _jsx("div", { className: "h-3.5 w-[45%] rounded-lg shimmer-premium" }),
+                    ]
+                  })
+                ]
+              }, i))
+            ]
+          }) :
+          messages.length === 0 ?
           /*#__PURE__*/
           /* Welcome */
           _jsxs("div", {
@@ -667,8 +696,8 @@ export default function ChatPage() {
           ]
         })
       })]
-    }), showModal && /*#__PURE__*/_jsx("div", {
-      className: "fixed inset-0 z-[200] flex items-center justify-center p-4 sm:p-8 bg-[hsl(228_25%_5%/0.5)] backdrop-blur-[6px] animate-in fade-in duration-150",
+    }), showModal && createPortal(_jsx("div", {
+      className: "fixed inset-0 z-[9999] flex items-center justify-center p-4 sm:p-8 bg-[hsl(228_25%_5%/0.55)] backdrop-blur-[6px] animate-in fade-in duration-150",
       onClick: () => {
         setShowModal(null);
         handleCancel();
@@ -820,8 +849,8 @@ export default function ChatPage() {
           })]
         })]
       })
-    }), quotaExceeded && /*#__PURE__*/_jsx("div", {
-      className: "fixed inset-0 z-[300] flex items-center justify-center p-4 bg-black/[0.12] dark:bg-black/60 backdrop-blur-[4px] animate-in fade-in duration-150",
+    }), document.body), quotaExceeded && createPortal(_jsx("div", {
+      className: "fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/[0.12] dark:bg-black/60 backdrop-blur-[4px] animate-in fade-in duration-150",
       onClick: () => setQuotaExceeded(null),
       children: /*#__PURE__*/_jsxs("div", {
         className: "bg-[var(--card-bg)] backdrop-blur-2xl w-full max-w-sm rounded-2xl border border-[var(--border-color)] shadow-[0_20px_60px_hsl(222_47%_4%/0.25)] p-8 text-center animate-in zoom-in-95 duration-200",
@@ -857,6 +886,6 @@ export default function ChatPage() {
           })]
         })]
       })
-    })]
+    }), document.body)]
   });
 }

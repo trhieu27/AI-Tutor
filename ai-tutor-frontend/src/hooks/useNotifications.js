@@ -9,7 +9,11 @@
  */
 
 import { useEffect, useRef, useCallback } from "react";
-const WS_BASE = import.meta.env.VITE_WS_URL || (typeof window !== "undefined" ? window.location.protocol === "https:" ? `wss://${window.location.host}` : `ws://${window.location.hostname}:8081` : "ws://localhost:8081");
+const WS_BASE = typeof window !== "undefined"
+  ? window.location.protocol === "https:"
+    ? `wss://${window.location.host}`
+    : `ws://${window.location.host}`
+  : "ws://localhost:3000";
 export function useNotifications({
   token,
   onNotification

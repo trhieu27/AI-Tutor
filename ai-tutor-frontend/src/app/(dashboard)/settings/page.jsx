@@ -768,7 +768,7 @@ export default function SettingsPage() {
   return /*#__PURE__*/_jsx("div", {
     className: "min-h-screen bg-[var(--background)]",
     children: /*#__PURE__*/_jsxs("div", {
-      className: "max-w-5xl mx-auto px-6 py-10",
+      className: "max-w-5xl mx-auto px-4 sm:px-6 py-6 sm:py-10",
       children: [/*#__PURE__*/_jsxs("div", {
         className: "mb-8",
         children: [/*#__PURE__*/_jsx("h1", {
@@ -779,14 +779,14 @@ export default function SettingsPage() {
           children: T.page.subtitle
         })]
       }), /*#__PURE__*/_jsxs("div", {
-        className: "flex gap-8 items-start",
+        className: "flex flex-col gap-4 sm:flex-row sm:gap-8 sm:items-start",
         children: [/*#__PURE__*/_jsx("aside", {
-          className: "w-52 shrink-0 sticky top-6",
+          className: "w-full sm:w-52 sm:shrink-0 sm:sticky sm:top-6",
           children: /*#__PURE__*/_jsx("nav", {
-            className: "space-y-1",
+            className: "flex gap-1 overflow-x-auto pb-1 sm:flex-col sm:overflow-visible sm:space-y-1 sm:pb-0",
             children: NAV.map(n => /*#__PURE__*/_jsxs("button", {
               onClick: () => setTab(n.id),
-              className: `w-full flex items-center gap-2.5 px-3.5 py-2.5 rounded-xl text-[13px] font-semibold transition-all text-left ${tab === n.id ? "bg-[hsl(239_68%_58%/0.10)] text-[hsl(239_55%_50%)] border border-[hsl(239_68%_58%/0.20)]" : "text-[var(--muted)] hover:bg-[var(--surface)] hover:text-[var(--foreground)] border border-transparent"}`,
+              className: `shrink-0 sm:w-full flex items-center gap-2.5 px-3.5 py-2.5 rounded-xl text-[13px] font-semibold transition-all text-left ${tab === n.id ? "bg-[hsl(239_68%_58%/0.10)] text-[hsl(239_55%_50%)] border border-[hsl(239_68%_58%/0.20)]" : "text-[var(--muted)] hover:bg-[var(--surface)] hover:text-[var(--foreground)] border border-transparent"}`,
               children: [/*#__PURE__*/_jsx("span", {
                 className: "material-symbols-outlined",
                 style: { fontSize: 18 },
@@ -796,7 +796,7 @@ export default function SettingsPage() {
           })
         }), /*#__PURE__*/_jsx("div", {
 
-          className: "flex-1 min-w-0 p-7 rounded-2xl bg-[var(--card-bg)] border border-[var(--border-color)] shadow-[0_4px_24px_hsl(228_25%_5%/0.08)]",
+          className: "flex-1 min-w-0 p-4 sm:p-7 rounded-2xl bg-[var(--card-bg)] border border-[var(--border-color)] shadow-[0_4px_24px_hsl(228_25%_5%/0.08)]",
           children: loading ? /*#__PURE__*/_jsxs("div", {
             className: "space-y-5",
             children: [/*#__PURE__*/_jsx(Skeleton, {

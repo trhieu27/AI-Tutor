@@ -427,11 +427,16 @@ const InteractiveMindmap = forwardRef(({ chart, onCodeChange, documentId, zoom =
   }, []);
 
   useEffect(() => {
+    const getXY = e => {
+      if (e.touches && e.touches.length > 0) return { cx: e.touches[0].clientX, cy: e.touches[0].clientY };
+      if (e.changedTouches && e.changedTouches.length > 0) return { cx: e.changedTouches[0].clientX, cy: e.changedTouches[0].clientY };
+      return { cx: e.clientX, cy: e.clientY };
+    };
     const onMove = e => {
-      // Resize handle drag
       const rs = resizeDragRef.current;
       if (rs) {
-        const pt = toSvg(e.clientX, e.clientY);
+        const { cx, cy } = getXY(e);
+        const pt = toSvg(cx, cy);
         const next = { ...posRef.current };
         const p = next[rs.id];
         if (p) {
@@ -442,9 +447,9 @@ const InteractiveMindmap = forwardRef(({ chart, onCodeChange, documentId, zoom =
         }
         return;
       }
-      // Node drag
       const ds = dragRef.current; if (!ds) return;
-      const pt = toSvg(e.clientX, e.clientY);
+      const { cx, cy } = getXY(e);
+      const pt = toSvg(cx, cy);
       const dx = pt.x - ds.sx, dy = pt.y - ds.sy;
       const next = { ...ds.snap };
       ds.ids.forEach(id => { if (next[id]) next[id] = { ...next[id], x: next[id].x + dx, y: next[id].y + dy }; });
@@ -457,7 +462,8 @@ const InteractiveMindmap = forwardRef(({ chart, onCodeChange, documentId, zoom =
         resizeDragRef.current = null; document.body.classList.remove('select-none'); return;
       }
       const ds = dragRef.current; if (!ds) { document.body.classList.remove('select-none'); return; }
-      const pt = toSvg(e.clientX, e.clientY);
+      const { cx, cy } = getXY(e);
+      const pt = toSvg(cx, cy);
       const dx = Math.abs(pt.x - ds.sx), dy = Math.abs(pt.y - ds.sy);
       if (dx > 5 || dy > 5) { const snap = { code: toMermaid(treeRef.current), pos: ds.snap }; histRef.current = [...histRef.current.slice(-39), snap]; redoRef.current = []; notifyUR(); }
       if (dx < 6 && dy < 6) {
@@ -466,8 +472,16 @@ const InteractiveMindmap = forwardRef(({ chart, onCodeChange, documentId, zoom =
       }
       dragRef.current = null; document.body.classList.remove('select-none');
     };
-    document.addEventListener('mousemove', onMove); document.addEventListener('mouseup', onUp);
-    return () => { document.removeEventListener('mousemove', onMove); document.removeEventListener('mouseup', onUp); };
+    document.addEventListener('mousemove', onMove);
+    document.addEventListener('mouseup', onUp);
+    document.addEventListener('touchmove', onMove, { passive: false });
+    document.addEventListener('touchend', onUp);
+    return () => {
+      document.removeEventListener('mousemove', onMove);
+      document.removeEventListener('mouseup', onUp);
+      document.removeEventListener('touchmove', onMove);
+      document.removeEventListener('touchend', onUp);
+    };
   }, [toSvg, notifyUR]);
 
   useEffect(() => {
@@ -478,11 +492,13 @@ const InteractiveMindmap = forwardRef(({ chart, onCodeChange, documentId, zoom =
   }, [selId]);
 
   const startDrag = useCallback((e, id) => {
-    if (e.button !== 0) return;
+    if (e.type === 'mousedown' && e.button !== 0) return;
     e.stopPropagation(); e.preventDefault();
     if (!treeRef.current) return;
     const node = findNode(treeRef.current, id); if (!node) return;
-    const pt = toSvg(e.clientX, e.clientY);
+    const cx = e.touches ? e.touches[0].clientX : e.clientX;
+    const cy = e.touches ? e.touches[0].clientY : e.clientY;
+    const pt = toSvg(cx, cy);
     dragRef.current = { id, ids: getDescendantIds(node), sx: pt.x, sy: pt.y, snap: { ...posRef.current } };
     document.body.classList.add('select-none');
   }, [toSvg]);
@@ -565,7 +581,7 @@ const InteractiveMindmap = forwardRef(({ chart, onCodeChange, documentId, zoom =
   const selNode = selId ? findNode(tree, selId) : null;
 
   return (
-    <div className="relative" style={{ width: vb.w, height: vb.h }}>
+    <div className="relative" style={{ width: vb.w, height: vb.h, touchAction: 'none' }}>
       <svg ref={svgRef} viewBox={`${vb.x} ${vb.y} ${vb.w} ${vb.h}`} width={vb.w} height={vb.h} className="select-none" style={{ overflow: 'visible' }}>
         <defs>
           {conns.map(c => {
@@ -606,6 +622,7 @@ const InteractiveMindmap = forwardRef(({ chart, onCodeChange, documentId, zoom =
           return (
             <g key={n.id} data-mindmap-node="true"
               onMouseDown={e => startDrag(e, n.id)}
+              onTouchStart={e => startDrag(e, n.id)}
               onClick={e => e.stopPropagation()}
               style={{ cursor: 'grab' }}>
               {isSel && <rect x={p.x - p.w / 2 - 6} y={p.y - p.h / 2 - 6} width={p.w + 12} height={p.h + 12} rx={rx + 4} fill="none" stroke="hsl(239 68% 68%)" strokeWidth={1.5} strokeDasharray="5 4" className="animate-pulse" />}
@@ -616,7 +633,8 @@ const InteractiveMindmap = forwardRef(({ chart, onCodeChange, documentId, zoom =
               </text>
               {isSel && [['nw',-1,-1,'nw-resize'],['ne',1,-1,'ne-resize'],['sw',-1,1,'sw-resize'],['se',1,1,'se-resize']].map(([corner,sx,sy,cur])=>{
                 const hx=p.x+sx*(p.w/2+8), hy=p.y+sy*(p.h/2+8), s=8;
-                return(<g key={corner} style={{cursor:cur}} onMouseDown={e=>{e.stopPropagation();e.preventDefault();resizeDragRef.current={id:n.id,snap:{...posRef.current}};document.body.classList.add('select-none');}}>
+                const startResize = e => { e.stopPropagation(); e.preventDefault(); resizeDragRef.current = { id: n.id, snap: { ...posRef.current } }; document.body.classList.add('select-none'); };
+                return(<g key={corner} style={{cursor:cur}} onMouseDown={startResize} onTouchStart={startResize}>
                   {/* hit area */}
                   <rect x={hx-s-4} y={hy-s-4} width={(s+4)*2} height={(s+4)*2} fill="transparent"/>
                   {/* shadow */}

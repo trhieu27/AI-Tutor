@@ -239,7 +239,7 @@ export default function InteractiveQuizPage() {
     children: [/*#__PURE__*/_jsxs("div", {
       className: "min-h-screen bg-[var(--background)] pb-12",
       children: [/*#__PURE__*/_jsxs("header", {
-        className: "sticky top-0 z-50 bg-[var(--header-bg)] backdrop-blur-xl border-b border-[var(--border-color)] px-6 h-16 flex items-center justify-between",
+        className: "sticky top-16 z-30 bg-[var(--header-bg)] backdrop-blur-xl border-b border-[var(--border-color)] px-4 sm:px-6 h-12 flex items-center justify-between",
         children: [/*#__PURE__*/_jsxs("div", {
           className: "flex items-center gap-3",
           children: [/*#__PURE__*/_jsx("button", {

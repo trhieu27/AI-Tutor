@@ -1,10 +1,12 @@
 <!doctype html>
-<html lang="vi">
+<html lang="vi" style="background:#f8fafc">
   <head>
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <link rel="shortcut icon" href="/favicon.svg" />
     <link rel="apple-touch-icon" href="/favicon.svg" />
+    <!-- theme-color matches page bg → address bar consistent, no adaptive color change -->
+    <meta name="theme-color" content="#f8fafc" id="theme-color-meta" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="description" content="AI Tutor - Trợ lý học tập thông minh powered by AI" />
     <title>AI Tutor – Học thông minh hơn với AI</title>
@@ -15,10 +17,20 @@
     <script>
       (function() {
         var stored = localStorage.getItem('theme');
-        // Default is now light. Only go dark if user explicitly picked dark.
-        var theme = stored === 'dark' ? 'dark' : 'light';
-        localStorage.setItem('theme', theme);
-        document.documentElement.classList.toggle('dark', theme === 'dark');
+        var isDark = stored === 'dark';
+        var bg = isDark ? '#0a0a0a' : '#f8fafc';
+        document.documentElement.style.background = bg;
+        document.documentElement.classList.toggle('dark', isDark);
+        localStorage.setItem('theme', isDark ? 'dark' : 'light');
+        // Sync theme-color meta + html bg when theme toggles
+        var meta = document.getElementById('theme-color-meta');
+        if (isDark) meta.content = '#0a0a0a';
+        new MutationObserver(function() {
+          var dark = document.documentElement.classList.contains('dark');
+          var newBg = dark ? '#0a0a0a' : '#f8fafc';
+          document.documentElement.style.background = newBg;
+          meta.content = newBg;
+        }).observe(document.documentElement, { attributeFilter: ['class'] });
       })();
     </script>
   </head>
