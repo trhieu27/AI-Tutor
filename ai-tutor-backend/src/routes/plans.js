@@ -1,109 +1,35 @@
 const express = require('express');
 const router = express.Router();
 const { v4: uuidv4 } = require('uuid');
-const { User, UserSubscription } = require('../db/models');
+const { User, UserSubscription, SubscriptionPlan } = require('../db/models');
 const { authMiddleware } = require('../middleware/auth');
 
-// ── Dữ liệu gói tĩnh (không cần seed DB) ─────────────────────────────────────
-// Thay đổi giá ở đây để cập nhật toàn bộ hệ thống.
+// ── Helper: Lấy danh sách plans từ DB (có cache ngắn để giảm query) ──────────
+let _planCache = null;
+let _planCacheAt = 0;
+const CACHE_TTL_MS = 60 * 1000; // 1 phút
 
-const PLANS = [
-  {
-    id: 'free',
-    name: 'free',
-    display_name: 'Miễn phí',
-    price_vnd: 0,
-    price_usd: 0,
-    billing_cycle: 'none',
-    discount_percent: 0,
-    discounted_price_vnd: 0,
-    discounted_price_usd: 0,
-    is_popular: false,
-    is_active: true,
-    sort_order: 0,
-    quota: {
-      chat_per_day: 30,
-      ai_generations_per_day: 10,
-      max_documents: 3,
-      max_file_size_mb: 50,
-    },
-    features: [
-      { icon: 'chat',         text: 'Chat với AI',              included: true,  limit: '30 tin/ngày' },
-      { icon: 'auto_awesome', text: 'Tạo nội dung AI',          included: true,  limit: '10 lượt/ngày' },
-      { icon: 'upload_file',  text: 'Tài liệu',                 included: true,  limit: 'Tối đa 3 file' },
-      { icon: 'hub',          text: 'Sơ đồ tư duy',             included: true,  limit: '10 lượt/ngày' },
-      { icon: 'quiz',         text: 'Luyện tập trắc nghiệm',    included: true,  limit: '10 lượt/ngày' },
-      { icon: 'support_agent',text: 'Hỗ trợ',                   included: true,  limit: 'Cộng đồng' },
-      { icon: 'history',      text: 'Lịch sử hội thoại',        included: false, limit: null },
-      { icon: 'priority_high',text: 'Ưu tiên xử lý',            included: false, limit: null },
-    ],
-  },
-  {
-    id: 'pro_monthly',
-    name: 'pro_monthly',
-    display_name: 'Pro Hàng tháng',
-    price_vnd: 149000,
-    price_usd: 5.99,
-    billing_cycle: 'monthly',
-    discount_percent: 0,
-    discounted_price_vnd: 149000,
-    discounted_price_usd: 5.99,
-    is_popular: true,
-    is_active: true,
-    sort_order: 1,
-    quota: {
-      chat_per_day: -1,
-      ai_generations_per_day: -1,
-      max_documents: -1,
-      max_file_size_mb: 100,
-    },
-    features: [
-      { icon: 'chat',         text: 'Chat với AI',              included: true,  limit: 'Không giới hạn' },
-      { icon: 'auto_awesome', text: 'Tạo nội dung AI',          included: true,  limit: 'Không giới hạn' },
-      { icon: 'upload_file',  text: 'Tài liệu',                 included: true,  limit: 'Không giới hạn' },
-      { icon: 'hub',          text: 'Sơ đồ tư duy',             included: true,  limit: 'Không giới hạn' },
-      { icon: 'quiz',         text: 'Luyện tập trắc nghiệm',    included: true,  limit: 'Không giới hạn' },
-      { icon: 'support_agent',text: 'Hỗ trợ',                   included: true,  limit: 'Email ưu tiên' },
-      { icon: 'history',      text: 'Lịch sử hội thoại',        included: true,  limit: 'Không giới hạn' },
-      { icon: 'priority_high',text: 'Ưu tiên xử lý',            included: true,  limit: 'Có' },
-    ],
-  },
-  {
-    id: 'pro_annual',
-    name: 'pro_annual',
-    display_name: 'Pro Hàng năm',
-    price_vnd: 298000,   // giá gốc mỗi tháng nếu trả theo năm (không giảm)
-    price_usd: 11.99,
-    billing_cycle: 'annual',
-    discount_percent: 40,
-    discounted_price_vnd: 179000,  // 149000 * 12 * 0.6 / 12 ≈ 107.000 → dùng 179k/năm chia 12
-    discounted_price_usd: 3.59,
-    is_popular: false,
-    is_active: true,
-    sort_order: 2,
-    quota: {
-      chat_per_day: -1,
-      ai_generations_per_day: -1,
-      max_documents: -1,
-      max_file_size_mb: 200,
-    },
-    features: [
-      { icon: 'chat',         text: 'Chat với AI',              included: true,  limit: 'Không giới hạn' },
-      { icon: 'auto_awesome', text: 'Tạo nội dung AI',          included: true,  limit: 'Không giới hạn' },
-      { icon: 'upload_file',  text: 'Tài liệu',                 included: true,  limit: 'Không giới hạn' },
-      { icon: 'hub',          text: 'Sơ đồ tư duy',             included: true,  limit: 'Không giới hạn' },
-      { icon: 'quiz',         text: 'Luyện tập trắc nghiệm',    included: true,  limit: 'Không giới hạn' },
-      { icon: 'support_agent',text: 'Hỗ trợ',                   included: true,  limit: 'Email ưu tiên 24/7' },
-      { icon: 'history',      text: 'Lịch sử hội thoại',        included: true,  limit: 'Không giới hạn' },
-      { icon: 'priority_high',text: 'Ưu tiên xử lý',            included: true,  limit: 'Cao nhất' },
-    ],
-  },
-];
+async function getPlans() {
+  const now = Date.now();
+  if (_planCache && now - _planCacheAt < CACHE_TTL_MS) return _planCache;
+  const result = await SubscriptionPlan.find({ is_active: true })
+    .sort({ sort_order: 1 })
+    .lean();
+  console.log('[plans] DB query result count:', result.length);
+  _planCache = result;
+  _planCacheAt = now;
+  return _planCache;
+}
+
+function invalidateCache() {
+  _planCache = null;
+}
 
 // GET /api/v1/plans  – Lấy danh sách gói
 router.get('/', async (_req, res) => {
   try {
-    res.json(PLANS.filter(p => p.is_active).sort((a, b) => a.sort_order - b.sort_order));
+    const plans = await getPlans();
+    res.json(plans);
   } catch (err) {
     res.status(500).json({ detail: 'Lỗi server' });
   }
@@ -112,9 +38,13 @@ router.get('/', async (_req, res) => {
 // GET /api/v1/plans/my  – Lấy gói hiện tại của user đang đăng nhập
 router.get('/my', authMiddleware, async (req, res) => {
   try {
+    const plans = await getPlans();
+    const freePlan = plans.find(p => p.id === 'free') || plans[0];
+
     const sub = await UserSubscription.findOne({ user_id: req.userId }).lean();
-    if (!sub) return res.json({ plan: PLANS[0], subscription: null }); // mặc định free
-    const plan = PLANS.find(p => p.id === sub.plan_id) || PLANS[0];
+    if (!sub) return res.json({ plan: freePlan, subscription: null });
+
+    const plan = plans.find(p => p.id === sub.plan_id) || freePlan;
     const { _id, ...cleanSub } = sub;
     res.json({ plan, subscription: cleanSub });
   } catch (err) {
@@ -127,7 +57,8 @@ router.get('/my', authMiddleware, async (req, res) => {
 router.post('/subscribe', authMiddleware, async (req, res) => {
   try {
     const { plan_id, payment_method } = req.body;
-    const plan = PLANS.find(p => p.id === plan_id && p.is_active);
+    const plans = await getPlans();
+    const plan = plans.find(p => p.id === plan_id && p.is_active);
     if (!plan) return res.status(400).json({ detail: 'Gói không tồn tại hoặc không khả dụng' });
     if (!['momo', 'vnpay', 'credit_card'].includes(payment_method)) {
       return res.status(400).json({ detail: 'Phương thức thanh toán không hợp lệ' });

@@ -111,10 +111,12 @@ export default function App() {
               }), /*#__PURE__*/_jsx(Route, {
                 path: "/help",
                 element: /*#__PURE__*/_jsx(HelpPage, {})
-              }), /*#__PURE__*/_jsx(Route, {
-                path: "/pricing",
-                element: /*#__PURE__*/_jsx(PricingPage, {})
               })]
+            }), /*#__PURE__*/_jsx(Route, {
+              path: "/pricing",
+              element: /*#__PURE__*/_jsx(PrivateRoute, {
+                children: /*#__PURE__*/_jsx(PricingPage, {})
+              })
             }), /*#__PURE__*/_jsx(Route, {
               path: "*",
               element: /*#__PURE__*/_jsx(Navigate, {

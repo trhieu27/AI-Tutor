@@ -1,6 +1,8 @@
 ﻿import { useState, useCallback, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext";
 import { SETTINGS_PAGE_TEXTS, QUOTA_TEXTS } from "@/constants/texts";
+
 
 /* ── Types ────────────────────────────────────────────────────────────────── */
 
@@ -618,126 +620,151 @@ function PreferencesSection({
 /* ══════════════════════════════════════════════════════════════════════════ */
 /*  UPGRADE SECTION                                                           */
 /* ══════════════════════════════════════════════════════════════════════════ */
-function UpgradeSection({
-  profile,
-  onRefresh
-}) {
-  const {
-    updateUser
-  } = useAuth();
-  const [activating, setActivating] = useState(false);
-  const [msg, setMsg] = useState(null);
+
+const UPGRADE_PLANS = [
+  {
+    id: "free",
+    name: "Miễn phí",
+    tagline: "Xem AI có thể làm gì",
+    priceLabel: "₫0",
+    unit: "VND /tháng",
+    featured: false,
+    features: [
+      { icon: "hub", text: "Mô hình cốt lõi" },
+      { icon: "chat", text: "30 tin/ngày" },
+      { icon: "auto_awesome", text: "10 lượt tạo nội dung AI/ngày" },
+      { icon: "upload_file", text: "Tối đa 3 file tài liệu" },
+    ],
+  },
+  {
+    id: "pro",
+    name: "Pro",
+    tagline: "Tối đa hóa năng suất của bạn",
+    priceLabel: "₫99.000",
+    unit: "VND /tháng (bao gồm VAT)",
+    featured: true,
+    badge: "Phổ biến",
+    features: [
+      { icon: "hub", text: "Mô hình nâng cao" },
+      { icon: "chat", text: "Không giới hạn tin nhắn" },
+      { icon: "auto_awesome", text: "Không giới hạn tạo nội dung AI" },
+      { icon: "upload_file", text: "Không giới hạn tài liệu" },
+      { icon: "psychology", text: "Ưu tiên xử lý AI" },
+    ],
+  },
+];
+
+function UpgradeSection({ profile }) {
+  const navigate = useNavigate();
   const isPro = profile.is_pro;
   const U = QUOTA_TEXTS.upgrade;
-  const handleUpgrade = async () => {
-    setActivating(true);
-    setMsg(null);
-    try {
-      const res = await authFetch(`${API}/users/upgrade-pro`, {
-        method: "PUT"
-      });
-      if (!res.ok) throw new Error((await res.json()).detail);
-      updateUser({
-        isPro: true
-      });
-      setMsg({
-        type: "ok",
-        text: U.successMsg
-      });
-      onRefresh();
-    } catch (e) {
-      setMsg({
-        type: "err",
-        text: e.message
-      });
-    } finally {
-      setActivating(false);
-    }
-  };
-  return /*#__PURE__*/_jsxs("div", {
-    className: "space-y-8",
-    children: [/*#__PURE__*/_jsxs("div", {
-      children: [/*#__PURE__*/_jsx("h2", {
-        className: "font-display text-[22px] font-semibold text-[var(--foreground)] tracking-tight",
-        children: U.title
-      }), /*#__PURE__*/_jsx("p", {
-        className: "text-[13px] text-[var(--muted)] mt-0.5",
-        children: U.subtitle
-      })]
-    }), /*#__PURE__*/_jsxs("div", {
-      className: "inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-[var(--surface)] border border-[var(--border-color)]",
-      children: [/*#__PURE__*/_jsxs("span", {
-        className: "text-[11px] font-semibold text-[var(--muted)] uppercase tracking-wider",
-        children: [U.currentPlan, ":"]
-      }), isPro ? /*#__PURE__*/_jsx("span", {
-        className: "px-2.5 py-0.5 rounded-lg bg-gradient-to-r from-[hsl(239_68%_58%)] to-[hsl(263_70%_62%)] text-white text-[11px] font-bold",
-        children: U.proPlan
-      }) : /*#__PURE__*/_jsx("span", {
-        className: "px-2.5 py-0.5 rounded-lg bg-[var(--border-color)] text-[var(--foreground)] text-[11px] font-bold",
-        children: U.freePlan
-      })]
-    }), /*#__PURE__*/_jsx("div", {
-      className: "max-w-md",
-      children: /*#__PURE__*/_jsxs("div", {
-        className: "rounded-2xl border border-[var(--border-color)] overflow-hidden",
-        children: [/*#__PURE__*/_jsxs("div", {
-          className: "grid grid-cols-3 gap-0 bg-[var(--surface)] border-b border-[var(--border-color)]",
-          children: [/*#__PURE__*/_jsx("div", {
-            className: "px-4 py-3 text-[11px] font-bold text-[var(--muted)] uppercase tracking-wider",
-            children: "T\xEDnh n\u0103ng"
-          }), /*#__PURE__*/_jsx("div", {
-            className: "px-4 py-3 text-[11px] font-bold text-[var(--muted)] uppercase tracking-wider text-center",
-            children: U.freePlan
-          }), /*#__PURE__*/_jsx("div", {
-            className: "px-4 py-3 text-[11px] font-bold text-[hsl(239_55%_50%)] uppercase tracking-wider text-center",
-            children: U.proPlan
-          })]
-        }), U.features.map((f, i) => /*#__PURE__*/_jsxs("div", {
-          className: "grid grid-cols-3 gap-0 border-b border-[var(--border-color)] last:border-0",
-          children: [/*#__PURE__*/_jsxs("div", {
-            className: "px-4 py-3.5 flex items-center gap-2",
-            children: [/*#__PURE__*/_jsx("span", {
-              className: "material-symbols-outlined text-[16px] text-[var(--muted)]",
-              children: f.icon
-            }), /*#__PURE__*/_jsx("span", {
-              className: "text-[12px] font-medium text-[var(--foreground)]",
-              children: f.text
-            })]
-          }), /*#__PURE__*/_jsx("div", {
-            className: "px-4 py-3.5 text-center text-[12px] text-[var(--muted)] font-medium flex items-center justify-center",
-            children: f.free
-          }), /*#__PURE__*/_jsxs("div", {
-            className: "px-4 py-3.5 text-center text-[12px] text-[hsl(158_64%_44%)] font-semibold flex items-center justify-center gap-1",
-            children: [/*#__PURE__*/_jsx("span", {
-              className: "material-symbols-outlined text-[14px]",
-              children: "check_circle"
-            }), f.pro]
-          })]
-        }, i))]
-      })
-    }), /*#__PURE__*/_jsxs("div", {
-      className: "flex items-center gap-4",
-      children: [isPro ? /*#__PURE__*/_jsxs("div", {
-        className: "flex items-center gap-2 px-5 py-2.5 rounded-xl bg-[hsl(158_64%_44%/0.08)] border border-[hsl(158_64%_44%/0.20)]",
-        children: [/*#__PURE__*/_jsx("span", {
-          className: "material-symbols-outlined text-[16px] text-[hsl(158_64%_44%)]",
-          children: "verified"
-        }), /*#__PURE__*/_jsx("span", {
-          className: "text-[13px] font-semibold text-[hsl(158_64%_44%)]",
-          children: U.alreadyPro
-        })]
-      }) : /*#__PURE__*/_jsx("button", {
-        onClick: handleUpgrade,
-        disabled: activating,
-        className: "px-6 py-2.5 rounded-xl bg-gradient-to-r from-[hsl(239_68%_58%)] to-[hsl(263_70%_62%)] text-white text-[13px] font-semibold hover:opacity-90 active:scale-[0.98] transition-all disabled:opacity-50 shadow-[0_4px_16px_hsl(239_68%_58%/0.3)]",
-        children: activating ? U.activating : U.activateBtn
-      }), /*#__PURE__*/_jsx(Msg, {
-        msg: msg
-      })]
-    })]
-  });
-}
 
+  return (
+    <div>
+      {/* Current plan row */}
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 24 }}>
+        <div>
+          <p style={{ fontSize: 13, color: "var(--muted)", marginBottom: 4 }}>{U.currentPlanLabel}</p>
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            {isPro ? (
+              <span style={{
+                display: "inline-flex", alignItems: "center", gap: 5,
+                padding: "4px 12px", borderRadius: 999,
+                background: "linear-gradient(135deg, hsl(239 68% 58%), hsl(263 70% 62%))",
+                color: "#fff", fontSize: 12, fontWeight: 800, letterSpacing: "0.04em"
+              }}>
+                <span className="material-symbols-outlined" style={{ fontSize: 13 }}>workspace_premium</span>
+                {U.proPlan}
+              </span>
+            ) : (
+              <span style={{
+                display: "inline-flex", alignItems: "center", gap: 5,
+                padding: "4px 12px", borderRadius: 999,
+                background: "var(--surface)", border: "1px solid var(--border-color)",
+                color: "var(--foreground)", fontSize: 12, fontWeight: 700
+              }}>
+                {U.freePlan}
+              </span>
+            )}
+          </div>
+        </div>
+        {!isPro && (
+          <button
+            onClick={() => navigate("/pricing")}
+            style={{
+              padding: "9px 20px",
+              borderRadius: 12, border: "none",
+              background: "linear-gradient(135deg, hsl(239 68% 58%), hsl(263 70% 62%))",
+              color: "#fff", fontWeight: 700, fontSize: 13,
+              cursor: "pointer",
+              boxShadow: "0 4px 14px hsl(239 68% 58% / 0.30)",
+              transition: "all 0.15s",
+              whiteSpace: "nowrap",
+            }}
+          >
+            {U.upgradeBtn}
+          </button>
+        )}
+      </div>
+
+      {/* Divider */}
+      <div style={{ borderTop: "1px solid var(--border-color)", marginBottom: 20 }} />
+
+      {/* Pro features list */}
+      {!isPro && (
+        <>
+          <p style={{ fontSize: 13, fontWeight: 700, color: "var(--foreground)", marginBottom: 14 }}>
+            {U.featuresIntro}
+          </p>
+          <ul style={{ listStyle: "none", padding: 0, margin: 0, display: "flex", flexDirection: "column", gap: 14 }}>
+            {U.freeFeatures.map((f, i) => (
+              <li key={i} style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                <span className="material-symbols-outlined"
+                  style={{ fontSize: 20, color: "var(--foreground)", flexShrink: 0 }}>{f.icon}</span>
+                <span style={{ fontSize: 13, color: "var(--foreground)" }}>{f.text}</span>
+              </li>
+            ))}
+          </ul>
+        </>
+      )}
+
+
+      {/* Already Pro state */}
+      {isPro && (
+        <>
+          <p style={{ fontSize: 13, fontWeight: 700, color: "var(--foreground)", marginBottom: 14 }}>
+            {U.proFeaturesIntro}
+          </p>
+          <ul style={{ listStyle: "none", padding: 0, margin: 0, display: "flex", flexDirection: "column", gap: 14, marginBottom: 20 }}>
+            {U.proFeatures.map((f, i) => (
+              <li key={i} style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                <span className="material-symbols-outlined"
+                  style={{ fontSize: 20, color: "hsl(239 68% 58%)", flexShrink: 0 }}>{f.icon}</span>
+                <span style={{ fontSize: 13, color: "var(--foreground)" }}>{f.text}</span>
+              </li>
+            ))}
+          </ul>
+          <div style={{ borderTop: "1px solid var(--border-color)", paddingTop: 16 }}>
+            <button
+              onClick={() => navigate("/pricing")}
+              style={{
+                display: "inline-flex", alignItems: "center", gap: 6,
+                padding: "8px 16px", borderRadius: 10,
+                border: "1px solid var(--border-color)",
+                background: "var(--surface)", color: "var(--muted)",
+                fontSize: 12, fontWeight: 600, cursor: "pointer",
+                transition: "all 0.15s",
+              }}
+            >
+              <span className="material-symbols-outlined" style={{ fontSize: 15 }}>open_in_new</span>
+              {U.viewAllPlans}
+            </button>
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
 /* ══════════════════════════════════════════════════════════════════════════ */
 /*  MAIN PAGE                                                                 */
 /* ══════════════════════════════════════════════════════════════════════════ */
@@ -755,9 +782,10 @@ const NAV = [{
   icon: T.nav.appearance.icon
 }, {
   id: "upgrade",
-  label: QUOTA_TEXTS.upgrade.title,
-  icon: "diamond"
+  label: QUOTA_TEXTS.upgrade.navLabel,
+  icon: "credit_card"
 }];
+
 export default function SettingsPage() {
   const [tab, setTab] = useState("profile");
   const [profile, setProfile] = useState(null);
@@ -797,14 +825,13 @@ export default function SettingsPage() {
               className: `w-full flex items-center gap-2.5 px-3.5 py-2.5 rounded-xl text-[13px] font-semibold transition-all text-left ${tab === n.id ? "bg-[hsl(239_68%_58%/0.10)] text-[hsl(239_55%_50%)] border border-[hsl(239_68%_58%/0.20)]" : "text-[var(--muted)] hover:bg-[var(--surface)] hover:text-[var(--foreground)] border border-transparent"}`,
               children: [/*#__PURE__*/_jsx("span", {
                 className: "material-symbols-outlined",
-                style: {
-                  fontSize: 18
-                },
+                style: { fontSize: 18 },
                 children: n.icon
               }), n.label]
             }, n.id))
           })
         }), /*#__PURE__*/_jsx("div", {
+
           className: "flex-1 min-w-0 p-7 rounded-2xl bg-[var(--card-bg)] border border-[var(--border-color)] shadow-[0_2px_16px_hsl(222_47%_4%/0.06)]",
           children: loading ? /*#__PURE__*/_jsxs("div", {
             className: "space-y-5",
@@ -828,8 +855,7 @@ export default function SettingsPage() {
               profile: profile,
               onRefresh: fetchProfile
             }), tab === "security" && /*#__PURE__*/_jsx(SecuritySection, {}), tab === "appearance" && /*#__PURE__*/_jsx(AppearanceSection, {}), tab === "upgrade" && /*#__PURE__*/_jsx(UpgradeSection, {
-              profile: profile,
-              onRefresh: fetchProfile
+              profile: profile
             })]
           }, tab)
         })]

@@ -25,20 +25,23 @@ export class Notification {
 
 /**
  * Quota model — map API response to typed class.
- * API shape: { usage: { chat_messages, ai_generations }, limits: { chat_messages, ai_generations }, plan }
+ * API shape: { is_pro: bool, usage: { chat_messages, ai_features }, limits: { chat_messages, ai_features, documents } }
  */
 export class Quota {
-  constructor({ usage = {}, limits = {}, plan = 'free' } = {}) {
+  constructor({ usage = {}, limits = {}, plan = 'free', is_pro = false } = {}) {
     this.usage  = usage;
     this.limits = limits;
     this.plan   = plan;
+    // Backend returns is_pro directly — expose it as a plain property
+    this.is_pro = is_pro;
   }
 
   static fromJSON(json) {
     return new Quota(json ?? {});
   }
 
-  get isPro() { return this.plan === 'pro'; }
+  // isPro is true if either is_pro flag is set OR plan name is 'pro'
+  get isPro() { return this.is_pro || this.plan === 'pro'; }
 
   chatRemaining() {
     return Math.max(0, (this.limits.chat_messages ?? 0) - (this.usage.chat_messages ?? 0));

@@ -342,12 +342,39 @@ export const QUOTA_TEXTS = {
     laterBtn: "Để sau"
   },
   upgrade: {
+    navLabel: "Gói & Thanh toán",
     title: "Nâng cấp Pro",
     subtitle: "Mở khóa toàn bộ sức mạnh AI Tutor",
-    currentPlan: "Gói hiện tại",
+    currentPlanLabel: "Gói hiện tại của bạn",
     freePlan: "Miễn phí",
     proPlan: "Pro",
+    upgradeBtn: "Nâng cấp",
+    activating: "Đang xử lý...",
+    successMsg: "Chúc mừng! Bạn đã nâng cấp thành công lên Pro 🎉",
+    featuresIntro: "Tận hưởng mọi tính năng trong gói Free và nhiều quyền lợi khác.",
+    proFeaturesIntro: "Bạn đang tận hưởng đầy đủ tính năng Pro.",
+    paymentTitle: "Thanh toán",
+    paymentPrice: "₫99.000 VND/tháng (bao gồm VAT)",
+    paymentPricePro: "₫99.000 VND/tháng",
+    viewAllPlans: "Xem tất cả gói",
+    proFeatures: [
+      { icon: "hub",         text: "Mô hình AI nâng cao" },
+      { icon: "chat",        text: "Gửi thêm nhiều tin nhắn không giới hạn" },
+      { icon: "auto_awesome",text: "Tạo nội dung AI không giới hạn" },
+      { icon: "upload_file", text: "Tải lên tài liệu không giới hạn" },
+      { icon: "psychology",  text: "Ưu tiên xử lý và phản hồi nhanh hơn" },
+    ],
+    freeFeatures: [
+      { icon: "hub",         text: "Mô hình AI cơ bản" },
+      { icon: "chat",        text: "30 tin nhắn mỗi ngày" },
+      { icon: "auto_awesome",text: "10 lượt tạo nội dung AI/ngày" },
+      { icon: "upload_file", text: "Tối đa 3 file tài liệu" },
+      { icon: "psychology",  text: "Xử lý thông thường" },
+    ],
+    currentPlan: "Gói hiện tại",
     proBadge: "Đang sử dụng",
+    activateBtn: "Kích hoạt Pro",
+    alreadyPro: "Bạn đang sử dụng gói Pro",
     features: [{
       icon: "chat",
       text: "Chat không giới hạn",
@@ -364,10 +391,6 @@ export const QUOTA_TEXTS = {
       free: "Tối đa 3 file",
       pro: "Không giới hạn"
     }],
-    activateBtn: "Kích hoạt Pro",
-    activating: "Đang kích hoạt...",
-    successMsg: "Chúc mừng Bạn đã nâng cấp thành công lên Pro 🎉",
-    alreadyPro: "Bạn đang sử dụng gói Pro"
   }
 };
 export const QUIZ_PAGE_TEXTS = {
@@ -631,7 +654,7 @@ export const PRICING_PAGE_TEXTS = {
   hero: {
     badge: 'Bảng giá',
     title: 'Chọn gói phù hợp với bạn',
-    subtitle: 'Bắt đầu miễn phí, nâng cấp bất cứ khi nào bạn sẵn sàng. Không có phí ẩn.',
+    subtitle: '',
   },
   toggle: {
     monthly: 'Hàng tháng',
@@ -641,20 +664,17 @@ export const PRICING_PAGE_TEXTS = {
   plans: {
     free: {
       name: 'Miễn phí',
-      tagline: 'Hoàn hảo để bắt đầu',
       cta: 'Dùng miễn phí',
       ctaActive: 'Gói hiện tại',
     },
     pro_monthly: {
       name: 'Pro',
-      tagline: 'Dành cho học sinh nghiêm túc',
       cta: 'Đăng ký ngay',
       ctaActive: 'Gói hiện tại',
       popularBadge: 'Phổ biến nhất',
     },
     pro_annual: {
       name: 'Pro Năm',
-      tagline: 'Tiết kiệm nhất cho năm học',
       cta: 'Đăng ký tiết kiệm',
       ctaActive: 'Gói hiện tại',
     },
@@ -710,7 +730,7 @@ export const PRICING_PAGE_TEXTS = {
       fillCard: 'Vui lòng điền đầy đủ thông tin thẻ',
     },
     secureNote: '🔒 Thông tin thanh toán được mã hóa và bảo mật tuyệt đối',
-    mockNote: '⚠️ Đây là môi trường demo. Không nhập thông tin thật.',
+
   },
   faq: {
     title: 'Câu hỏi thường gặp',
