@@ -49,8 +49,10 @@ function wrapText(text, w, h, fs) {
 }
 
 // ── Estimated node width ──────────────────────────────────────────────────────
-function estW(text) {
-  return Math.max(NODE_MIN_W, (text || '').length * 8.5 + NODE_H + 20);
+function estW(text, fs = 13) {
+  // Must match wrapText: cw = fs * 0.58, pad = 28
+  // Add +10 buffer to ensure maxCh > text.length (no wrap/truncation)
+  return Math.max(NODE_MIN_W, Math.ceil((text || '').length * (fs * 0.58)) + 28 + 10);
 }
 
 // ── Parser ────────────────────────────────────────────────────────────────────
@@ -213,7 +215,7 @@ function computePositions(root, sizeMap) {
   const left = [], right = [];
   (root.children || []).forEach((c, i) => (i % 2 === 0 ? right : left).push(c));
 
-  const rw = gW(root), rh = gH(root);
+  const rw = sizeMap?.[root.id]?.w || root.width || estW(root.text || '', 20), rh = gH(root);
   pos[root.id] = { x: 0, y: 0, w: rw, h: rh, depth: 0, text: root.text };
 
   function layoutSide(branches, dir) {
