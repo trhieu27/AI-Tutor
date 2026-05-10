@@ -14,32 +14,16 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Noto+Serif:wght@400;700&display=swap" rel="stylesheet" />
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" />
-    <!-- Instant dark background via CSS (before JS runs) — prevents Safari toolbar flash -->
-    <style>
-      @media (prefers-color-scheme: dark) {
-        html { background: #0a0a0a !important; }
-      }
-    </style>
     <script>
       (function() {
-        // Default to 'light' — matches ThemeProvider's `stored ?? 'light'`
+        // Set theme before React mounts — prevents flash on initial load
         var stored = localStorage.getItem('theme') || 'light';
         var isDark = stored !== 'light';
         var bg = isDark ? '#0a0a0a' : '#f8fafc';
-        // Apply background + class before React mounts (prevents flash)
         document.documentElement.style.background = bg;
         document.documentElement.classList.toggle('dark', isDark);
         localStorage.setItem('theme', isDark ? 'dark' : 'light');
-        // Always update theme-color meta (both light AND dark)
-        var meta = document.getElementById('theme-color-meta');
-        meta.content = bg;
-        // Keep in sync when user toggles theme at runtime
-        new MutationObserver(function() {
-          var dark = document.documentElement.classList.contains('dark');
-          var newBg = dark ? '#0a0a0a' : '#f8fafc';
-          document.documentElement.style.background = newBg;
-          meta.content = newBg;
-        }).observe(document.documentElement, { attributeFilter: ['class'] });
+        document.getElementById('theme-color-meta').content = bg;
       })();
     </script>
   </head>

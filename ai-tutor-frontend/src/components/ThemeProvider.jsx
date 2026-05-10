@@ -19,8 +19,18 @@ export function ThemeProvider({
   });
   useEffect(() => {
     const root = document.documentElement;
-    root.classList.toggle('dark', theme === 'dark');
+    const isDark = theme === 'dark';
+    const bg = isDark ? '#0a0a0a' : '#f8fafc';
+    root.classList.toggle('dark', isDark);
+    root.style.background = bg;
     localStorage.setItem('theme', theme);
+    // Remove + re-add meta[theme-color] — forces iOS Safari to re-read and update toolbar
+    const old = document.querySelector('meta[name="theme-color"]');
+    if (old) old.remove();
+    const meta = document.createElement('meta');
+    meta.name = 'theme-color';
+    meta.content = bg;
+    document.head.appendChild(meta);
   }, [theme]);
   const setTheme = t => {
     setThemeState(t);
