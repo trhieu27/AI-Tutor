@@ -317,6 +317,14 @@ const InteractiveMindmap = forwardRef(({ chart, onCodeChange, documentId, zoom =
       const W = MX - mx, H = MY - my;
       const scale = 2; // 2x for retina quality
       const cl = svgRef.current.cloneNode(true);
+      // ── Strip all selection UI before export ──────────────────────────────
+      // 1. Remove dashed selection ring (animate-pulse rect)
+      cl.querySelectorAll('.animate-pulse').forEach(el => el.remove());
+      // 2. Remove resize handle groups (they come after <text> and have cursor style)
+      cl.querySelectorAll('[style*="cursor: nw-resize"], [style*="cursor: ne-resize"], [style*="cursor: sw-resize"], [style*="cursor: se-resize"]').forEach(el => el.remove());
+      // 3. Reset glow filter on selected node back to normal shadow
+      cl.querySelectorAll('[filter="url(#ng)"]').forEach(el => el.setAttribute('filter', 'url(#ns)'));
+      // ─────────────────────────────────────────────────────────────────────
       cl.setAttribute('width', W * scale); cl.setAttribute('height', H * scale);
       cl.setAttribute('viewBox', `${mx} ${my} ${W} ${H}`);
       // Inline a basic background rect so PNG has a background
@@ -499,7 +507,20 @@ const InteractiveMindmap = forwardRef(({ chart, onCodeChange, documentId, zoom =
 
   const doEdit = () => { const n = findNode(treeRef.current, selId); if (n) { setEditText(n.text); setMenuMode('edit'); } };
   const doSave = () => { if (treeRef.current && selId && editText.trim()) { applyUpdate(updateNode(treeRef.current, selId, { text: editText.trim() })); } setMenuMode(null); setSelId(null); };
-  const doAdd = () => { if (treeRef.current && selId) applyUpdate(addChild(treeRef.current, selId)); };
+  const doAdd = () => {
+    if (!treeRef.current || !selId) return;
+    const newId = `u-${Math.random().toString(36).slice(2, 9)}`;
+    const addChildWithId = (root, pid) => {
+      if (root.id === pid) {
+        return { ...root, children: [...(root.children || []), { id: newId, text: 'Nhánh mới', children: [], color: root.color }] };
+      }
+      return { ...root, children: (root.children || []).map(c => addChildWithId(c, pid)) };
+    };
+    applyUpdate(addChildWithId(treeRef.current, selId));
+    // Select the new node so it renders on top and user can edit it immediately
+    setSelId(newId);
+    setMenuMode(null);
+  };
   const doDel = () => { if (treeRef.current && selId && selId !== treeRef.current.id) applyUpdate(removeNode(treeRef.current, selId)); };
   const doColor = c => { if (treeRef.current && selId) applyUpdate(updateNode(treeRef.current, selId, { color: c })); };
 
@@ -532,7 +553,13 @@ const InteractiveMindmap = forwardRef(({ chart, onCodeChange, documentId, zoom =
     );
   }
 
-  const allNodes = flattenTree(tree).sort((a, b) => a.depth - b.depth);
+  // Sort: deeper nodes render above shallower ones (standard);
+  // selected node always renders last so it sits on top of all others in SVG.
+  const allNodes = flattenTree(tree).sort((a, b) => {
+    if (a.id === selId) return 1;
+    if (b.id === selId) return -1;
+    return a.depth - b.depth;
+  });
   const selNode = selId ? findNode(tree, selId) : null;
 
   return (
