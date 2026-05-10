@@ -16,15 +16,18 @@
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" />
     <script>
       (function() {
-        var stored = localStorage.getItem('theme');
-        var isDark = stored === 'dark';
+        // Default to 'light' — matches ThemeProvider's `stored ?? 'light'`
+        var stored = localStorage.getItem('theme') || 'light';
+        var isDark = stored !== 'light';
         var bg = isDark ? '#0a0a0a' : '#f8fafc';
+        // Apply background + class before React mounts (prevents flash)
         document.documentElement.style.background = bg;
         document.documentElement.classList.toggle('dark', isDark);
         localStorage.setItem('theme', isDark ? 'dark' : 'light');
-        // Sync theme-color meta + html bg when theme toggles
+        // Always update theme-color meta (both light AND dark)
         var meta = document.getElementById('theme-color-meta');
-        if (isDark) meta.content = '#0a0a0a';
+        meta.content = bg;
+        // Keep in sync when user toggles theme at runtime
         new MutationObserver(function() {
           var dark = document.documentElement.classList.contains('dark');
           var newBg = dark ? '#0a0a0a' : '#f8fafc';
