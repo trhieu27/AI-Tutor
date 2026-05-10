@@ -15,6 +15,7 @@ export default defineConfig({
     extensions: ['.js', '.jsx', '.json'],
   },
   server: {
+    host: true,   // bind to 0.0.0.0 → accessible via local network IP
     port: 3000,
     proxy: {
       '/api/v1': {

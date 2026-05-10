@@ -79,7 +79,7 @@ export async function uploadDocument(file) {
           if (rawText.length < 300) errorDetail = rawText;
         }
       }
-    } catch {}
+    } catch { }
     throw new Error(errorDetail);
   }
   return res.json();
@@ -129,7 +129,7 @@ export async function askQuestion(documentId, request, signal) {
   }
   const data = await res.json();
   const msgContent = data.message.content;
-  if (Array.isArray(msgContent)) data.message.content = msgContent.map(p => p.text || '').join('');else if (typeof msgContent === 'object' && msgContent !== null) data.message.content = msgContent.text || JSON.stringify(msgContent);
+  if (Array.isArray(msgContent)) data.message.content = msgContent.map(p => p.text || '').join(''); else if (typeof msgContent === 'object' && msgContent !== null) data.message.content = msgContent.text || JSON.stringify(msgContent);
   return data;
 }
 export async function fetchChatSessions(documentId) {

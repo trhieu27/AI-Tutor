@@ -130,7 +130,7 @@ function ToastItem({ toast, onDismiss, stackIndex }) {
         border: "1px solid var(--border-color)",
         borderLeft: `4px solid ${cfg.accent}`,
         boxShadow:
-          "0 4px 6px -1px hsl(0 0% 0% / 0.08), 0 10px 30px -4px hsl(222 47% 6% / 0.22)",
+          "0 4px 12px -2px hsl(228 25% 5% / 0.18), 0 12px 36px -4px hsl(228 25% 5% / 0.28)",
         pointerEvents: "auto",
       }}
     >

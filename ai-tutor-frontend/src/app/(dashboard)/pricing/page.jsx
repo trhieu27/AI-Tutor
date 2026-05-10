@@ -38,7 +38,7 @@ function PaymentModal({ plan, onClose, onSuccess }) {
 
   return (
     <div className="fixed inset-0 z-[70] flex items-center justify-center p-4"
-      style={{ background: 'rgba(0,0,0,0.65)', backdropFilter: 'blur(8px)' }}
+      style={{ background: 'hsl(228 25% 5% / 0.65)', backdropFilter: 'blur(8px)' }}
       onClick={(e) => e.target === e.currentTarget && onClose()}>
       <div className="w-full max-w-md rounded-3xl overflow-hidden shadow-2xl animate-in zoom-in-95 duration-200"
         style={{ background: 'var(--background)', border: '1px solid var(--border-color)' }}>
@@ -130,7 +130,7 @@ function PlanCard({ plan, isActive, onSelect }) {
         background: isPopular
           ? 'linear-gradient(160deg, hsl(239 68% 58% / 0.07) 0%, hsl(263 70% 62% / 0.04) 100%)'
           : 'var(--surface)',
-        boxShadow: isPopular ? '0 12px 40px hsl(239 68% 58% / 0.18)' : '0 2px 12px rgba(0,0,0,0.05)',
+        boxShadow: isPopular ? '0 12px 40px hsl(239 68% 58% / 0.18)' : '0 2px 12px hsl(228 20% 5% / 0.06)',
       }}>
       {isPopular && (
         <div className="absolute -top-px left-0 right-0 flex justify-center">
@@ -260,7 +260,7 @@ export default function PricingPage() {
   };
 
   return (
-    <div className="min-h-screen" style={{ background: 'var(--background)' }}>
+    <div className="min-h-screen bg-[var(--background)]">
 
       {/* ── Close button ── */}
       <button onClick={() => navigate(-1)}
@@ -278,7 +278,7 @@ export default function PricingPage() {
             <span className="material-symbols-outlined" style={{ fontSize: 14 }}>diamond</span>
             Bảng giá
           </span>
-          <h1 className="text-[38px] font-black tracking-tight mb-3" style={{ color: 'var(--foreground)' }}>
+          <h1 className="text-[38px] font-extrabold tracking-[-0.03em] leading-[1.05] mb-3" style={{ color: 'var(--foreground)' }}>
             Nâng cấp gói của bạn
           </h1>
 

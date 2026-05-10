@@ -35,13 +35,15 @@ const app = express();
 const server = http.createServer(app);
 
 // ── CORS ────────────────────────────────────────────────────────────────────
+const isDev = process.env.NODE_ENV !== 'production';
+
 app.use(cors({
   origin: (origin, callback) => {
-    if (!origin || config.corsOrigins.includes(origin)) {
-      callback(null, true);
-    } else {
-      callback(new Error('Not allowed by CORS'));
-    }
+    // Dev: allow all origins (phone, tablet, any device on any IP)
+    if (isDev) return callback(null, true);
+    // Production: strict whitelist only
+    if (!origin || config.corsOrigins.includes(origin)) return callback(null, true);
+    callback(new Error('Not allowed by CORS'));
   },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],

@@ -10,7 +10,11 @@ export function ThemeProvider({
   children
 }) {
   const [theme, setThemeState] = useState(() => {
-    if (typeof window !== 'undefined') return localStorage.getItem('theme') || 'dark';
+    if (typeof window !== 'undefined') {
+      const stored = localStorage.getItem('theme');
+      // If explicitly set by user, respect it. Otherwise default dark.
+      return stored ?? 'dark';
+    }
     return 'dark';
   });
   useEffect(() => {

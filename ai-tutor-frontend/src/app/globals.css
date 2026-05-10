@@ -78,15 +78,19 @@ input:autofill {
 .dark input:-webkit-autofill:focus,
 .dark input:-webkit-autofill:active,
 .dark input:autofill {
-  -webkit-box-shadow: 0 0 0 1000px #020617 inset !important;
+  -webkit-box-shadow: 0 0 0 1000px #070a14 inset !important;
   -webkit-text-fill-color: #f8fafc !important;
   color-scheme: dark !important;
 }
 
 @custom-variant dark (&:where(.dark, .dark *));
 
-/* ── 3. SEMANTIC DESIGN TOKENS (CSS vars) ─────────────────────────────── */
+/* ── 3. SEMANTIC TOKENS ────────────────────────────────────────────────── */
+
+/* Light mode */
 :root {
+  color-scheme: light;  /* native scrollbar + inputs follow light mode */
+
   /* Surfaces */
   --background: hsl(210 40% 98%);
   --foreground: hsl(222 47% 11%);
@@ -111,35 +115,61 @@ input:autofill {
   --accent-glow: hsl(239 68% 58% / 0.08);
   --accent-glow-lg: hsl(239 68% 58% / 0.15);
 
+  /* Glass panels — light mode (for floating elements: modals, dropdowns, header) */
+  --glass-bg: hsl(0 0% 100% / 0.88);
+  --glass-border: hsl(214 32% 91% / 0.9);
+  --glass-hover: hsl(214 32% 88% / 0.6);
+
+  /* Glow — light mode (subtle) */
+  --glow-primary: hsl(239 68% 58% / 0.15);
+  --glow-accent: hsl(263 70% 62% / 0.10);
+
   /* Node colors for mindmap (high-contrast, SaaS palette) */
   --node-root-start: hsl(239 62% 50%);
   --node-root-end: hsl(263 70% 55%);
   --connector-opacity: 0.55;
 }
 
+/* ── VOID Dark Mode Palette ───────────────────────────────────────────── */
 .dark {
-  --background: hsl(222 47% 4%);
-  --foreground: hsl(210 40% 96%);
-  --sidebar-bg: hsl(222 47% 7%);
-  --header-bg: hsl(222 47% 7% / 0.85);
-  --card-bg: hsl(217 33% 11%);
-  --card-bg-hover: hsl(217 33% 14%);
-  --surface: hsl(222 47% 8%);
-  --surface-raised: hsl(217 33% 11%);
-  --surface-overlay: hsl(217 33% 10%);
+  color-scheme: dark;  /* fixes native scrollbar, inputs, selects */
 
-  --border-color: hsl(215 28% 17%);
-  --border-subtle: hsl(215 28% 14%);
-  --border-emphasis: hsl(239 68% 58% / 0.30);
+  /* Pure zinc/black surfaces — inspired by Linear, Vercel */
+  --background:       hsl(0 0% 4%);
+  --foreground:       hsl(0 0% 93%);
+  --sidebar-bg:       hsl(0 0% 5%);
+  --header-bg:        hsl(0 0% 4% / 0.90);
+  --card-bg:          hsl(0 0% 8%);
+  --card-bg-hover:    hsl(0 0% 10%);
+  --surface:          hsl(0 0% 10%);
+  --surface-raised:   hsl(0 0% 12%);
+  --surface-overlay:  hsl(0 0% 7%);
 
-  --muted: hsl(215 20% 62%);
-  --muted-light: hsl(215 16% 47%);
+  /* Borders */
+  --border-color:     hsl(0 0% 15%);
+  --border-subtle:    hsl(0 0% 11%);
+  --border-emphasis:  hsl(239 68% 58% / 0.40);
 
-  --accent-glow: hsl(239 68% 58% / 0.12);
-  --accent-glow-lg: hsl(239 68% 58% / 0.22);
+  /* Text */
+  --muted:            hsl(0 0% 52%);
+  --muted-light:      hsl(0 0% 35%);
 
-  --node-root-start: hsl(239 72% 62%);
-  --node-root-end: hsl(263 75% 62%);
+  /* Glows */
+  --accent-glow:      hsl(239 68% 58% / 0.14);
+  --accent-glow-lg:   hsl(239 68% 58% / 0.25);
+
+  /* Glass — for floating panels (dropdowns, modals) */
+  --glass-bg:         hsl(0 0% 9% / 0.92);
+  --glass-border:     hsl(0 0% 20% / 0.8);
+  --glass-hover:      hsl(0 0% 12%);
+
+  /* Glow */
+  --glow-primary:     hsl(239 68% 58% / 0.22);
+  --glow-accent:      hsl(263 70% 62% / 0.15);
+
+  /* Mindmap */
+  --node-root-start:  hsl(239 72% 62%);
+  --node-root-end:    hsl(263 75% 62%);
   --connector-opacity: 0.7;
 }
 
@@ -408,6 +438,169 @@ h6 {
         var(--surface) 75%);
     background-size: 800px 100%;
     animation: shimmer 1.4s ease-in-out infinite;
+  }
+
+  /* ── NEW 2025 UTILITIES ───────────────────────────────────────────── */
+
+  /* Glass morphism — use ONLY on floating elements: modals, dropdowns, header */
+  .glass {
+    background: var(--glass-bg);
+    backdrop-filter: blur(20px) saturate(160%);
+    -webkit-backdrop-filter: blur(20px) saturate(160%);
+    border: 1px solid var(--glass-border);
+  }
+
+  .glass-dark {
+    background: hsl(228 20% 8% / 0.85);
+    backdrop-filter: blur(24px) saturate(180%);
+    -webkit-backdrop-filter: blur(24px) saturate(180%);
+    border: 1px solid hsl(0 0% 100% / 0.06);
+  }
+
+  /* Bento grid card — base style for dashboard cards */
+  .bento-card {
+    background: var(--card-bg);
+    border: 1px solid var(--border-color);
+    border-radius: 20px;
+    transition: border-color 200ms ease,
+      box-shadow 200ms ease,
+      transform 200ms cubic-bezier(0.34, 1.56, 0.64, 1);
+  }
+
+  .bento-card:hover {
+    border-color: var(--border-emphasis);
+    box-shadow: 0 8px 32px -4px var(--glow-primary);
+    transform: translateY(-2px);
+  }
+
+  /* Neon gradient border via pseudo-element */
+  .neon-border {
+    position: relative;
+  }
+
+  .neon-border::before {
+    content: '';
+    position: absolute;
+    inset: -1px;
+    border-radius: inherit;
+    padding: 1px;
+    background: linear-gradient(135deg, hsl(239 68% 58%), hsl(263 70% 62%));
+    -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+    -webkit-mask-composite: xor;
+    mask-composite: exclude;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 200ms ease;
+  }
+
+  .neon-border:hover::before {
+    opacity: 1;
+  }
+
+  /* Aurora background animation — brand gradient accent */
+  @keyframes aurora-shift {
+
+    0%,
+    100% {
+      background-position: 0% 50%;
+    }
+
+    50% {
+      background-position: 100% 50%;
+    }
+  }
+
+  .animate-aurora {
+    background: linear-gradient(135deg,
+        hsl(239 68% 50%),
+        hsl(263 70% 55%),
+        hsl(239 68% 50%));
+    background-size: 200% 200%;
+    animation: aurora-shift 8s ease infinite;
+  }
+
+  /* Float — gentle vertical oscillation for decorative elements */
+  @keyframes float {
+
+    0%,
+    100% {
+      transform: translateY(0);
+    }
+
+    50% {
+      transform: translateY(-6px);
+    }
+  }
+
+  .animate-float {
+    animation: float 4s ease-in-out infinite;
+  }
+
+  /* Glow pulse — for notification badges, CTAs */
+  @keyframes glow-pulse {
+
+    0%,
+    100% {
+      box-shadow: 0 0 0 0 var(--glow-primary);
+    }
+
+    50% {
+      box-shadow: 0 0 16px 4px var(--glow-primary);
+    }
+  }
+
+  .animate-glow-pulse {
+    animation: glow-pulse 2.4s ease-in-out infinite;
+  }
+
+  /* Premium shimmer skeleton */
+  @keyframes gradient-shimmer {
+    0% {
+      background-position: -400px 0;
+    }
+
+    100% {
+      background-position: 400px 0;
+    }
+  }
+
+  .shimmer-premium {
+    background: linear-gradient(90deg,
+        var(--surface) 25%,
+        var(--glass-hover, var(--surface-raised)) 50%,
+        var(--surface) 75%);
+    background-size: 800px 100%;
+    animation: gradient-shimmer 1.6s ease-in-out infinite;
+  }
+
+  /* Stagger children animation helper */
+  .stagger-children>* {
+    opacity: 0;
+    animation: fadeInUp 0.35s var(--ease-out-expo) forwards;
+  }
+
+  .stagger-children>*:nth-child(1) {
+    animation-delay: 0ms;
+  }
+
+  .stagger-children>*:nth-child(2) {
+    animation-delay: 50ms;
+  }
+
+  .stagger-children>*:nth-child(3) {
+    animation-delay: 100ms;
+  }
+
+  .stagger-children>*:nth-child(4) {
+    animation-delay: 150ms;
+  }
+
+  .stagger-children>*:nth-child(5) {
+    animation-delay: 200ms;
+  }
+
+  .stagger-children>*:nth-child(6) {
+    animation-delay: 250ms;
   }
 }
 

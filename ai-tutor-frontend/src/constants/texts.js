@@ -129,7 +129,7 @@ export const AUTH_TEXTS = {
     PASSWORD_MISMATCH: "Mật khẩu xác nhận không khớp.",
     REGISTER_ERROR: "Đăng ký thất bại. Vui lòng thử lại.",
     VERIFY_ERROR: "Mã xác nhận không đúng.",
-    WELCOME_TITLE: "Tạo tài khoản mới 🚀",
+    WELCOME_TITLE: "Tạo tài khoản mới",
     WELCOME_SUBTITLE: "Bắt đầu hành trình học tập thông minh ngay hôm nay",
     CONTINUE_WITH_GOOGLE: "Đăng ký với Google",
     OR_REGISTER_WITH_EMAIL: "Hoặc đăng ký bằng email",

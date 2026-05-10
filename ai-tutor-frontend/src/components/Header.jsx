@@ -2,35 +2,29 @@ import { useState, useRef, useEffect, useCallback } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { useNotifications } from '@/hooks/useNotifications';
 import { useToast } from '@/components/NotificationToast';
+import { useTheme } from '@/components/ThemeProvider';
 import { HEADER_TEXTS } from '@/constants/texts';
 import { fetchNotifications, markAllNotificationsRead, clearAllNotifications } from '@/services/api.service';
-import { jsx as _jsx, jsxs as _jsxs } from "react/jsx-runtime";
-export default function Header({
-  onMenuClick
-}) {
-  const {
-    user,
-    logout,
-    isInitialLoading,
-    accessToken
-  } = useAuth();
+
+// ─── All logic unchanged — only visual layer updated ───────────────────────
+
+export default function Header({ onMenuClick }) {
+  const { user, logout, isInitialLoading, accessToken } = useAuth();
+  const { theme, setTheme } = useTheme();
   const [mounted, setMounted] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
   const [showUserMenu, setShowUserMenu] = useState(false);
   const [notifications, setNotifications] = useState([]);
   const notificationRef = useRef(null);
   const userMenuRef = useRef(null);
-  const {
-    addToast
-  } = useToast();
-  useEffect(() => {
-    setMounted(true);
-  }, []);
+  const { addToast } = useToast();
+
+  useEffect(() => { setMounted(true); }, []);
 
   // Load notifications from API on mount
   useEffect(() => {
     if (!accessToken) return;
-    fetchNotifications().then(setNotifications).catch(() => {});
+    fetchNotifications().then(setNotifications).catch(() => { });
   }, [accessToken]);
 
   // Close dropdowns on outside click
@@ -42,52 +36,48 @@ export default function Header({
     document.addEventListener('mousedown', handler);
     return () => document.removeEventListener('mousedown', handler);
   }, []);
+
   const handleNotification = useCallback(notification => {
-    // Add to local list
-    setNotifications(prev => [{
-      ...notification,
-      is_read: false
-    }, ...prev]);
+    setNotifications(prev => [{ ...notification, is_read: false }, ...prev]);
     addToast({
       type: notification.type === 'document_ready' ? 'document_ready' : notification.type === 'document_failed' ? 'document_failed' : 'system',
       title: notification.title || 'Thông báo',
       message: notification.message || '',
-      documentId: notification.document_id
+      documentId: notification.document_id,
     });
   }, [addToast]);
-  useNotifications({
-    token: accessToken,
-    onNotification: handleNotification
-  });
+
+  useNotifications({ token: accessToken, onNotification: handleNotification });
+
   const unreadCount = notifications.filter(n => !n.is_read).length;
+
   const handleMarkAllRead = async () => {
-    await markAllNotificationsRead().catch(() => {});
-    setNotifications(prev => prev.map(n => ({
-      ...n,
-      is_read: true
-    })));
+    await markAllNotificationsRead().catch(() => { });
+    setNotifications(prev => prev.map(n => ({ ...n, is_read: true })));
   };
+
   const handleClearAll = async () => {
-    await clearAllNotifications().catch(() => {});
+    await clearAllNotifications().catch(() => { });
     setNotifications([]);
     setShowNotifications(false);
   };
 
-  // Icon + color theo type
+  // Icon + color per type
   const notifTypeIcon = {
     document_ready: 'description',
     document_failed: 'hide_source',
     payment_success: 'payments',
     payment_failed: 'money_off',
-    system: 'settings'
+    system: 'settings',
   };
   const notifTypeColor = {
     document_ready: 'text-emerald-400 bg-emerald-400/10',
     document_failed: 'text-red-400 bg-red-400/10',
     payment_success: 'text-amber-400 bg-amber-400/10',
     payment_failed: 'text-orange-400 bg-orange-400/10',
-    system: 'text-[var(--muted)] bg-[var(--surface)]'
+    system: 'text-[var(--muted)] bg-[var(--surface)]',
   };
+
   function timeAgo(dateStr) {
     const diff = Date.now() - new Date(dateStr).getTime();
     const m = Math.floor(diff / 60000);
@@ -97,151 +87,162 @@ export default function Header({
     if (h < 24) return `${h} giờ trước`;
     return `${Math.floor(h / 24)} ngày trước`;
   }
+
+  // ── Skeleton loading state ──
   if (!mounted || isInitialLoading) {
-    return /*#__PURE__*/_jsxs("header", {
-      className: "h-16 bg-[var(--card-bg)] border-b border-[var(--border-color)] flex items-center px-4 gap-3",
-      children: [
-        /*#__PURE__*/_jsx("div", { className: "flex-1" }),
-        /*#__PURE__*/_jsx("div", { className: "w-8 h-8 rounded-full bg-[var(--surface)] animate-pulse" }),
-        /*#__PURE__*/_jsx("div", { className: "w-20 h-5 bg-[var(--surface)] rounded-lg animate-pulse" })
-      ]
-    });
+    return (
+      <header className="h-16 glass border-b border-[var(--border-color)] flex items-center px-4 gap-3 sticky top-0 z-40">
+        <div className="flex-1" />
+        <div className="w-8 h-8 rounded-full shimmer-premium" />
+        <div className="w-20 h-4 rounded-lg shimmer-premium" />
+      </header>
+    );
   }
-  const initials = user?.full_name ? user.full_name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2) : '?';
-  return /*#__PURE__*/_jsxs("header", {
-    className: "h-16 bg-[var(--card-bg)] border-b border-[var(--border-color)] flex items-center px-4 gap-3 sticky top-0 z-40",
-    children: [/*#__PURE__*/_jsx("button", {
-      onClick: onMenuClick,
-      className: "lg:hidden w-9 h-9 flex items-center justify-center rounded-xl text-[var(--muted)] hover:bg-[var(--surface)] transition-colors",
-      "aria-label": "Menu",
-      children: /*#__PURE__*/_jsx("span", {
-        className: "material-symbols-outlined text-[20px]",
-        children: "menu"
-      })
-    }), /*#__PURE__*/_jsx("div", {
-      className: "flex-1"
-    }), /*#__PURE__*/_jsxs("div", {
-      className: "relative",
-      ref: notificationRef,
-      children: [/*#__PURE__*/_jsxs("button", {
-        id: "notification-bell",
-        onClick: () => {
-          setShowNotifications(p => !p);
-          setShowUserMenu(false);
-          if (!showNotifications && unreadCount > 0) handleMarkAllRead();
-        },
-        className: "relative w-9 h-9 flex items-center justify-center rounded-xl text-[var(--muted)] hover:bg-[var(--surface)] transition-colors",
-        "aria-label": "Th\xF4ng b\xE1o",
-        children: [/*#__PURE__*/_jsx("span", {
-          className: "material-symbols-outlined text-[20px]",
-          children: "notifications"
-        }), unreadCount > 0 && /*#__PURE__*/_jsx("span", {
-          className: "absolute top-1.5 right-1.5 w-4 h-4 rounded-full bg-[hsl(343_72%_48%)] text-white text-[9px] font-bold flex items-center justify-center leading-none",
-          children: unreadCount > 9 ? '9+' : unreadCount
-        })]
-      }), showNotifications && /*#__PURE__*/_jsxs("div", {
-        className: "absolute right-0 top-full mt-1 w-80 bg-[var(--card-bg)] border border-[var(--border-color)] rounded-2xl shadow-xl z-50 overflow-hidden",
-        children: [/*#__PURE__*/_jsxs("div", {
-          className: "flex items-center justify-between px-4 py-3 border-b border-[var(--border-color)]",
-          children: [/*#__PURE__*/_jsx("p", {
-            className: "text-[13px] font-semibold text-[var(--foreground)]",
-            children: "Th\xF4ng b\xE1o"
-          }), notifications.length > 0 && /*#__PURE__*/_jsx("button", {
-            onClick: handleClearAll,
-            className: "text-[11px] text-[var(--muted)] hover:text-[hsl(343_72%_48%)] transition-colors",
-            children: "X\xF3a t\u1EA5t c\u1EA3"
-          })]
-        }), /*#__PURE__*/_jsx("div", {
-          className: "max-h-80 overflow-y-auto",
-          children: notifications.length === 0 ? /*#__PURE__*/_jsxs("div", {
-            className: "flex flex-col items-center justify-center py-10 gap-2 text-[var(--muted)]",
-            children: [/*#__PURE__*/_jsx("span", {
-              className: "material-symbols-outlined text-[32px] icon-thin",
-              children: "notifications_off"
-            }), /*#__PURE__*/_jsx("p", {
-              className: "text-[12px]",
-              children: "Ch\u01B0a c\xF3 th\xF4ng b\xE1o"
-            })]
-          }) : notifications.map((n, i) => {
-            const iconKey = n.type in notifTypeIcon ? n.type : 'system';
-            return /*#__PURE__*/_jsxs("div", {
-              className: `flex items-start gap-3 px-4 py-3 border-b border-[var(--border-subtle)] last:border-0 transition-colors ${!n.is_read ? 'bg-[hsl(239_68%_58%/0.04)]' : ''}`,
-              children: [/*#__PURE__*/_jsx("div", {
-                className: `w-7 h-7 rounded-lg flex items-center justify-center shrink-0 mt-0.5 ${notifTypeColor[iconKey]}`,
-                children: /*#__PURE__*/_jsx("span", {
-                  className: "material-symbols-outlined text-[14px] icon-thin",
-                  children: notifTypeIcon[iconKey]
+
+  const initials = user?.full_name
+    ? user.full_name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)
+    : '?';
+
+  return (
+    <header className="h-16 glass border-b border-[var(--border-color)] flex items-center px-4 gap-3 sticky top-0 z-40 transition-colors duration-300">
+
+      {/* Mobile hamburger */}
+      <button
+        onClick={onMenuClick}
+        className="lg:hidden w-9 h-9 flex items-center justify-center rounded-xl text-[var(--muted)] hover:text-[var(--foreground)] hover:bg-[var(--surface)] transition-all duration-150 active:scale-90 focus-visible:outline-2 focus-visible:outline-[hsl(239_68%_58%/0.6)] focus-visible:outline-offset-2"
+        aria-label="Menu"
+      >
+        <span className="material-symbols-outlined text-[20px]">menu</span>
+      </button>
+
+      <div className="flex-1" />
+
+      {/* ── Notification bell ── */}
+      <div className="relative" ref={notificationRef}>
+        <button
+          id="notification-bell"
+          onClick={() => {
+            setShowNotifications(p => !p);
+            setShowUserMenu(false);
+            if (!showNotifications && unreadCount > 0) handleMarkAllRead();
+          }}
+          className="relative w-9 h-9 flex items-center justify-center rounded-xl text-[var(--muted)] hover:text-[var(--foreground)] hover:bg-[var(--surface)] transition-all duration-150 active:scale-90 focus-visible:outline-2 focus-visible:outline-[hsl(239_68%_58%/0.6)] focus-visible:outline-offset-2"
+          aria-label="Thông báo"
+        >
+          <span className="material-symbols-outlined text-[20px]">notifications</span>
+          {/* Badge with glow pulse on unread */}
+          {unreadCount > 0 && (
+            <span className="absolute top-1 right-1 w-[18px] h-[18px] rounded-full bg-[hsl(343_72%_48%)] text-white text-[9px] font-bold flex items-center justify-center leading-none animate-glow-pulse shadow-[0_0_8px_hsl(343_72%_48%/0.5)]">
+              {unreadCount > 9 ? '9+' : unreadCount}
+            </span>
+          )}
+        </button>
+
+        {/* Notification dropdown — glass panel (floating = allowed) */}
+        {showNotifications && (
+          <div className="absolute right-0 top-full mt-2 w-80 glass border border-[var(--glass-border)] rounded-2xl shadow-[0_16px_48px_hsl(228_25%_5%/0.4)] z-50 overflow-hidden animate-fade-up">
+            {/* Header */}
+            <div className="flex items-center justify-between px-4 py-3 border-b border-[var(--border-color)]">
+              <p className="text-[13px] font-semibold text-[var(--foreground)]">Thông báo</p>
+              {notifications.length > 0 && (
+                <button
+                  onClick={handleClearAll}
+                  className="text-[11px] text-[var(--muted)] hover:text-[hsl(343_72%_48%)] transition-colors font-medium"
+                >
+                  Xóa tất cả
+                </button>
+              )}
+            </div>
+
+            {/* List */}
+            <div className="max-h-80 overflow-y-auto custom-scrollbar">
+              {notifications.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-10 gap-3 text-[var(--muted)]">
+                  <div className="w-12 h-12 rounded-2xl bg-[var(--surface)] flex items-center justify-center">
+                    <span className="material-symbols-outlined text-[24px] icon-thin">notifications_off</span>
+                  </div>
+                  <p className="text-[12px] font-medium">Chưa có thông báo</p>
+                </div>
+              ) : (
+                notifications.map((n, i) => {
+                  const iconKey = n.type in notifTypeIcon ? n.type : 'system';
+                  return (
+                    <div
+                      key={n.id || i}
+                      className={`flex items-start gap-3 px-4 py-3 border-b border-[var(--border-subtle)] last:border-0 transition-colors hover:bg-[var(--surface)] ${!n.is_read ? 'bg-[hsl(239_68%_58%/0.04)]' : ''}`}
+                    >
+                      <div className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 mt-0.5 ${notifTypeColor[iconKey]}`}>
+                        <span className="material-symbols-outlined text-[14px] icon-thin">{notifTypeIcon[iconKey]}</span>
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-[12px] font-semibold text-[var(--foreground)] leading-snug">{n.title}</p>
+                        {n.message && (
+                          <p className="text-[11px] text-[var(--muted)] mt-0.5 leading-snug line-clamp-2">{n.message}</p>
+                        )}
+                        <p className="text-[10px] text-[var(--muted-light)] mt-1 font-medium">{timeAgo(n.created_at)}</p>
+                      </div>
+                      {!n.is_read && (
+                        <div className="w-1.5 h-1.5 rounded-full bg-[hsl(239_68%_58%)] shrink-0 mt-1.5" />
+                      )}
+                    </div>
+                  );
                 })
-              }), /*#__PURE__*/_jsxs("div", {
-                className: "flex-1 min-w-0",
-                children: [/*#__PURE__*/_jsx("p", {
-                  className: "text-[12px] font-semibold text-[var(--foreground)] leading-snug",
-                  children: n.title
-                }), n.message && /*#__PURE__*/_jsx("p", {
-                  className: "text-[11px] text-[var(--muted)] mt-0.5 leading-snug line-clamp-2",
-                  children: n.message
-                }), /*#__PURE__*/_jsx("p", {
-                  className: "text-[10px] text-[var(--muted-light)] mt-1",
-                  children: timeAgo(n.created_at)
-                })]
-              }), !n.is_read && /*#__PURE__*/_jsx("div", {
-                className: "w-1.5 h-1.5 rounded-full bg-[hsl(239_68%_58%)] shrink-0 mt-1.5"
-              })]
-            }, n.id || i);
-          })
-        })]
-      })]
-    }), /*#__PURE__*/_jsxs("div", {
-      className: "relative",
-      ref: userMenuRef,
-      children: [/*#__PURE__*/_jsxs("button", {
-        onClick: () => {
-          setShowUserMenu(p => !p);
-          setShowNotifications(false);
-        },
-        className: "flex items-center gap-2 px-2 py-1 rounded-xl hover:bg-[var(--surface)] transition-colors",
-        children: [/*#__PURE__*/_jsx("div", {
-          className: "w-7 h-7 rounded-full bg-gradient-to-br from-[hsl(239_68%_58%)] to-[hsl(263_70%_62%)] flex items-center justify-center text-white text-[11px] font-bold",
-          children: initials
-        }), /*#__PURE__*/_jsx("span", {
-          className: "hidden sm:block text-[13px] font-medium text-[var(--foreground)] max-w-[120px] truncate",
-          children: user?.full_name
-        }), /*#__PURE__*/_jsx("span", {
-          className: "material-symbols-outlined text-[var(--muted)] text-[16px]",
-          children: "expand_more"
-        })]
-      }), showUserMenu && /*#__PURE__*/_jsxs("div", {
-        className: "absolute right-0 top-full mt-1 w-52 bg-[var(--card-bg)] border border-[var(--border-color)] rounded-2xl shadow-xl z-50 overflow-hidden py-1",
-        children: [/*#__PURE__*/_jsxs("div", {
-          className: "px-4 py-3 border-b border-[var(--border-color)]",
-          children: [/*#__PURE__*/_jsx("p", {
-            className: "text-[13px] font-semibold text-[var(--foreground)] truncate",
-            children: user?.full_name
-          }), /*#__PURE__*/_jsx("p", {
-            className: "text-[11px] text-[var(--muted)] truncate",
-            children: user?.email
-          }), user?.isPro ? /*#__PURE__*/_jsxs("span", {
-            className: "inline-flex items-center gap-1 mt-1.5 px-2 py-0.5 rounded-full bg-gradient-to-r from-[hsl(239_68%_58%)] to-[hsl(263_70%_62%)] text-white text-[10px] font-bold",
-            children: [/*#__PURE__*/_jsx("span", {
-              className: "material-symbols-outlined text-[11px]",
-              style: {
-                fontVariationSettings: "'FILL' 1"
-              },
-              children: "workspace_premium"
-            }), "Pro"]
-          }) : /*#__PURE__*/_jsx("span", {
-            className: "inline-flex items-center gap-1 mt-1.5 px-2 py-0.5 rounded-full bg-[var(--surface)] text-[var(--muted)] text-[10px] font-semibold border border-[var(--border-color)]",
-            children: "Free"
-          })]
-        }), /*#__PURE__*/_jsxs("button", {
-          onClick: logout,
-          className: "w-full flex items-center gap-2.5 px-4 py-2.5 text-[13px] text-[hsl(343_72%_48%)] hover:bg-[hsl(343_85%_58%/0.06)] transition-colors",
-          children: [/*#__PURE__*/_jsx("span", {
-            className: "material-symbols-outlined text-[16px]",
-            children: "logout"
-          }), HEADER_TEXTS.logout]
-        })]
-      })]
-    })]
-  });
+              )}
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* ── User menu ── */}
+      <div className="relative" ref={userMenuRef}>
+        <button
+          onClick={() => { setShowUserMenu(p => !p); setShowNotifications(false); }}
+          className="flex items-center gap-2 px-2 py-1.5 rounded-xl hover:bg-[var(--surface)] transition-all duration-150 active:scale-95 focus-visible:outline-2 focus-visible:outline-[hsl(239_68%_58%/0.6)] focus-visible:outline-offset-2"
+        >
+          {/* Avatar with gradient ring */}
+          <div className="p-[2px] rounded-full bg-gradient-to-br from-[hsl(239_68%_58%)] to-[hsl(263_70%_62%)]">
+            <div className="w-7 h-7 rounded-full bg-gradient-to-br from-[hsl(239_68%_58%)] to-[hsl(263_70%_62%)] flex items-center justify-center text-white text-[11px] font-bold border-2 border-[var(--card-bg)]">
+              {initials}
+            </div>
+          </div>
+          <span className="hidden sm:block text-[13px] font-medium text-[var(--foreground)] max-w-[120px] truncate">
+            {user?.full_name}
+          </span>
+          <span className="material-symbols-outlined text-[var(--muted)] text-[16px] transition-transform duration-200" style={{ transform: showUserMenu ? 'rotate(180deg)' : 'none' }}>
+            expand_more
+          </span>
+        </button>
+
+        {/* User dropdown — glass panel (floating = allowed) */}
+        {showUserMenu && (
+          <div className="absolute right-0 top-full mt-2 w-52 glass border border-[var(--glass-border)] rounded-2xl shadow-[0_16px_48px_hsl(228_25%_5%/0.4)] z-50 overflow-hidden py-1 animate-fade-up">
+            {/* User info */}
+            <div className="px-4 py-3 border-b border-[var(--border-color)]">
+              <p className="text-[13px] font-semibold text-[var(--foreground)] truncate">{user?.full_name}</p>
+              <p className="text-[11px] text-[var(--muted)] truncate mt-0.5">{user?.email}</p>
+              {user?.isPro ? (
+                <span className="inline-flex items-center gap-1 mt-2 px-2 py-0.5 rounded-full bg-gradient-to-r from-[hsl(239_68%_58%)] to-[hsl(263_70%_62%)] text-white text-[10px] font-bold">
+                  <span className="material-symbols-outlined text-[11px]" style={{ fontVariationSettings: "'FILL' 1" }}>workspace_premium</span>
+                  Pro
+                </span>
+              ) : (
+                <span className="inline-flex items-center mt-2 px-2 py-0.5 rounded-full bg-[var(--surface)] text-[var(--muted)] text-[10px] font-semibold border border-[var(--border-color)]">
+                  Free
+                </span>
+              )}
+            </div>
+
+            {/* Logout */}
+            <button
+              onClick={logout}
+              className="w-full flex items-center gap-2.5 px-4 py-2.5 text-[13px] text-[hsl(343_72%_48%)] hover:bg-[hsl(343_72%_48%/0.06)] transition-colors font-medium focus-visible:outline-none"
+            >
+              <span className="material-symbols-outlined text-[16px]">logout</span>
+              {HEADER_TEXTS.logout}
+            </button>
+          </div>
+        )}
+      </div>
+    </header>
+  );
 }

@@ -156,17 +156,17 @@ export default function ForgotPasswordPage() {
                 setError(''); // Xóa lỗi khi gõ email mới
               },
               placeholder: "Nh\u1EADp \u0111\u1ECBa ch\u1EC9 email c\u1EE7a b\u1EA1n...",
-              className: "w-full bg-[#f8fafc] rounded-2xl py-4.5 pl-6 pr-14 outline-none border-2 border-slate-100 focus:border-[#0052ff] focus:bg-white text-[15px] font-medium transition-all text-slate-700 group-hover:border-slate-200 shadow-sm",
+              className: "w-full bg-[var(--surface)] rounded-2xl py-4.5 pl-6 pr-14 outline-none border border-[var(--border-color)] focus:border-[hsl(239_68%_58%)] focus:bg-[var(--surface-raised)] text-[15px] font-medium transition-all text-[var(--foreground)] shadow-sm",
               required: true,
               disabled: isLoading
             }), /*#__PURE__*/_jsx("span", {
-              className: "material-symbols-outlined absolute right-5 top-1/2 -translate-y-1/2 text-slate-300 group-focus-within:text-[#0052ff] transition-colors",
+              className: "material-symbols-outlined absolute right-5 top-1/2 -translate-y-1/2 text-[var(--muted)] group-focus-within:text-[hsl(239_68%_58%)] transition-colors",
               children: "mail"
             })]
           }), /*#__PURE__*/_jsx("button", {
             type: "submit",
             disabled: isLoading || resendTimer > 0 && email === lastEmailSent,
-            className: "w-full bg-[#0052ff] text-white font-semibold rounded-2xl py-4.5 hover:bg-[#0042cc] transition-all shadow-[0_4px_14px_0_rgba(0,82,255,0.25)] active:scale-[0.99] disabled:bg-slate-50 disabled:text-slate-400 disabled:shadow-none text-[16px] border border-transparent disabled:border-slate-100",
+            className: "w-full bg-[hsl(239_68%_58%)] text-white font-semibold rounded-2xl py-4.5 hover:bg-[hsl(239_62%_52%)] transition-all shadow-[0_4px_14px_0_hsl(239_68%_58%/0.30)] active:scale-[0.99] disabled:bg-[var(--surface)] disabled:text-[var(--muted)] disabled:shadow-none text-[16px] border border-transparent",
             children: isLoading ? "Đang xử lý..." : resendTimer > 0 && email === lastEmailSent ? `Thử lại sau ${resendTimer}s` : "Tiếp tục"
           })]
         });
@@ -186,7 +186,7 @@ export default function ForgotPasswordPage() {
               onChange: e => handleOtpChange(idx, e.target.value),
               onKeyDown: e => handleKeyDown(idx, e),
               disabled: isLoading || otpLockoutTimer > 0,
-              className: "w-full h-16 sm:h-18 text-center text-3xl font-bold bg-[#f8fafc] border-2 border-slate-100 rounded-2xl focus:border-[#0052ff] focus:bg-white outline-none transition-all text-slate-700 shadow-sm disabled:opacity-50",
+              className: "w-full h-16 sm:h-18 text-center text-3xl font-bold bg-[var(--surface)] border border-[var(--border-color)] rounded-2xl focus:border-[hsl(239_68%_58%)] focus:bg-[var(--surface-raised)] outline-none transition-all text-[var(--foreground)] shadow-sm disabled:opacity-50",
               required: true
             }, idx))
           }), /*#__PURE__*/_jsxs("div", {
@@ -194,17 +194,17 @@ export default function ForgotPasswordPage() {
             children: [/*#__PURE__*/_jsx("button", {
               type: "submit",
               disabled: isLoading || otpLockoutTimer > 0,
-              className: "w-full bg-[#0052ff] text-white font-semibold rounded-2xl py-4.5 hover:bg-[#0042cc] transition-all shadow-[0_4px_14px_0_rgba(0,82,255,0.25)] active:scale-[0.99] disabled:bg-slate-50 disabled:text-slate-400 disabled:shadow-none border border-transparent disabled:border-slate-100",
+              className: "w-full bg-[hsl(239_68%_58%)] text-white font-semibold rounded-2xl py-4.5 hover:bg-[hsl(239_62%_52%)] transition-all shadow-[0_4px_14px_0_hsl(239_68%_58%/0.30)] active:scale-[0.99] disabled:bg-[var(--surface)] disabled:text-[var(--muted)] disabled:shadow-none border border-transparent disabled:border-[var(--border-color)]",
               children: isLoading ? "Đang kiểm tra..." : otpLockoutTimer > 0 ? "Đang bị khóa" : "Xác thực mã OTP"
             }), /*#__PURE__*/_jsxs("p", {
-              className: "text-center text-[15px] font-medium text-slate-400",
+              className: "text-center text-[15px] font-medium text-[var(--muted)]",
               children: ["B\u1EA1n kh\xF4ng nh\u1EADn \u0111\u01B0\u1EE3c m\xE3? ", resendTimer > 0 ? /*#__PURE__*/_jsxs("span", {
-                className: "text-slate-400 italic",
+                className: "text-[var(--muted)] italic",
                 children: ["Th\u1EED l\u1EA1i sau ", resendTimer, "s"]
               }) : /*#__PURE__*/_jsx("button", {
                 type: "button",
                 onClick: () => handleSendOtp(),
-                className: "text-[#0052ff] font-bold hover:underline",
+                className: "text-[hsl(239_68%_58%)] font-bold hover:underline",
                 disabled: otpLockoutTimer > 0,
                 children: "G\u1EEDi l\u1EA1i ngay"
               })]
@@ -224,13 +224,13 @@ export default function ForgotPasswordPage() {
                 value: newPassword,
                 onChange: e => setNewPassword(e.target.value),
                 placeholder: "M\u1EADt kh\u1EA9u m\u1EDBi (t\u1ED1i thi\u1EC3u 8 k\xFD t\u1EF1)",
-                className: "w-full bg-[#f8fafc] rounded-2xl py-4.5 pl-6 pr-14 outline-none border-2 border-slate-100 focus:border-[#0052ff] focus:bg-white text-[15px] font-medium transition-all text-slate-700 shadow-sm",
+                className: "w-full bg-[var(--surface)] rounded-2xl py-4.5 pl-6 pr-14 outline-none border border-[var(--border-color)] focus:border-[hsl(239_68%_58%)] focus:bg-[var(--surface-raised)] text-[15px] font-medium transition-all text-[var(--foreground)] shadow-sm",
                 required: true
               }), /*#__PURE__*/_jsx("button", {
                 type: "button",
                 tabIndex: -1,
                 onClick: () => setShowPassword(!showPassword),
-                className: "absolute right-5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-[#0052ff] transition-colors focus:outline-none",
+                className: "absolute right-5 top-1/2 -translate-y-1/2 text-[var(--muted)] hover:text-[hsl(239_68%_58%)] transition-colors focus:outline-none",
                 children: /*#__PURE__*/_jsx("span", {
                   className: "material-symbols-outlined",
                   children: showPassword ? "visibility_off" : "visibility"
@@ -243,7 +243,7 @@ export default function ForgotPasswordPage() {
                 value: confirmPassword,
                 onChange: e => setConfirmPassword(e.target.value),
                 placeholder: "X\xE1c nh\u1EADn l\u1EA1i m\u1EADt kh\u1EA9u m\u1EDBi",
-                className: "w-full bg-[#f8fafc] rounded-2xl py-4.5 pl-6 pr-14 outline-none border-2 border-slate-100 focus:border-[#0052ff] focus:bg-white text-[15px] font-medium transition-all text-slate-700 shadow-sm",
+                className: "w-full bg-[var(--surface)] rounded-2xl py-4.5 pl-6 pr-14 outline-none border border-[var(--border-color)] focus:border-[hsl(239_68%_58%)] focus:bg-[var(--surface-raised)] text-[15px] font-medium transition-all text-[var(--foreground)] shadow-sm",
                 required: true
               }), /*#__PURE__*/_jsx("button", {
                 type: "button",
@@ -259,7 +259,7 @@ export default function ForgotPasswordPage() {
           }), /*#__PURE__*/_jsx("button", {
             type: "submit",
             disabled: isLoading,
-            className: "w-full bg-[#0052ff] text-white font-semibold rounded-2xl py-4.5 hover:bg-[#0042cc] transition-all shadow-[0_4px_14px_0_rgba(0,82,255,0.25)]",
+            className: "w-full bg-[hsl(239_68%_58%)] text-white font-semibold rounded-2xl py-4.5 hover:bg-[hsl(239_62%_52%)] transition-all shadow-[0_4px_14px_0_hsl(239_68%_58%/0.30)]",
             children: "C\u1EADp nh\u1EADt m\u1EADt kh\u1EA9u"
           })]
         });
@@ -267,22 +267,22 @@ export default function ForgotPasswordPage() {
         return /*#__PURE__*/_jsxs("div", {
           className: "text-center py-8 animate-in fade-in zoom-in-95 duration-700",
           children: [/*#__PURE__*/_jsx("div", {
-            className: "w-20 h-20 bg-emerald-50 text-emerald-500 rounded-full flex items-center justify-center mx-auto mb-8 shadow-sm",
+            className: "w-20 h-20 bg-emerald-500/10 text-emerald-500 rounded-full flex items-center justify-center mx-auto mb-8",
             children: /*#__PURE__*/_jsx("span", {
               className: "material-symbols-outlined text-4xl",
               children: "verified"
             })
           }), /*#__PURE__*/_jsx("h2", {
-            className: "text-2xl font-bold text-slate-800 mb-4 tracking-tight",
+            className: "text-2xl font-bold text-[var(--foreground)] mb-4 tracking-tight",
             children: "C\u1EADp nh\u1EADt th\xE0nh c\xF4ng"
           }), /*#__PURE__*/_jsx("p", {
-            className: "text-slate-400 text-[16px] mb-10 leading-relaxed font-medium",
+            className: "text-[var(--muted)] text-[16px] mb-10 leading-relaxed font-medium",
             children: "M\u1EADt kh\u1EA9u c\u1EE7a b\u1EA1n \u0111\xE3 \u0111\u01B0\u1EE3c thay \u0111\u1ED5i. H\xE3y \u0111\u0103ng nh\u1EADp l\u1EA1i \u0111\u1EC3 ti\u1EBFp t\u1EE5c h\u1ECDc t\u1EADp."
           }), /*#__PURE__*/_jsx("button", {
             onClick: () => navigate('/login', {
               replace: true
             }),
-            className: "w-full bg-slate-800 text-white font-semibold rounded-2xl py-4.5 hover:bg-slate-900 transition-all shadow-lg active:scale-[0.99]",
+            className: "w-full bg-[var(--surface)] text-[var(--foreground)] font-semibold rounded-2xl py-4.5 hover:bg-[var(--surface-raised)] border border-[var(--border-color)] transition-all shadow-lg active:scale-[0.99]",
             children: "\u0110\u0103ng nh\u1EADp ngay"
           })]
         });
@@ -319,7 +319,7 @@ export default function ForgotPasswordPage() {
   };
   const header = getHeaderInfo();
   return /*#__PURE__*/_jsxs("div", {
-    className: "h-screen flex w-full font-sans bg-white overflow-hidden text-slate-800",
+    className: "h-[100dvh] overflow-hidden flex w-full font-sans bg-[var(--background)] text-[var(--foreground)]",
     children: [/*#__PURE__*/_jsx(AuthBranding, {}), /*#__PURE__*/_jsxs("div", {
       className: "w-full lg:w-1/2 flex flex-col justify-center items-center py-12 px-6 sm:px-12 relative overflow-y-auto h-full",
       children: [step !== 'success' && /*#__PURE__*/_jsxs("button", {
@@ -327,7 +327,7 @@ export default function ForgotPasswordPage() {
         onClick: () => step === 'email' ? navigate('/login', {
           replace: true
         }) : setStep('email'),
-        className: "absolute top-10 left-8 sm:left-12 flex items-center gap-2 text-slate-400 hover:text-[#0052ff] transition-all font-semibold text-sm group",
+        className: "absolute top-10 left-8 sm:left-12 flex items-center gap-2 text-[var(--muted)] hover:text-[hsl(239_68%_58%)] transition-all font-semibold text-sm group",
         children: [/*#__PURE__*/_jsx("span", {
           className: "material-symbols-outlined text-[20px] group-hover:-translate-x-1 transition-transform",
           children: "arrow_back"
@@ -339,10 +339,10 @@ export default function ForgotPasswordPage() {
         children: [step !== 'success' && /*#__PURE__*/_jsxs("div", {
           className: "mb-14 text-center lg:text-left",
           children: [/*#__PURE__*/_jsx("h2", {
-            className: "text-3xl font-bold text-slate-800 mb-4 tracking-tight leading-tight",
+            className: "text-3xl font-bold text-[var(--foreground)] mb-4 tracking-tight leading-tight",
             children: header.title
           }), /*#__PURE__*/_jsx("p", {
-            className: "text-slate-400 text-[16px] leading-relaxed font-medium",
+            className: "text-[var(--muted)] text-[16px] leading-relaxed font-medium",
             children: header.subtitle
           })]
         }), (error || step === 'otp' && otpLockoutTimer > 0) && /*#__PURE__*/_jsxs("div", {

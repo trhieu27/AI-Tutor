@@ -41,9 +41,6 @@ export default function DashboardLayout() {
               })
             }), /*#__PURE__*/_jsx("main", {
               className: "flex-1 overflow-y-auto relative w-full",
-              style: {
-                overscrollBehaviorY: 'none'
-              },
               children: /*#__PURE__*/_jsx(Outlet, {})
             })]
           })]
