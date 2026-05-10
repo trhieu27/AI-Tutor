@@ -174,7 +174,8 @@ export default function InteractiveMindmapPage() {
         return;
       }
       console.error("Error loading mindmap:", error);
-      setErrorMessage(error.message || 'Không thể tạo sơ đồ tư duy. Vui lòng thử lại.');
+      // Always show a generic message — never expose raw API errors to the user
+      setErrorMessage('Không thể tạo sơ đồ tư duy. Vui lòng thử lại.');
     } finally {
       if (isActive()) {
         setIsLoading(false);
@@ -487,12 +488,12 @@ export default function InteractiveMindmapPage() {
                 children: "error_outline"
               })
             }), /*#__PURE__*/_jsxs("div", {
-              className: "text-center space-y-2",
+              className: "text-center space-y-1.5",
               children: [/*#__PURE__*/_jsx("p", {
                 className: "text-[13px] font-bold text-[var(--foreground)]",
                 children: "Không thể tải sơ đồ tư duy"
               }), /*#__PURE__*/_jsx("p", {
-                className: "text-[11px] text-[var(--muted)] font-medium font-mono bg-[var(--surface)] px-3 py-2 rounded-xl border border-[var(--border-color)] text-left break-all",
+                className: "text-[11px] text-[var(--muted)] font-medium",
                 children: errorMessage
               })]
             }), /*#__PURE__*/_jsxs("div", {

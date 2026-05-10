@@ -191,6 +191,9 @@ html {
   background-color: var(--background);
   /* contain: keeps bounce within page (pull-to-refresh works), no system bg leak */
   overscroll-behavior-y: contain;
+  /* Ensure html fills at least the full visual viewport height so the background
+     color is always visible behind the Safari bottom toolbar (viewport-fit=cover) */
+  min-height: 100dvh;
 }
 
 body {
@@ -204,15 +207,20 @@ body {
   line-height: 1.6;
   text-transform: none;
   transition: color var(--duration-slow) var(--ease-in-out-quart);
+  /* Push content above the iOS safe-area so it's not hidden behind the pill toolbar */
+  padding-bottom: env(safe-area-inset-bottom, 0px);
 }
 
-/* Fixed background layer — always covers viewport including safe area.
-   When Safari address bar appears/disappears, this fixed div is what shows,
-   not the body default which could flash white. */
+/* Fixed background layer — fills the ENTIRE screen including behind the iOS toolbar.
+   With viewport-fit=cover, fixed elements must explicitly reach into safe-area insets. */
 body::before {
   content: '';
   position: fixed;
-  inset: 0;
+  /* Stretch beyond safe-area edges so background shows behind Safari pill */
+  top: calc(0px - env(safe-area-inset-top, 0px));
+  left: calc(0px - env(safe-area-inset-left, 0px));
+  right: calc(0px - env(safe-area-inset-right, 0px));
+  bottom: calc(0px - env(safe-area-inset-bottom, 0px));
   z-index: -999;
   background: var(--background);
   pointer-events: none;

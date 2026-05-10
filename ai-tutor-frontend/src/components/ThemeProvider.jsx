@@ -19,18 +19,52 @@ export function ThemeProvider({
   });
   function applyTheme(t) {
     const isDark = t === 'dark';
-    const bg = isDark ? '#0a0a0a' : '#f8fafc';
-    document.documentElement.classList.toggle('dark', isDark);
-    // Clear inline styles set by index.html script so CSS var(--background) takes effect
-    document.documentElement.style.background = '';
-    document.body.style.background = '';
-    // Remove + re-add theme-color meta — forces iOS Safari to re-read toolbar color
-    const old = document.querySelector('meta[name="theme-color"]');
-    if (old) old.remove();
-    const meta = document.createElement('meta');
-    meta.name = 'theme-color';
-    meta.content = bg;
-    document.head.appendChild(meta);
+    // Exact values that match CSS --background tokens in globals.css
+    const bg     = isDark ? '#0a0a0a' : '#f8fafc';
+    const scheme = isDark ? 'dark' : 'light';
+
+    const root = document.documentElement;
+
+    // 1. Toggle Tailwind dark-mode class
+    root.classList.toggle('dark', isDark);
+
+    // 2. color-scheme inline style — tells Safari which native-control variant to use
+    root.style.colorScheme = scheme;
+
+    // 3. Set backgroundColor EXPLICITLY on <html> (do NOT clear it).
+    //    iOS 26 Safari samples html.style.backgroundColor synchronously to decide
+    //    the toolbar pill / status-bar color. If we clear the inline style, Safari
+    //    must wait for the CSS custom-property cascade (var(--background)) to
+    //    resolve — which happens too late. An explicit hex is always instant.
+    root.style.backgroundColor = bg;
+
+    // 4. Patch both meta tags that influence Safari chrome:
+    //    - theme-color : tints address bar (Chrome Android, older Safari)
+    //    - color-scheme: PRIMARY signal for iOS 26 toolbar pill appearance
+    function patchMetas() {
+      let tcMeta = document.querySelector('meta[name="theme-color"]');
+      if (!tcMeta) {
+        tcMeta = document.createElement('meta');
+        tcMeta.name = 'theme-color';
+        document.head.appendChild(tcMeta);
+      }
+      tcMeta.content = bg;
+
+      let csMeta = document.querySelector('meta[name="color-scheme"]');
+      if (!csMeta) {
+        csMeta = document.createElement('meta');
+        csMeta.name = 'color-scheme';
+        document.head.appendChild(csMeta);
+      }
+      csMeta.content = scheme;
+    }
+
+    // Patch immediately …
+    patchMetas();
+    // … after two paint frames (DOM class has repainted) …
+    requestAnimationFrame(() => requestAnimationFrame(patchMetas));
+    // … and after a task boundary (iOS 26 chrome process needs this gap)
+    setTimeout(patchMetas, 300);
   }
   useEffect(() => {
     applyTheme(theme);
