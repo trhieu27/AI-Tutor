@@ -344,7 +344,7 @@ export default function ChatPage() {
         children: sessions.length === 0 ? /*#__PURE__*/_jsx("div", {
           className: "py-14 text-center",
           children: /*#__PURE__*/_jsx("p", {
-            className: "text-[12px] text-[#9CA3AF] dark:text-white/20 font-medium",
+            className: "text-[12px] text-[var(--muted-light)] font-medium",
             children: CHAT_TEXTS.SIDEBAR.NO_SESSIONS
           })
         }) : sessions.map(session => /*#__PURE__*/_jsxs("div", {
@@ -364,7 +364,7 @@ export default function ChatPage() {
               e.stopPropagation();
               handleDeleteSession(session.id);
             },
-            className: "absolute right-2 top-1/2 -translate-y-1/2 w-6 h-6 rounded-md flex items-center justify-center text-[#9CA3AF] opacity-0 group-hover:opacity-100 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10 transition-all",
+            className: "absolute right-2 top-1/2 -translate-y-1/2 w-6 h-6 rounded-md flex items-center justify-center text-[var(--muted-light)] opacity-0 group-hover:opacity-100 hover:text-[hsl(343_72%_48%)] hover:bg-[hsl(343_85%_58%/0.08)] transition-all",
             children: /*#__PURE__*/_jsx("span", {
               className: "material-symbols-outlined text-[13px]",
               children: "delete"
@@ -437,28 +437,25 @@ export default function ChatPage() {
           _jsxs("div", {
             className: "flex flex-col items-center justify-center text-center space-y-6 animate-in fade-in duration-500 pt-12",
             children: [/*#__PURE__*/_jsx("div", {
-              className: "w-10 h-10 rounded-xl bg-[#F3F4F6] dark:bg-white/[0.05] flex items-center justify-center",
+              className: "w-10 h-10 rounded-xl bg-[var(--surface)] flex items-center justify-center",
               children: /*#__PURE__*/_jsx("span", {
-                className: "material-symbols-outlined text-[20px] text-[#9CA3AF] dark:text-white/30",
+                className: "material-symbols-outlined text-[20px] text-[var(--muted)]",
                 children: "auto_stories"
               })
             }), /*#__PURE__*/_jsxs("div", {
               className: "space-y-2",
               children: [/*#__PURE__*/_jsx("h2", {
-                className: "text-[20px] font-semibold text-[#1F2937] dark:text-white tracking-[-0.02em]",
-                style: {
-                  fontFamily: "var(--font-serif)"
-                },
+                className: "text-[20px] font-semibold text-[var(--foreground)] tracking-[-0.02em]",
                 children: CHAT_TEXTS.WELCOME.TITLE
               }), /*#__PURE__*/_jsx("p", {
-                className: "text-[13px] text-[#6B7280] dark:text-white/35 leading-relaxed max-w-sm",
+                className: "text-[13px] text-[var(--muted)] leading-relaxed max-w-sm",
                 children: CHAT_TEXTS.WELCOME.SUBTITLE
               })]
             }), /*#__PURE__*/_jsx("div", {
               className: "grid grid-cols-1 sm:grid-cols-2 gap-2 w-full max-w-lg",
               children: CHAT_TEXTS.WELCOME.SUGGESTIONS.map(q => /*#__PURE__*/_jsx("button", {
                 onClick: () => setInput(q),
-                className: "p-3 text-left text-[12px] text-[#374151] dark:text-white/55 bg-[#F9FAFB] dark:bg-white/[0.03] border border-[#E5E7EB] dark:border-white/[0.07] rounded-xl hover:border-[#9CA3AF] dark:hover:border-white/20 hover:bg-[#F3F4F6] dark:hover:bg-white/[0.06] hover:-translate-y-0.5 hover:shadow-sm transition-all duration-200 font-medium leading-snug",
+                className: "p-3 text-left text-[12px] text-[var(--muted)] bg-[var(--surface)] border border-[var(--border-color)] rounded-xl hover:border-[var(--border-emphasis)] hover:bg-[var(--card-bg-hover)] hover:-translate-y-0.5 hover:shadow-sm transition-all duration-200 font-medium leading-snug",
                 children: q
               }, q))
             })]
@@ -467,18 +464,20 @@ export default function ChatPage() {
             children: [messages.map(msg => /*#__PURE__*/_jsxs("div", {
               className: `flex gap-4 animate-in slide-in-from-bottom-2 duration-300 ${msg.role === "user" ? "flex-row-reverse" : ""}`,
               children: [/*#__PURE__*/_jsx("div", {
-                className: `w-8 h-8 rounded-xl shrink-0 flex items-center justify-center mt-0.5 ${msg.role === "user" ? "bg-[#1F2937] dark:bg-white/90" : "bg-[#F3F4F6] dark:bg-white/[0.06]"}`,
+                className: `w-8 h-8 rounded-xl shrink-0 flex items-center justify-center mt-0.5 ${msg.role === "user" ? "bg-[hsl(239_68%_58%)]" : "bg-[var(--surface)]"}`,
                 children: /*#__PURE__*/_jsx("span", {
-                  className: `material-symbols-outlined text-[16px] ${msg.role === "user" ? "text-white dark:text-[#1F2937]" : "text-[#6B7280] dark:text-white/35"}`,
+                  className: `material-symbols-outlined text-[16px] ${msg.role === "user" ? "text-white" : "text-[var(--muted)]"}`,
+                  
                   children: msg.role === "user" ? "person" : "auto_awesome"
                 })
               }), /*#__PURE__*/_jsxs("div", {
                 className: `flex-1 min-w-0 ${msg.role === "user" ? "flex flex-col items-end" : ""}`,
                 children: [msg.role === "assistant" && /*#__PURE__*/_jsx("p", {
-                  className: "text-[10px] font-semibold text-[#9CA3AF] dark:text-white/20 mb-1.5 uppercase tracking-[0.08em]",
+                  className: "text-[10px] font-semibold text-[var(--muted-light)] mb-1.5 uppercase tracking-[0.08em]",
                   children: "AI Tr\u1EE3 l\xFD"
                 }), /*#__PURE__*/_jsx("div", {
-                  className: `text-[13.5px] leading-[1.75] ${msg.role === "user" ? "inline-block bg-[#1F2937] dark:bg-white/90 text-white dark:text-[#111113] px-4 py-2.5 rounded-2xl rounded-tr-sm font-medium max-w-[85%]" : "text-[#374151] dark:text-white/75 w-full"}`,
+                  className: `text-[13.5px] leading-[1.75] ${msg.role === "user" ? "inline-block bg-[hsl(239_68%_58%)] text-white px-4 py-2.5 rounded-2xl rounded-tr-sm font-medium max-w-[85%]" : "text-[var(--foreground)] w-full"}`,
+                  
                   children: msg.role === "assistant" ? /*#__PURE__*/_jsxs("div", {
                     className: "prose prose-sm dark:prose-invert max-w-none prose-p:leading-[1.75] prose-p:text-[13.5px] prose-p:text-[#374151] dark:prose-p:text-white/70 prose-p:m-0 prose-p:mb-3 last:prose-p:mb-0 prose-headings:text-[#1F2937] dark:prose-headings:text-white prose-headings:font-semibold prose-headings:tracking-[-0.01em] prose-headings:mt-5 prose-headings:mb-2 prose-strong:text-[#1F2937] dark:prose-strong:text-white prose-strong:font-semibold prose-code:text-[11.5px] prose-code:bg-[#F3F4F6] dark:prose-code:bg-white/[0.07] prose-code:px-1.5 prose-code:py-0.5 prose-code:rounded-md prose-code:font-mono prose-code:text-[#374151] dark:prose-code:text-white/65 prose-code:before:content-none prose-code:after:content-none prose-pre:bg-[#F9FAFB] dark:prose-pre:bg-white/[0.04] prose-pre:border prose-pre:border-[#E5E7EB] dark:prose-pre:border-white/[0.07] prose-pre:rounded-xl prose-blockquote:border-l-2 prose-blockquote:border-[#D1D5DB] dark:prose-blockquote:border-white/15 prose-blockquote:pl-4 prose-blockquote:text-[#6B7280] dark:prose-blockquote:text-white/35 prose-blockquote:not-italic prose-li:text-[13.5px] prose-li:text-[#374151] dark:prose-li:text-white/65 prose-li:leading-[1.7] prose-ul:my-2 prose-ol:my-2 prose-li:my-0.5 prose-table:text-[12px] prose-th:font-semibold prose-th:text-[#1F2937] dark:prose-th:text-white prose-td:text-[#374151] dark:prose-td:text-white/65 prose-table:border-collapse prose-th:border prose-th:border-[#E5E7EB] dark:prose-th:border-white/[0.08] prose-td:border prose-td:border-[#F3F4F6] dark:prose-td:border-white/[0.05] prose-th:px-3 prose-td:px-3",
                     children: [/*#__PURE__*/_jsx(ReactMarkdown, {
@@ -495,24 +494,24 @@ export default function ChatPage() {
             }, msg.id)), isLoading && messages[messages.length - 1]?.role !== "assistant" && /*#__PURE__*/_jsxs("div", {
               className: "flex gap-4 animate-in fade-in duration-200",
               children: [/*#__PURE__*/_jsx("div", {
-                className: "w-8 h-8 rounded-xl bg-[#F3F4F6] dark:bg-white/[0.06] flex items-center justify-center mt-0.5 shrink-0",
+                className: "w-8 h-8 rounded-xl bg-[var(--surface)] flex items-center justify-center mt-0.5 shrink-0",
                 children: /*#__PURE__*/_jsx("span", {
-                  className: "material-symbols-outlined text-[16px] text-[#9CA3AF] dark:text-white/30",
+                  className: "material-symbols-outlined text-[16px] text-[var(--muted)]",
                   children: "auto_awesome"
                 })
               }), /*#__PURE__*/_jsxs("div", {
                 className: "pt-1",
                 children: [/*#__PURE__*/_jsx("p", {
-                  className: "text-[12px] font-medium text-[#9CA3AF] dark:text-white/25 mb-2.5",
+                  className: "text-[12px] font-medium text-[var(--muted)] mb-2.5",
                   children: CHAT_TEXTS.MESSAGES.AI_ANALYZING
                 }), /*#__PURE__*/_jsxs("div", {
                   className: "flex gap-1.5 items-center",
                   children: [/*#__PURE__*/_jsx("span", {
-                    className: "w-2 h-2 bg-[#D1D5DB] dark:bg-white/20 rounded-full animate-bounce"
+                    className: "w-2 h-2 bg-[hsl(239_68%_58%/0.35)] rounded-full animate-bounce"
                   }), /*#__PURE__*/_jsx("span", {
-                    className: "w-2 h-2 bg-[#D1D5DB] dark:bg-white/20 rounded-full animate-bounce [animation-delay:0.15s]"
+                    className: "w-2 h-2 bg-[hsl(239_68%_58%/0.35)] rounded-full animate-bounce [animation-delay:0.15s]"
                   }), /*#__PURE__*/_jsx("span", {
-                    className: "w-2 h-2 bg-[#D1D5DB] dark:bg-white/20 rounded-full animate-bounce [animation-delay:0.3s]"
+                    className: "w-2 h-2 bg-[hsl(239_68%_58%/0.35)] rounded-full animate-bounce [animation-delay:0.3s]"
                   })]
                 })]
               })]
@@ -525,7 +524,7 @@ export default function ChatPage() {
           className: "sticky bottom-4 z-20 flex justify-end pr-5 pointer-events-none",
           children: /*#__PURE__*/_jsx("button", {
             onClick: () => scrollToBottom(true),
-            className: "pointer-events-auto w-9 h-9 rounded-full bg-white dark:bg-[#1C1C1E] border border-[#E5E7EB] dark:border-white/[0.1] shadow-lg flex items-center justify-center text-[#6B7280] dark:text-white/50 hover:text-[#1F2937] dark:hover:text-white hover:shadow-xl transition-all active:scale-90 animate-in fade-in slide-in-from-bottom-2 duration-200",
+            className: "pointer-events-auto w-9 h-9 rounded-full bg-[var(--card-bg)] border border-[var(--border-color)] shadow-[0_4px_12px_hsl(228_25%_5%/0.15)] flex items-center justify-center text-[var(--muted)] hover:text-[var(--foreground)] hover:shadow-xl transition-all active:scale-90 animate-in fade-in slide-in-from-bottom-2 duration-200",
             children: /*#__PURE__*/_jsx("span", {
               className: "material-symbols-outlined text-[18px]",
               children: "keyboard_arrow_down"
@@ -669,13 +668,13 @@ export default function ChatPage() {
         })
       })]
     }), showModal && /*#__PURE__*/_jsx("div", {
-      className: "fixed inset-0 z-[200] flex items-center justify-center p-4 sm:p-8 bg-black/[0.08] dark:bg-black/50 backdrop-blur-[3px] animate-in fade-in duration-150",
+      className: "fixed inset-0 z-[200] flex items-center justify-center p-4 sm:p-8 bg-[hsl(228_25%_5%/0.5)] backdrop-blur-[6px] animate-in fade-in duration-150",
       onClick: () => {
         setShowModal(null);
         handleCancel();
       },
       children: /*#__PURE__*/_jsxs("div", {
-        className: "bg-[var(--card-bg)] backdrop-blur-2xl w-full max-w-3xl max-h-[88dvh] rounded-2xl border border-[var(--border-color)] shadow-[0_12px_48px_hsl(222_47%_4%/0.18)] flex flex-col overflow-hidden animate-in zoom-in-95 duration-150",
+        className: "bg-[var(--card-bg)] w-full max-w-3xl max-h-[88dvh] rounded-2xl border border-[var(--border-color)] shadow-[0_24px_64px_hsl(228_25%_5%/0.5)] flex flex-col overflow-hidden animate-in zoom-in-95 duration-150",
         onClick: e => e.stopPropagation(),
         children: [/*#__PURE__*/_jsxs("div", {
           className: "px-6 py-4 border-b border-[var(--border-subtle)] flex items-center justify-between shrink-0",

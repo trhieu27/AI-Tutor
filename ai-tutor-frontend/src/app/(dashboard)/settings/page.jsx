@@ -1,4 +1,4 @@
-﻿import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext";
 import { SETTINGS_PAGE_TEXTS, QUOTA_TEXTS } from "@/constants/texts";
@@ -660,29 +660,19 @@ function UpgradeSection({ profile }) {
   const U = QUOTA_TEXTS.upgrade;
 
   return (
-    <div>
+    <div className="space-y-6">
       {/* Current plan row */}
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 24 }}>
+      <div className="flex items-center justify-between">
         <div>
-          <p style={{ fontSize: 13, color: "var(--muted)", marginBottom: 4 }}>{U.currentPlanLabel}</p>
-          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <p className="text-[13px] text-[var(--muted)] mb-2">{U.currentPlanLabel}</p>
+          <div className="flex items-center gap-2">
             {isPro ? (
-              <span style={{
-                display: "inline-flex", alignItems: "center", gap: 5,
-                padding: "4px 12px", borderRadius: 999,
-                background: "linear-gradient(135deg, hsl(239 68% 58%), hsl(263 70% 62%))",
-                color: "#fff", fontSize: 12, fontWeight: 800, letterSpacing: "0.04em"
-              }}>
-                <span className="material-symbols-outlined" style={{ fontSize: 13 }}>workspace_premium</span>
+              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-gradient-to-r from-[hsl(239_68%_58%)] to-[hsl(263_70%_62%)] text-white text-[12px] font-bold">
+                <span className="material-symbols-outlined text-[13px]" style={{ fontVariationSettings: "'FILL' 1" }}>workspace_premium</span>
                 {U.proPlan}
               </span>
             ) : (
-              <span style={{
-                display: "inline-flex", alignItems: "center", gap: 5,
-                padding: "4px 12px", borderRadius: 999,
-                background: "var(--surface)", border: "1px solid var(--border-color)",
-                color: "var(--foreground)", fontSize: 12, fontWeight: 700
-              }}>
+              <span className="inline-flex items-center px-3 py-1 rounded-full bg-[var(--surface)] border border-[var(--border-color)] text-[var(--foreground)] text-[12px] font-bold">
                 {U.freePlan}
               </span>
             )}
@@ -691,72 +681,46 @@ function UpgradeSection({ profile }) {
         {!isPro && (
           <button
             onClick={() => navigate("/pricing")}
-            style={{
-              padding: "9px 20px",
-              borderRadius: 12, border: "none",
-              background: "linear-gradient(135deg, hsl(239 68% 58%), hsl(263 70% 62%))",
-              color: "#fff", fontWeight: 700, fontSize: 13,
-              cursor: "pointer",
-              boxShadow: "0 4px 14px hsl(239 68% 58% / 0.30)",
-              transition: "all 0.15s",
-              whiteSpace: "nowrap",
-            }}
+            className="px-5 py-2.5 rounded-xl bg-[hsl(239_68%_58%)] text-white font-bold text-[13px] hover:bg-[hsl(239_62%_52%)] active:scale-95 transition-all shadow-[0_4px_16px_hsl(239_68%_58%/0.30)] hover:shadow-[0_8px_24px_hsl(239_68%_58%/0.40)]"
           >
             {U.upgradeBtn}
           </button>
         )}
       </div>
 
-      {/* Divider */}
-      <div style={{ borderTop: "1px solid var(--border-color)", marginBottom: 20 }} />
+      <div className="h-px bg-[var(--border-color)]" />
 
-      {/* Pro features list */}
       {!isPro && (
         <>
-          <p style={{ fontSize: 13, fontWeight: 700, color: "var(--foreground)", marginBottom: 14 }}>
-            {U.featuresIntro}
-          </p>
-          <ul style={{ listStyle: "none", padding: 0, margin: 0, display: "flex", flexDirection: "column", gap: 14 }}>
+          <p className="text-[13px] font-bold text-[var(--foreground)] mb-3">{U.featuresIntro}</p>
+          <ul className="space-y-3">
             {U.freeFeatures.map((f, i) => (
-              <li key={i} style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                <span className="material-symbols-outlined"
-                  style={{ fontSize: 20, color: "var(--foreground)", flexShrink: 0 }}>{f.icon}</span>
-                <span style={{ fontSize: 13, color: "var(--foreground)" }}>{f.text}</span>
+              <li key={i} className="flex items-center gap-3">
+                <span className="material-symbols-outlined text-[var(--muted)] text-[20px] shrink-0">{f.icon}</span>
+                <span className="text-[13px] text-[var(--foreground)] font-medium">{f.text}</span>
               </li>
             ))}
           </ul>
         </>
       )}
 
-
-      {/* Already Pro state */}
       {isPro && (
         <>
-          <p style={{ fontSize: 13, fontWeight: 700, color: "var(--foreground)", marginBottom: 14 }}>
-            {U.proFeaturesIntro}
-          </p>
-          <ul style={{ listStyle: "none", padding: 0, margin: 0, display: "flex", flexDirection: "column", gap: 14, marginBottom: 20 }}>
+          <p className="text-[13px] font-bold text-[var(--foreground)] mb-3">{U.proFeaturesIntro}</p>
+          <ul className="space-y-3 mb-6">
             {U.proFeatures.map((f, i) => (
-              <li key={i} style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                <span className="material-symbols-outlined"
-                  style={{ fontSize: 20, color: "hsl(239 68% 58%)", flexShrink: 0 }}>{f.icon}</span>
-                <span style={{ fontSize: 13, color: "var(--foreground)" }}>{f.text}</span>
+              <li key={i} className="flex items-center gap-3">
+                <span className="material-symbols-outlined text-[hsl(239_68%_58%)] text-[20px] shrink-0">{f.icon}</span>
+                <span className="text-[13px] text-[var(--foreground)] font-medium">{f.text}</span>
               </li>
             ))}
           </ul>
-          <div style={{ borderTop: "1px solid var(--border-color)", paddingTop: 16 }}>
+          <div className="pt-4 border-t border-[var(--border-color)]">
             <button
               onClick={() => navigate("/pricing")}
-              style={{
-                display: "inline-flex", alignItems: "center", gap: 6,
-                padding: "8px 16px", borderRadius: 10,
-                border: "1px solid var(--border-color)",
-                background: "var(--surface)", color: "var(--muted)",
-                fontSize: 12, fontWeight: 600, cursor: "pointer",
-                transition: "all 0.15s",
-              }}
+              className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl border border-[var(--border-color)] bg-[var(--surface)] text-[var(--muted)] text-[12px] font-semibold hover:text-[var(--foreground)] hover:border-[var(--border-emphasis)] transition-all"
             >
-              <span className="material-symbols-outlined" style={{ fontSize: 15 }}>open_in_new</span>
+              <span className="material-symbols-outlined text-[15px]">open_in_new</span>
               {U.viewAllPlans}
             </button>
           </div>
@@ -808,10 +772,10 @@ export default function SettingsPage() {
       children: [/*#__PURE__*/_jsxs("div", {
         className: "mb-8",
         children: [/*#__PURE__*/_jsx("h1", {
-          className: "font-display text-[28px] font-semibold text-[var(--foreground)] tracking-tight",
+          className: "font-sans text-[28px] font-extrabold text-[var(--foreground)] tracking-[-0.03em] leading-[1.05]",
           children: T.page.title
         }), /*#__PURE__*/_jsx("p", {
-          className: "text-[13px] text-[var(--muted)] mt-1",
+          className: "text-[14px] text-[var(--muted)] mt-1.5 leading-relaxed",
           children: T.page.subtitle
         })]
       }), /*#__PURE__*/_jsxs("div", {
@@ -832,7 +796,7 @@ export default function SettingsPage() {
           })
         }), /*#__PURE__*/_jsx("div", {
 
-          className: "flex-1 min-w-0 p-7 rounded-2xl bg-[var(--card-bg)] border border-[var(--border-color)] shadow-[0_2px_16px_hsl(222_47%_4%/0.06)]",
+          className: "flex-1 min-w-0 p-7 rounded-2xl bg-[var(--card-bg)] border border-[var(--border-color)] shadow-[0_4px_24px_hsl(228_25%_5%/0.08)]",
           children: loading ? /*#__PURE__*/_jsxs("div", {
             className: "space-y-5",
             children: [/*#__PURE__*/_jsx(Skeleton, {
