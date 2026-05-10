@@ -358,18 +358,18 @@ export const QUOTA_TEXTS = {
     paymentPricePro: "₫99.000 VND/tháng",
     viewAllPlans: "Xem tất cả gói",
     proFeatures: [
-      { icon: "hub",         text: "Mô hình AI nâng cao" },
-      { icon: "chat",        text: "Gửi thêm nhiều tin nhắn không giới hạn" },
-      { icon: "auto_awesome",text: "Tạo nội dung AI không giới hạn" },
+      { icon: "hub", text: "Mô hình AI nâng cao" },
+      { icon: "chat", text: "Gửi thêm nhiều tin nhắn không giới hạn" },
+      { icon: "auto_awesome", text: "Tạo nội dung AI không giới hạn" },
       { icon: "upload_file", text: "Tải lên tài liệu không giới hạn" },
-      { icon: "psychology",  text: "Ưu tiên xử lý và phản hồi nhanh hơn" },
+      { icon: "psychology", text: "Ưu tiên xử lý và phản hồi nhanh hơn" },
     ],
     freeFeatures: [
-      { icon: "hub",         text: "Mô hình AI cơ bản" },
-      { icon: "chat",        text: "30 tin nhắn mỗi ngày" },
-      { icon: "auto_awesome",text: "10 lượt tạo nội dung AI/ngày" },
-      { icon: "upload_file", text: "Tối đa 3 file tài liệu" },
-      { icon: "psychology",  text: "Xử lý thông thường" },
+      { icon: "hub", text: "Mô hình AI cơ bản" },
+      { icon: "chat", text: "30 tin nhắn mỗi ngày" },
+      { icon: "auto_awesome", text: "10 lượt tạo nội dung AI/ngày" },
+      { icon: "upload_file", text: "Không giới hạn tài liệu" },
+      { icon: "psychology", text: "Xử lý thông thường" },
     ],
     currentPlan: "Gói hiện tại",
     proBadge: "Đang sử dụng",
@@ -388,7 +388,7 @@ export const QUOTA_TEXTS = {
     }, {
       icon: "upload_file",
       text: "Tài liệu",
-      free: "Tối đa 3 file",
+      free: "Không giới hạn",
       pro: "Không giới hạn"
     }],
   }

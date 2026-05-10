@@ -533,77 +533,139 @@ export default function ChatPage() {
           })
         })]
       }), /*#__PURE__*/_jsx("div", {
-        className: "px-5 md:px-10 py-4 pb-6 border-t border-[var(--border-color)] shrink-0",
+        style: { padding: "12px 20px 20px", flexShrink: 0 },
         children: /*#__PURE__*/_jsxs("div", {
-          className: "max-w-2xl mx-auto",
-          children: [/*#__PURE__*/_jsxs("form", {
-            onSubmit: handleSendMessage,
-            className: "flex items-end gap-2 group",
-            children: [/*#__PURE__*/_jsxs("div", {
-              className: "flex-1 flex items-center rounded-xl border border-[var(--border-color)] bg-[var(--surface)] overflow-hidden transition-all focus-within:border-[var(--border-emphasis)] focus-within:bg-[var(--surface-raised)]",
-              children: [/*#__PURE__*/_jsx("span", {
-                className: "material-symbols-outlined text-[18px] shrink-0 ml-4 text-[var(--muted-light)] group-focus-within:text-[var(--muted)] transition-colors self-center pointer-events-none",
-                style: {
-                  lineHeight: 1
-                },
-                children: "psychology"
-              }), /*#__PURE__*/_jsx("textarea", {
-                ref: textareaRef,
-                value: input,
-                onChange: e => {
-                  setInput(e.target.value);
-                  e.target.style.height = "auto";
-                  e.target.style.height = Math.min(e.target.scrollHeight, 120) + "px";
-                },
-                onKeyDown: e => {
-                  if (e.key === "Enter" && !e.shiftKey) {
-                    e.preventDefault();
-                    if (input.trim() && !isLoading) handleSendMessage();
+          style: { maxWidth: 672, margin: "0 auto" },
+          children: [
+            /*#__PURE__*/_jsxs("form", {
+              className: "chat-prompt-inner",
+              onSubmit: handleSendMessage,
+              children: [
+                /*#__PURE__*/_jsx("textarea", {
+                  ref: textareaRef,
+                  value: input,
+                  onChange: e => {
+                    setInput(e.target.value);
+                    e.target.style.height = "auto";
+                    e.target.style.height = Math.min(e.target.scrollHeight, 160) + "px";
+                  },
+                  onKeyDown: e => {
+                    if (e.key === "Enter" && !e.shiftKey) {
+                      e.preventDefault();
+                      if (input.trim() && !isLoading) handleSendMessage();
+                    }
+                  },
+                  rows: 1,
+                  maxLength: quota?.is_pro ? undefined : 1200,
+                  placeholder: CHAT_TEXTS.INPUT.PLACEHOLDER,
+                  disabled: isLoading,
+                  style: {
+                    display: "block",
+                    width: "100%",
+                    background: "transparent",
+                    border: "none",
+                    outline: "none",
+                    resize: "none",
+                    overflowY: "auto",
+                    minHeight: 52,
+                    maxHeight: 160,
+                    fontSize: 14,
+                    lineHeight: 1.65,
+                    color: "var(--foreground)",
+                    fontFamily: "inherit",
+                    fontWeight: 450,
+                    padding: "14px 16px 4px",
+                    boxSizing: "border-box",
                   }
-                },
-                rows: 1,
-                maxLength: quota?.is_pro ? undefined : 1200,
-                placeholder: CHAT_TEXTS.INPUT.PLACEHOLDER,
-                className: "flex-1 bg-transparent text-[var(--foreground)] py-3.5 pl-3 pr-4 focus:outline-none text-[13px] font-medium placeholder:text-[var(--muted-light)] resize-none overflow-y-auto leading-relaxed",
-                style: {
-                  minHeight: "52px",
-                  maxHeight: "120px"
-                }
-              })]
-            }), /*#__PURE__*/_jsx("button", {
-              type: isLoading ? "button" : "submit",
-              onClick: isLoading ? handleCancel : undefined,
-              disabled: !isLoading && !input.trim(),
-              className: `shrink-0 mb-1 w-9 h-9 rounded-xl flex items-center justify-center transition-all ${isLoading ? "bg-red-500/90 dark:bg-red-500/80 text-white hover:opacity-80 active:scale-95" : input.trim() ? "bg-[#1F2937] dark:bg-white/90 text-white dark:text-[#0A0A0B] hover:opacity-75 active:scale-95" : "bg-[#F3F4F6] dark:bg-white/[0.04] text-[#D1D5DB] dark:text-white/15 cursor-not-allowed"}`,
-              children: /*#__PURE__*/_jsx("span", {
-                className: `material-symbols-outlined text-[18px] ${isLoading ? "animate-pulse" : ""}`,
-                children: isLoading ? "stop_circle" : "arrow_upward"
-              })
-            })]
-          }), /*#__PURE__*/_jsxs("div", {
-            className: "flex items-center justify-between mt-1.5 px-0.5",
-            children: [/*#__PURE__*/_jsx("p", {
-              className: "text-[11px] text-[var(--muted-light)] font-medium",
+                }),
+                /*#__PURE__*/_jsxs("div", {
+                  style: { display: "flex", alignItems: "center", justifyContent: "flex-end", padding: "4px 10px 10px 14px" },
+                  children: [
+
+                    /*#__PURE__*/_jsxs("div", {
+                      style: { display: "flex", alignItems: "center", gap: 10 },
+                      children: [
+                        !quota?.is_pro && /*#__PURE__*/_jsx("span", {
+                          style: {
+                            fontSize: 11,
+                            fontWeight: 500,
+                            fontVariantNumeric: "tabular-nums",
+                            transition: "color 0.2s",
+                            color: input.length > 1080
+                              ? (input.length >= 1200 ? "hsl(343 85% 58%)" : "hsl(38 92% 50%)")
+                              : "var(--muted-light)",
+                          },
+                          children: `${input.length}/1200`
+                        }),
+                        /*#__PURE__*/_jsx("button", {
+                          type: isLoading ? "button" : "submit",
+                          onClick: isLoading ? handleCancel : undefined,
+                          disabled: !isLoading && !input.trim(),
+                          style: {
+                            width: 34,
+                            height: 34,
+                            borderRadius: 11,
+                            border: "none",
+                            cursor: (!isLoading && !input.trim()) ? "not-allowed" : "pointer",
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            flexShrink: 0,
+                            transition: "background 0.2s, box-shadow 0.2s, transform 0.18s cubic-bezier(0.34,1.56,0.64,1)",
+                            background: isLoading
+                              ? "hsl(343 85% 56%)"
+                              : input.trim()
+                                ? "hsl(239 68% 58%)"
+                                : "var(--surface)",
+                            color: (isLoading || input.trim()) ? "#fff" : "var(--muted-light)",
+                            boxShadow: (isLoading || input.trim())
+                              ? "0 2px 8px hsl(239 68% 58% / 0.35)"
+                              : "none",
+                          },
+                          onMouseEnter: e => { if (!e.currentTarget.disabled) e.currentTarget.style.transform = "scale(1.10)"; },
+                          onMouseLeave: e => { e.currentTarget.style.transform = "scale(1)"; },
+                          onMouseDown: e => { if (!e.currentTarget.disabled) e.currentTarget.style.transform = "scale(0.90)"; },
+                          onMouseUp: e => { if (!e.currentTarget.disabled) e.currentTarget.style.transform = "scale(1.10)"; },
+                          children: /*#__PURE__*/_jsx("span", {
+                            className: "material-symbols-outlined icon-thin",
+                            style: { fontSize: 17, transition: "transform 0.15s" },
+                            children: isLoading ? "stop_circle" : "arrow_upward"
+                          })
+                        }),
+                      ]
+                    }),
+                  ]
+                }),
+              ]
+            }),
+            quota && !quota.is_pro && quota.usage && quota.limits && /*#__PURE__*/_jsxs("div", {
+              style: { display: "flex", alignItems: "center", gap: 8, marginTop: 8, padding: "0 4px" },
+              children: [
+                /*#__PURE__*/_jsx("div", {
+                  style: { flex: 1, height: 2, background: "var(--border-subtle)", borderRadius: 99, overflow: "hidden" },
+                  children: /*#__PURE__*/_jsx("div", {
+                    style: {
+                      height: "100%",
+                      borderRadius: 99,
+                      transition: "width 0.5s ease",
+                      width: `${Math.min(quota.usage.chat_messages / quota.limits.chat_messages * 100, 100)}%`,
+                      background: quota.usage.chat_messages / quota.limits.chat_messages > 0.8
+                        ? "linear-gradient(90deg, hsl(38 92% 50%), hsl(343 85% 58%))"
+                        : "linear-gradient(90deg, hsl(217 91% 60%), hsl(263 70% 62%))",
+                    }
+                  })
+                }),
+                /*#__PURE__*/_jsxs("span", {
+                  style: { fontSize: 11, color: "var(--muted-light)", fontVariantNumeric: "tabular-nums", whiteSpace: "nowrap" },
+                  children: [quota.limits.chat_messages - quota.usage.chat_messages, " l\u01B0\u1EE3t c\xF2n l\u1EA1i"]
+                }),
+              ]
+            }),
+            /*#__PURE__*/_jsx("p", {
+              style: { fontSize: 11, color: "var(--muted-light)", fontWeight: 500, marginTop: 6, paddingLeft: 2 },
               children: CHAT_TEXTS.INPUT.DISCLAIMER
-            }), !quota?.is_pro && /*#__PURE__*/_jsxs("span", {
-              className: `text-[11px] font-medium tabular-nums transition-colors ${input.length > 1080 ? input.length >= 1200 ? "text-red-400" : "text-amber-400" : "text-[var(--muted-light)]"}`,
-              children: [input.length, "/1200"]
-            })]
-          }), quota && !quota.is_pro && quota.usage && quota.limits && /*#__PURE__*/_jsxs("div", {
-            className: "flex items-center gap-2 mt-2 px-0.5",
-            children: [/*#__PURE__*/_jsx("div", {
-              className: "flex-1 h-0.5 bg-[#F3F4F6] dark:bg-white/[0.05] rounded-full overflow-hidden",
-              children: /*#__PURE__*/_jsx("div", {
-                className: `h-full rounded-full transition-all duration-500 ${quota.usage.chat_messages / quota.limits.chat_messages > 0.8 ? "bg-gradient-to-r from-amber-400 to-red-400" : "bg-gradient-to-r from-blue-400 to-violet-400"}`,
-                style: {
-                  width: `${Math.min(quota.usage.chat_messages / quota.limits.chat_messages * 100, 100)}%`
-                }
-              })
-            }), /*#__PURE__*/_jsxs("span", {
-              className: "text-[10px] text-[#9CA3AF] dark:text-white/20 tabular-nums shrink-0",
-              children: [quota.limits.chat_messages - quota.usage.chat_messages, " l\u01B0\u1EE3t c\xF2n l\u1EA1i"]
-            })]
-          })]
+            }),
+          ]
         })
       })]
     }), showModal && /*#__PURE__*/_jsx("div", {

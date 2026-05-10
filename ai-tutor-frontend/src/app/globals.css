@@ -670,3 +670,34 @@ h6 {
 .dark .custom-scrollbar::-webkit-scrollbar-thumb:hover {
   background: rgba(255, 255, 255, 0.10);
 }
+
+/* ── 10. CHAT PROMPT — Input Box ───────────────────────────────────────── */
+.chat-prompt-inner {
+  border-radius: 20px;
+  background: var(--card-bg);
+  border: 1.5px solid var(--border-color);
+  overflow: hidden;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+  box-shadow: 0 1px 6px hsl(222 47% 11% / 0.05);
+}
+
+.chat-prompt-inner:focus-within {
+  border-color: hsl(239 68% 58% / 0.5);
+  box-shadow: 0 0 0 3px hsl(239 68% 58% / 0.08), 0 2px 12px hsl(222 47% 6% / 0.08);
+}
+
+.dark .chat-prompt-inner {
+  background: var(--card-bg);
+  box-shadow: 0 1px 6px hsl(222 47% 6% / 0.12);
+}
+
+.dark .chat-prompt-inner:focus-within {
+  border-color: hsl(239 68% 58% / 0.45);
+  box-shadow: 0 0 0 3px hsl(239 68% 58% / 0.10), 0 4px 16px hsl(222 47% 6% / 0.18);
+}
+
+/* Placeholder color */
+.chat-prompt-inner textarea::placeholder {
+  color: var(--muted-light);
+  opacity: 1;
+}
