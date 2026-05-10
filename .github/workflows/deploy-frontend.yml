@@ -17,13 +17,18 @@ jobs:
     name: Deploy Frontend to EC2
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    concurrency:
+      group: deploy-ec2
+      cancel-in-progress: false
+    env:
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: 'true'
 
     steps:
       - name: 📥 Checkout code
         uses: actions/checkout@v4
 
       - name: 🔑 Setup SSH
-        uses: webfactory/ssh-agent@v0.9.0
+        uses: webfactory/ssh-agent@v0.9.1
         with:
           ssh-private-key: ${{ secrets.EC2_SSH_KEY }}
 
@@ -37,15 +42,37 @@ jobs:
 
           ssh $EC2_USER@$EC2_HOST << 'ENDSSH'
             set -e
-            echo "📁 Navigating to project directory..."
-            cd ~/DoAn
 
-            echo "⬇️  Pulling latest code..."
-            git pull origin $(git rev-parse --abbrev-ref HEAD)
+            echo "📁 Checking project directory..."
+            if [ ! -d ~/AI-Tutor ]; then
+              echo "📥 Cloning repository..."
+              git clone https://github.com/trhieu27/AI-Tutor.git ~/AI-Tutor
+              cd ~/AI-Tutor
+              git checkout develop
+            else
+              cd ~/AI-Tutor
+              echo "⬇️  Syncing with remote..."
+              git remote prune origin
+              git fetch --prune origin
+              git checkout develop
+              git reset --hard origin/develop
+            fi
+
+            echo "🔧 Ensuring Docker Compose plugin..."
+            if ! sudo docker compose version &>/dev/null 2>&1; then
+              sudo mkdir -p /usr/local/lib/docker/cli-plugins
+              sudo curl -SL https://github.com/docker/compose/releases/latest/download/docker-compose-linux-x86_64 \
+                -o /tmp/docker-compose-tmp
+              sudo mv /tmp/docker-compose-tmp /usr/local/lib/docker/cli-plugins/docker-compose
+              sudo chmod +x /usr/local/lib/docker/cli-plugins/docker-compose
+              sudo systemctl restart docker
+              sleep 3
+              echo "Docker Compose: $(sudo docker compose version)"
+            fi
 
             echo "🔨 Building and restarting frontend..."
-            docker compose -f docker-compose.prod.yml build --no-cache frontend
-            docker compose -f docker-compose.prod.yml up -d --force-recreate frontend nginx
+            sudo docker compose -f docker-compose.prod.yml build --no-cache frontend
+            sudo docker compose -f docker-compose.prod.yml up -d --force-recreate frontend nginx
 
             echo "🧹 Cleaning up unused Docker images..."
             docker image prune -f
