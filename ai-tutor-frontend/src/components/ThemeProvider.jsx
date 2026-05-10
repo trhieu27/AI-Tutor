@@ -17,12 +17,26 @@ export function ThemeProvider({
     }
     return 'light';
   });
+  function applyTheme(t) {
+    const isDark = t === 'dark';
+    const bg = isDark ? '#0a0a0a' : '#f8fafc';
+    document.documentElement.classList.toggle('dark', isDark);
+    document.documentElement.style.background = bg;
+    document.body.style.background = bg;
+    // Remove + re-add theme-color meta — forces iOS Safari to re-read toolbar color
+    const old = document.querySelector('meta[name="theme-color"]');
+    if (old) old.remove();
+    const meta = document.createElement('meta');
+    meta.name = 'theme-color';
+    meta.content = bg;
+    document.head.appendChild(meta);
+  }
   useEffect(() => {
-    const root = document.documentElement;
-    root.classList.toggle('dark', theme === 'dark');
+    applyTheme(theme);
     localStorage.setItem('theme', theme);
   }, [theme]);
   const setTheme = t => {
+    applyTheme(t); // update DOM immediately (before React re-render)
     setThemeState(t);
   };
   return /*#__PURE__*/_jsx(ThemeContext.Provider, {
