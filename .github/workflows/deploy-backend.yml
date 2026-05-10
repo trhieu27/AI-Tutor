@@ -2,7 +2,7 @@ name: 🚀 Deploy Backend to EC2
 
 on:
   push:
-    branches: [main, develop]
+    branches: [develop]
     paths:
       - 'ai-tutor-backend/**'
       - 'nginx/**'
@@ -41,7 +41,7 @@ jobs:
             cd ~/DoAn
 
             echo "⬇️  Pulling latest code..."
-            git pull origin main
+            git pull origin develop
 
             echo "🔨 Building and restarting backend..."
             docker compose -f docker-compose.prod.yml build --no-cache backend
