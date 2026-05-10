@@ -21,8 +21,9 @@ export function ThemeProvider({
     const isDark = t === 'dark';
     const bg = isDark ? '#0a0a0a' : '#f8fafc';
     document.documentElement.classList.toggle('dark', isDark);
-    document.documentElement.style.background = bg;
-    document.body.style.background = bg;
+    // Clear inline styles set by index.html script so CSS var(--background) takes effect
+    document.documentElement.style.background = '';
+    document.body.style.background = '';
     // Remove + re-add theme-color meta — forces iOS Safari to re-read toolbar color
     const old = document.querySelector('meta[name="theme-color"]');
     if (old) old.remove();
