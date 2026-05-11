@@ -182,23 +182,40 @@ input:autofill {
   box-sizing: border-box;
 }
 
+/* ── THEME SWITCH: kill transitions so Safari samples the final color ─────
+   Safari iOS 26 Liquid Glass samples rendered pixels at the top of the page
+   to color its toolbar. If background/color transitions are running when the
+   sample occurs, Safari sees an intermediate (still-dark) value and keeps the
+   chrome dark. Added by ThemeProvider for exactly 2 rAF frames. */
+.theme-switching,
+.theme-switching *,
+.theme-switching *::before,
+.theme-switching *::after {
+  transition-duration: 0ms !important;
+  transition-delay:    0ms !important;
+  animation-duration:  0ms !important;
+  animation-delay:     0ms !important;
+}
+
 html {
   font-size: 16px;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  /* Match app bg — prevents white flash on Safari address bar appear/disappear */
+  /* Covers overscroll bounce area and safe-area insets in Safari iOS.
+     JS inline style (set by blocking script + ThemeProvider) overrides this
+     via specificity but this is the correct CSS fallback. */
   background-color: var(--background);
-  /* contain: keeps bounce within page (pull-to-refresh works), no system bg leak */
   overscroll-behavior-y: contain;
-  /* Ensure html fills at least the full visual viewport height so the background
-     color is always visible behind the Safari bottom toolbar (viewport-fit=cover) */
   min-height: 100dvh;
 }
 
 body {
-  background-color: transparent;
-  /* html layer handles base color */
+  /* Safari samples body background-color for its toolbar / Liquid Glass color.
+     Must be a real color — NOT transparent — so Safari can read it correctly.
+     Use 100dvh so container adjusts when Safari address bar hides/shows. */
+  background-color: var(--background);
+  min-height: 100dvh;
   color: var(--foreground);
   font-family: var(--font-sans);
   font-weight: 600;
@@ -207,23 +224,8 @@ body {
   line-height: 1.6;
   text-transform: none;
   transition: color var(--duration-slow) var(--ease-in-out-quart);
-  /* Push content above the iOS safe-area so it's not hidden behind the pill toolbar */
+  /* Push content above iOS safe-area pill toolbar */
   padding-bottom: env(safe-area-inset-bottom, 0px);
-}
-
-/* Fixed background layer — fills the ENTIRE screen including behind the iOS toolbar.
-   With viewport-fit=cover, fixed elements must explicitly reach into safe-area insets. */
-body::before {
-  content: '';
-  position: fixed;
-  /* Stretch beyond safe-area edges so background shows behind Safari pill */
-  top: calc(0px - env(safe-area-inset-top, 0px));
-  left: calc(0px - env(safe-area-inset-left, 0px));
-  right: calc(0px - env(safe-area-inset-right, 0px));
-  bottom: calc(0px - env(safe-area-inset-bottom, 0px));
-  z-index: -999;
-  background: var(--background);
-  pointer-events: none;
 }
 
 /* Tất cả heading đều dùng Inter */

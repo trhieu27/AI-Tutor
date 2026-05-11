@@ -1,87 +1,137 @@
 import { createContext, useContext, useState, useEffect } from "react";
 
-// Simple theme provider without next-themes dependency
-import { jsx as _jsx } from "react/jsx-runtime";
-const ThemeContext = /*#__PURE__*/createContext({
-  theme: 'light',
-  setTheme: _t => {}
-});
-export function ThemeProvider({
-  children
-}) {
-  const [theme, setThemeState] = useState(() => {
-    if (typeof window !== 'undefined') {
-      const stored = localStorage.getItem('theme');
-      // If explicitly set by user, respect it. Otherwise default light.
-      return stored ?? 'light';
-    }
-    return 'light';
-  });
-  function applyTheme(t) {
-    const isDark = t === 'dark';
-    // Exact values that match CSS --background tokens in globals.css
-    const bg     = isDark ? '#0a0a0a' : '#f8fafc';
-    const scheme = isDark ? 'dark' : 'light';
+// ── Colors must match CSS --background tokens exactly ─────────────────────────
+const PALETTE = {
+  light: { bg: "#f8fafc", scheme: "light" },
+  dark:  { bg: "#0a0a0a", scheme: "dark"  },
+};
 
-    const root = document.documentElement;
-
-    // 1. Toggle Tailwind dark-mode class
-    root.classList.toggle('dark', isDark);
-
-    // 2. color-scheme inline style — tells Safari which native-control variant to use
-    root.style.colorScheme = scheme;
-
-    // 3. Set backgroundColor EXPLICITLY on <html> (do NOT clear it).
-    //    iOS 26 Safari samples html.style.backgroundColor synchronously to decide
-    //    the toolbar pill / status-bar color. If we clear the inline style, Safari
-    //    must wait for the CSS custom-property cascade (var(--background)) to
-    //    resolve — which happens too late. An explicit hex is always instant.
-    root.style.backgroundColor = bg;
-
-    // 4. Patch both meta tags that influence Safari chrome:
-    //    - theme-color : tints address bar (Chrome Android, older Safari)
-    //    - color-scheme: PRIMARY signal for iOS 26 toolbar pill appearance
-    function patchMetas() {
-      let tcMeta = document.querySelector('meta[name="theme-color"]');
-      if (!tcMeta) {
-        tcMeta = document.createElement('meta');
-        tcMeta.name = 'theme-color';
-        document.head.appendChild(tcMeta);
-      }
-      tcMeta.content = bg;
-
-      let csMeta = document.querySelector('meta[name="color-scheme"]');
-      if (!csMeta) {
-        csMeta = document.createElement('meta');
-        csMeta.name = 'color-scheme';
-        document.head.appendChild(csMeta);
-      }
-      csMeta.content = scheme;
-    }
-
-    // Patch immediately …
-    patchMetas();
-    // … after two paint frames (DOM class has repainted) …
-    requestAnimationFrame(() => requestAnimationFrame(patchMetas));
-    // … and after a task boundary (iOS 26 chrome process needs this gap)
-    setTimeout(patchMetas, 300);
+// ── Inject <style> rule for color-scheme (CSS path, different from inline) ────
+function injectColorSchemeRule(scheme) {
+  let s = document.getElementById("__ai_cs__");
+  if (!s) {
+    s = document.createElement("style");
+    s.id = "__ai_cs__";
+    document.head.prepend(s);
   }
+  s.textContent = `:root { color-scheme: ${scheme} !important; }`;
+}
+
+// ── Recreate a single meta tag (destroy old → insert fresh) ───────────────────
+function forceMetaTag(name, content, media) {
+  document.querySelectorAll(
+    media ? `meta[name="${name}"][media]` : `meta[name="${name}"]:not([media])`
+  ).forEach(el => el.remove());
+  const m = document.createElement("meta");
+  m.setAttribute("name", name);
+  m.setAttribute("content", content);
+  if (media) m.setAttribute("media", media);
+  document.head.prepend(m);
+}
+
+// ── Force Safari Liquid Glass compositor to re-sample page background ─────────
+// Safari re-evaluates page appearance on scroll events.
+function triggerSafariResample() {
+  const y = window.scrollY;
+  window.scrollTo({ top: y === 0 ? 1 : y - 1, behavior: "instant" });
+  requestAnimationFrame(() => window.scrollTo({ top: y, behavior: "instant" }));
+}
+
+function applyTheme(theme) {
+  const { bg, scheme } = PALETTE[theme] ?? PALETTE.light;
+  const root = document.documentElement;
+
+  // ── 1. Kill transitions (Safari samples at tap time) ──────────────────────
+  root.classList.add("theme-switching");
+
+  // ── 2. DOM class + inline styles ──────────────────────────────────────────
+  root.classList.toggle("dark", theme === "dark");
+  root.style.colorScheme = scheme;
+  root.style.backgroundColor = bg;
+  // Safari samples BODY background for its toolbar color (guide step 1).
+  // Setting it here ensures it updates synchronously before Safari reads it.
+  if (document.body) document.body.style.backgroundColor = bg;
+
+  // ── 3. Override glass/header CSS vars instantly (before cascade resolves) ─
+  // The sticky header reads var(--glass-bg) which would take 1 frame to update
+  // via CSS cascade. Setting it inline is synchronous → Safari sees final color.
+  if (theme === "light") {
+    root.style.setProperty("--header-bg",    "hsl(0 0% 100% / 0.82)");
+    root.style.setProperty("--glass-bg",     "hsl(0 0% 100% / 0.88)");
+    root.style.setProperty("--glass-border", "hsl(214 32% 91% / 0.9)");
+  } else {
+    root.style.setProperty("--header-bg",    "hsl(0 0% 4% / 0.90)");
+    root.style.setProperty("--glass-bg",     "hsl(0 0% 9% / 0.92)");
+    root.style.setProperty("--glass-border", "hsl(0 0% 20% / 0.8)");
+  }
+
+  // ── 4. CSS rule for color-scheme ──────────────────────────────────────────
+  injectColorSchemeRule(scheme);
+
+  // ── 5. Meta tags ──────────────────────────────────────────────────────────
+  // JolyUI technique: theme-color matches the page background EXACTLY so the
+  // Safari address bar appears to "merge" with the page (visually seamless).
+  // We set both the plain meta AND a media-query-scoped version so Safari
+  // picks up the correct value regardless of which path it evaluates.
+  forceMetaTag("theme-color", bg);               // plain (active theme)
+  forceMetaTag("color-scheme", scheme);           // light/dark chrome signal
+
+  // ── 6. Re-enable transitions + trigger resample ───────────────────────────
+  requestAnimationFrame(() => {
+    root.classList.remove("theme-switching");
+    triggerSafariResample();
+    forceMetaTag("theme-color", bg);
+    forceMetaTag("color-scheme", scheme);
+    injectColorSchemeRule(scheme);
+
+    requestAnimationFrame(() => {
+      triggerSafariResample();
+      forceMetaTag("theme-color", bg);
+      forceMetaTag("color-scheme", scheme);
+    });
+  });
+
+  setTimeout(() => {
+    forceMetaTag("theme-color", bg);
+    forceMetaTag("color-scheme", scheme);
+    injectColorSchemeRule(scheme);
+    triggerSafariResample();
+  }, 100);
+
+  setTimeout(() => {
+    forceMetaTag("theme-color", bg);
+    forceMetaTag("color-scheme", scheme);
+    triggerSafariResample();
+  }, 400);
+}
+
+const ThemeContext = createContext({ theme: "light", setTheme: () => {} });
+
+export function ThemeProvider({ children }) {
+  const [theme, setThemeState] = useState(() => {
+    if (typeof window !== "undefined") return localStorage.getItem("theme") ?? "light";
+    return "light";
+  });
+
   useEffect(() => {
     applyTheme(theme);
-    localStorage.setItem('theme', theme);
+    localStorage.setItem("theme", theme);
   }, [theme]);
-  const setTheme = t => {
-    applyTheme(t); // update DOM immediately (before React re-render)
+
+  const setTheme = (t) => {
+    if (t === theme) return;
+    localStorage.setItem("theme", t);
+    applyTheme(t);
     setThemeState(t);
   };
-  return /*#__PURE__*/_jsx(ThemeContext.Provider, {
-    value: {
-      theme,
-      setTheme
-    },
-    children: children
-  });
+
+  return (
+    <ThemeContext.Provider value={{ theme, setTheme }}>
+      {children}
+    </ThemeContext.Provider>
+  );
 }
+
 export function useTheme() {
   return useContext(ThemeContext);
 }

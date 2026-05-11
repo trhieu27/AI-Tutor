@@ -109,45 +109,35 @@ export default function HelpPage() {
     const q = searchQuery.toLowerCase();
     return (!q || f.question.toLowerCase().includes(q) || f.answer.toLowerCase().includes(q)) && (faqCategory === T.faq.allCategory || f.category === faqCategory);
   });
-  const handleSubmit = useCallback(async () => {
-    const errs = {
-      subject: "",
-      message: ""
-    };
+  const handleSubmit = useCallback(() => {
+    // Validate locally first
+    const errs = { subject: "", message: "" };
     if (!contactForm.subject.trim()) errs.subject = T.contact.errors.subjectRequired;
-    if (!contactForm.message.trim()) errs.message = T.contact.errors.messageRequired;else if (contactForm.message.length < 20) errs.message = T.contact.errors.messageMinLength;
+    if (!contactForm.message.trim()) errs.message = T.contact.errors.messageRequired;
+    else if (contactForm.message.length < 20) errs.message = T.contact.errors.messageMinLength;
     setFormErrors(errs);
     if (errs.subject || errs.message) return;
-    setSubmitting(true);
+
+    // ── Fire-and-forget ──────────────────────────────────────────────────────
+    // Show success immediately — no spinner, no waiting for backend.
+    // The API call runs in the background; backend handles email delivery.
+    const payload = { subject: contactForm.subject, message: contactForm.message };
+
+    setShowToast(true);
+    setContactForm({ subject: "", message: "" });
+    setFormErrors({ subject: "", message: "" });
     setSubmitError(null);
-    try {
-      const res = await authFetch(`${API}/users/support`, {
-        method: "POST",
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          subject: contactForm.subject,
-          message: contactForm.message
-        })
-      });
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
-        throw new Error(data.detail || "Gửi thất bại, vui lòng thử lại");
-      }
-      setShowToast(true);
-      setContactForm({
-        subject: "",
-        message: ""
-      });
-      setFormErrors({
-        subject: "",
-        message: ""
-      });
-    } catch (e) {
-      setSubmitError(e.message);
-    } finally {
-      setSubmitting(false);
-    }
+
+    authFetch(`${API}/users/support`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    }).catch(() => {
+      // Silently ignore — user already saw success toast.
+      // Could add a background retry here if needed.
+    });
   }, [contactForm]);
+
 
   /* ── input shared styles ──────────────────────────────────────────────── */
   const inputCls = "w-full px-4 py-3 rounded-xl bg-[var(--background)] border border-[var(--border-color)] text-[13px] text-[var(--foreground)] placeholder:text-[var(--muted)] focus:outline-none focus:ring-1 focus:ring-[hsl(239_68%_58%/0.30)] transition-all";
@@ -477,30 +467,15 @@ export default function HelpPage() {
                 })]
               }), /*#__PURE__*/_jsx("button", {
                 onClick: handleSubmit,
-                disabled: submitting,
-                className: "w-full flex items-center justify-center gap-2 py-3 rounded-xl bg-[hsl(239_68%_58%)] text-white text-[13px] font-semibold hover:bg-[hsl(239_55%_50%)] active:scale-[0.98] transition-all disabled:opacity-60 disabled:cursor-not-allowed",
-                children: submitting ? /*#__PURE__*/_jsxs(_Fragment, {
-                  children: [/*#__PURE__*/_jsx("div", {
-                    className: "w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"
-                  }), "\u0110ang g\u1EEDi..."]
-                }) : /*#__PURE__*/_jsxs(_Fragment, {
+                disabled: false,
+                className: "w-full flex items-center justify-center gap-2 py-3 rounded-xl bg-[hsl(239_68%_58%)] text-white text-[13px] font-semibold hover:bg-[hsl(239_55%_50%)] active:scale-[0.98] transition-all",
+                children: /*#__PURE__*/_jsxs(_Fragment, {
                   children: [/*#__PURE__*/_jsx("span", {
                     className: "material-symbols-outlined",
-                    style: {
-                      fontSize: 17
-                    },
+                    style: { fontSize: 17 },
                     children: "send"
                   }), T.contact.submitButton]
                 })
-              }), submitError && /*#__PURE__*/_jsxs("p", {
-                className: "text-[12px] text-[hsl(343_72%_48%)] flex items-center gap-1.5 font-semibold",
-                children: [/*#__PURE__*/_jsx("span", {
-                  className: "material-symbols-outlined",
-                  style: {
-                    fontSize: 14
-                  },
-                  children: "error"
-                }), submitError]
               })]
             })]
           })

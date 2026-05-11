@@ -104,7 +104,7 @@ export default function Header({ onMenuClick }) {
     : '?';
 
   return (
-    <header className="h-16 glass border-b border-[var(--border-color)] flex items-center px-4 gap-3 sticky top-0 z-40 transition-colors duration-300">
+    <header className="h-16 glass border-b border-[var(--border-color)] flex items-center px-4 gap-3 sticky top-0 z-40">
 
       {/* Mobile hamburger */}
       <button

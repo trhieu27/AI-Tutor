@@ -1,38 +1,67 @@
 <!doctype html>
-<html lang="vi" style="background:#f8fafc">
+<html lang="vi">
   <head>
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <link rel="shortcut icon" href="/favicon.svg" />
     <link rel="apple-touch-icon" href="/favicon.svg" />
-    <!-- theme-color: controls Safari address-bar tint (iOS legacy + Android Chrome) -->
-    <meta name="theme-color" content="#f8fafc" id="theme-color-meta" />
-    <!-- color-scheme: tells iOS 26 Safari which chrome variant (light/dark) to render.
-         This is the PRIMARY signal for status-bar text color & toolbar pill appearance.
-         Value is patched immediately by the inline script below. -->
-    <meta name="color-scheme" content="light" id="color-scheme-meta" />
+
+    <!--
+      JolyUI technique: two media-scoped theme-color tags so Safari picks up
+      the correct chrome color even before JS runs (SSR / first paint).
+      The blocking script below adds a THIRD plain tag (no media) that overrides
+      both when the user has explicitly selected a theme different from their
+      system preference.
+    -->
+    <meta name="theme-color" content="#f8fafc" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#0a0a0a" media="(prefers-color-scheme: dark)" />
+    <!-- Plain tag (no media) = user-selected theme override — set by script below -->
+    <meta name="theme-color" content="#f8fafc" id="tc" />
+
+    <meta name="color-scheme" content="light dark" id="cs" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <meta name="description" content="AI Tutor - Trợ lý học tập thông minh powered by AI" />
     <title>AI Tutor – Học thông minh hơn với AI</title>
+
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Noto+Serif:wght@400;700&display=swap" rel="stylesheet" />
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" />
+
+    <!--
+      Blocking script — runs synchronously before first paint.
+      Reads localStorage → patches html inline styles + meta tags so Safari iOS
+      reads the correct chrome color from the very first frame.
+    -->
     <script>
-      (function() {
-        // Runs synchronously before first paint — patches both meta tags and html element
-        // so Safari iOS 26 reads the correct chrome color from the very first frame.
+      (function () {
         var stored = localStorage.getItem('theme') || 'light';
-        var isDark = stored !== 'light';
-        var bg     = isDark ? '#0a0a0a' : '#f8fafc';
-        var scheme = isDark ? 'dark' : 'light';
-        document.documentElement.style.backgroundColor   = bg;
-        document.documentElement.style.colorScheme  = scheme;
-        document.documentElement.classList.toggle('dark', isDark);
-        localStorage.setItem('theme', scheme);
-        // Patch both meta tags while DOM is still blocked (guaranteed to exist)
-        document.getElementById('theme-color-meta').content  = bg;
-        document.getElementById('color-scheme-meta').content = scheme;
+        var isDark  = stored === 'dark';
+        var bg      = isDark ? '#0a0a0a' : '#f8fafc';
+        var scheme  = isDark ? 'dark'    : 'light';
+
+        var root = document.documentElement;
+        root.classList.toggle('dark', isDark);
+        root.style.backgroundColor = bg;
+        root.style.colorScheme     = scheme;
+
+        // Safari samples BODY background for toolbar color — set it inline
+        // here (before first paint) so it matches html background exactly.
+        // body element exists at this point because <script> is in <head> and
+        // <body> tag comes after, so we use document.body safely after DOMContentLoaded?
+        // Actually body doesn't exist yet here — handled by ThemeProvider on mount.
+        // But we add a style block to set body bg before CSS loads:
+        var s = document.createElement('style');
+        s.textContent = 'body{background-color:' + bg + '!important}';
+        document.head.appendChild(s);
+        // Remove the injected rule once CSS loads (ThemeProvider will take over)
+        window.addEventListener('DOMContentLoaded', function() { if(s.parentNode) s.parentNode.removeChild(s); }, {once:true});
+
+        // Plain (no-media) tag overrides the media-query tags when user has
+        // explicitly selected a theme.
+        document.getElementById('tc').content = bg;
+        // color-scheme meta: tell Safari light/dark chrome style
+        document.getElementById('cs').content = scheme;
       })();
     </script>
   </head>
