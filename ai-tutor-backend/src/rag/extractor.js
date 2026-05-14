@@ -22,13 +22,16 @@ async function extractPdfText(buffer) {
   const numPages = pdfDoc.numPages;
 
   let fullText = '';
+  const pages = [];
   for (let i = 1; i <= numPages; i++) {
     const page = await pdfDoc.getPage(i);
     const content = await page.getTextContent();
-    fullText += content.items.map(item => item.str || '').join(' ') + '\n';
+    const text = content.items.map(item => item.str || '').join(' ');
+    pages.push({ page_number: i, text });
+    fullText += text + '\n';
   }
 
-  return { text: fullText, pageCount: numPages };
+  return { text: fullText, pageCount: numPages, pages };
 }
 
 /**
@@ -47,7 +50,11 @@ async function extractText(filePath) {
     const result = await mammoth.extractRawText({ buffer });
     const text = result.value || '';
     const pageCount = Math.max(1, Math.ceil(text.length / 3000));
-    return { text, pageCount };
+    const pages = Array.from({ length: pageCount }, (_, index) => ({
+      page_number: index + 1,
+      text: text.slice(index * 3000, (index + 1) * 3000),
+    }));
+    return { text, pageCount, pages };
   }
 
   throw new Error(`Định dạng file không hỗ trợ: ${ext}`);

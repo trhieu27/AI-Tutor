@@ -9,6 +9,7 @@ const rag = require('../rag/pipeline');
 
 const INJECTION_PATTERN = /ignore (all |previous |above )?instructions?|forget (everything|all|your instructions?)|(reveal|output|print|show|display) (the |your )?(system |original )?prompt|you are now|act as (a |an )?(different|new)|jailbreak|DAN mode/i;
 const CTRL_CHAR_PATTERN = /[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]/g;
+const QUIZ_CACHE_VERSION = 2;
 
 function sanitizeQuestion(text) {
   const cleaned = text.replace(CTRL_CHAR_PATTERN, '').trim();
@@ -56,9 +57,60 @@ function normalizeQuiz(raw) {
   }).filter(Boolean);
 }
 
+function normalizeStudyQuestions(value) {
+  const numberedPrefix = /^\s*(?:[-*]\s*)?\*{0,2}\d{1,2}\s*[\).\-\:]\s*\*{0,2}\s*/;
+  const lines = Array.isArray(value) ? value : String(value || '').split('\n');
+
+  return lines
+    .map(line => String(line || '').trim())
+    .filter(line => numberedPrefix.test(line))
+    .map(line => line.replace(numberedPrefix, '').trim())
+    .filter(line => line.length > 5);
+}
+
+function cleanStoredStudyQuestions(lines) {
+  const introPattern = /^(chào|dưới đây|sau đây|đây là|tất nhiên|mình sẽ|lưu ý|kết luận|hy vọng)/i;
+  return lines
+    .map(line => String(line || '').trim())
+    .filter(line => line.length > 5)
+    .filter(line => !introPattern.test(line))
+    .filter(line => line.includes('?') || line.length < 180);
+}
+
+function formatStudyQuestions(questions) {
+  return questions.map((question, index) => `${index + 1}. ${question}`).join('\n');
+}
+
+function readQuizCache(cache) {
+  if (!cache) return { version: 0, items: [] };
+  if (Array.isArray(cache)) return { version: 1, items: normalizeQuiz(cache) };
+  if (Array.isArray(cache.items)) {
+    return {
+      version: Number(cache.version) || 0,
+      items: normalizeQuiz(cache.items),
+    };
+  }
+  return { version: 0, items: [] };
+}
+
 
 // POST /api/v1/chat/:documentId/ask
 router.post('/:documentId/ask', authMiddleware, requireChatQuota(), async (req, res) => {
+  let clientClosed = false;
+  const requestController = new AbortController();
+  const abortGeminiRequest = () => {
+    if (!requestController.signal.aborted) requestController.abort();
+  };
+  const markClientClosed = () => {
+    clientClosed = true;
+    abortGeminiRequest();
+  };
+  req.on('aborted', markClientClosed);
+  res.on('close', () => {
+    if (!res.writableEnded) markClientClosed();
+  });
+  const isClientClosed = () => clientClosed || req.aborted || (res.destroyed && !res.writableEnded);
+
   try {
     const { documentId } = req.params;
     const { question, session_id } = req.body;
@@ -68,22 +120,16 @@ router.post('/:documentId/ask', authMiddleware, requireChatQuota(), async (req, 
       return res.status(404).json({ detail: 'Tài liệu không tồn tại hoặc chưa được xử lý' });
     }
 
-    // Get or create session
-    let sessionId = session_id;
+    // Get existing session or prepare a new one. New sessions are created only
+    // after the answer is ready so cancelled requests do not leave empty history.
+    const requestedSessionId = session_id;
+    const sessionId = requestedSessionId || uuidv4();
     let sessionData;
-    if (!sessionId) {
-      sessionId = uuidv4();
-      const newSession = await ChatSession.create({
-        id: sessionId,
-        user_id: req.userId,
-        document_id: documentId,
-        title: (question || '').slice(0, 50) + '...',
-        messages: [],
-      });
-      sessionData = newSession.toObject();
-    } else {
-      sessionData = await ChatSession.findOne({ id: sessionId }).lean();
+    if (requestedSessionId) {
+      sessionData = await ChatSession.findOne({ id: sessionId, user_id: req.userId, document_id: documentId }).lean();
       if (!sessionData) return res.status(404).json({ detail: 'Phiên chat không tồn tại' });
+    } else {
+      sessionData = { messages: [] };
     }
 
     // Build context window by tier
@@ -119,21 +165,43 @@ router.post('/:documentId/ask', authMiddleware, requireChatQuota(), async (req, 
       });
     }
 
+    if (isClientClosed()) return;
+
     // Call Node.js RAG pipeline
-    const { answer, sources } = await rag.ask(doc.chroma_collection_id, questionText, chatHistory);
+    const { answer, sources } = await rag.ask(doc.chroma_collection_id, questionText, chatHistory, {
+      signal: requestController.signal,
+    });
+
+    if (isClientClosed()) return;
 
     const userMsg = { id: uuidv4(), session_id: sessionId, role: 'user', content: question, sources: [] };
     const aiMsg = { id: uuidv4(), session_id: sessionId, role: 'assistant', content: answer, sources };
 
-    await ChatSession.updateOne(
-      { id: sessionId },
-      { $push: { messages: { $each: [userMsg, aiMsg] } }, $set: { updated_at: new Date() } }
-    );
+    if (requestedSessionId) {
+      await ChatSession.updateOne(
+        { id: sessionId, user_id: req.userId, document_id: documentId },
+        { $push: { messages: { $each: [userMsg, aiMsg] } }, $set: { updated_at: new Date() } }
+      );
+    } else {
+      await ChatSession.create({
+        id: sessionId,
+        user_id: req.userId,
+        document_id: documentId,
+        title: (questionText || '').slice(0, 50) + '...',
+        messages: [userMsg, aiMsg],
+      });
+    }
 
     await recordChatUsage(req.userId);
 
+    if (isClientClosed()) return;
+
     res.json({ session_id: sessionId, message: aiMsg });
   } catch (err) {
+    if (isClientClosed()) return;
+    if (err?.name === 'AbortError' || requestController.signal.aborted) {
+      return res.status(499).json({ detail: 'Yêu cầu đã được hủy.' });
+    }
     const msg = String(err.message);
     if (msg.includes('429') || msg.includes('RESOURCE_EXHAUSTED')) {
       // Use 503 (not 429) so frontend doesn't confuse Gemini rate-limit with app quota
@@ -193,9 +261,11 @@ router.get('/:documentId/quiz', authMiddleware, async (req, res) => {
     if (force) {
       await Document.updateOne({ id: req.params.documentId }, { $unset: { quiz: '' } });
     } else if (doc.quiz) {
-      const normalized = normalizeQuiz(Array.isArray(doc.quiz) ? doc.quiz : []);
-      res.setHeader('Content-Type', 'application/json');
-      return res.send(JSON.stringify(normalized));
+      const cached = readQuizCache(doc.quiz);
+      if (cached.version >= QUIZ_CACHE_VERSION && cached.items.length > 0) {
+        res.setHeader('Content-Type', 'application/json');
+        return res.send(JSON.stringify(cached.items));
+      }
     }
 
     await checkAndRecordAiQuota(req.userId);
@@ -219,7 +289,10 @@ router.get('/:documentId/quiz', authMiddleware, async (req, res) => {
         const parsed = JSON.parse(clean);
         const normalized = normalizeQuiz(Array.isArray(parsed) ? parsed : []);
         if (normalized.length > 0) {
-          await Document.updateOne({ id: req.params.documentId }, { $set: { quiz: normalized } });
+          await Document.updateOne(
+            { id: req.params.documentId },
+            { $set: { quiz: { version: QUIZ_CACHE_VERSION, items: normalized } } }
+          );
         }
       } catch (e) { console.error('Failed to cache quiz:', e.message); }
     }
@@ -321,8 +394,13 @@ router.get('/:documentId/study-questions', authMiddleware, async (req, res) => {
     if (!doc || !doc.chroma_collection_id) return res.status(404).json({ detail: 'Tài liệu chưa sẵn sàng' });
 
     if (doc.study_questions?.length) {
+      const cachedQuestions = normalizeStudyQuestions(doc.study_questions);
+      const questions = cachedQuestions.length ? cachedQuestions : cleanStoredStudyQuestions(doc.study_questions);
       res.setHeader('Content-Type', 'text/plain');
-      return res.send(doc.study_questions.join('\n'));
+      if (questions.length && questions.length !== doc.study_questions.length) {
+        await Document.updateOne({ id: req.params.documentId }, { $set: { study_questions: questions } });
+      }
+      return res.send(formatStudyQuestions(questions.length ? questions : doc.study_questions));
     }
 
     await checkAndRecordAiQuota(req.userId);
@@ -339,7 +417,7 @@ router.get('/:documentId/study-questions', authMiddleware, async (req, res) => {
     res.end();
 
     if (fullText.trim()) {
-      const questions = fullText.split('\n').map(l => l.trim()).filter(l => l.length > 0);
+      const questions = normalizeStudyQuestions(fullText);
       await Document.updateOne({ id: req.params.documentId }, { $set: { study_questions: questions } });
     }
   } catch (err) {
@@ -352,6 +430,47 @@ router.get('/:documentId/study-questions', authMiddleware, async (req, res) => {
       return res.status(503).json({ detail: 'AI đang quá tải. Vui lòng thử lại sau.' });
     }
     res.status(500).json({ detail: 'Không thể tạo câu hỏi ôn tập' });
+  }
+});
+
+// GET /api/v1/chat/sessions/recent
+router.get('/sessions/recent', authMiddleware, async (req, res) => {
+  try {
+    const rawLimit = Number(req.query.limit);
+    const limit = Number.isFinite(rawLimit) ? Math.min(Math.max(rawLimit, 1), 20) : 5;
+
+    const sessions = await ChatSession.find({ user_id: req.userId })
+      .sort({ updated_at: -1 })
+      .limit(limit)
+      .lean();
+
+    const documentIds = [...new Set(sessions.map(s => s.document_id).filter(Boolean))];
+    const documents = await Document.find({
+      id: { $in: documentIds },
+      owner_id: req.userId,
+    }).select('id file_name status page_count uploaded_at').lean();
+    const docsById = new Map(documents.map(doc => [doc.id, doc]));
+
+    const result = sessions.map(s => {
+      const doc = docsById.get(s.document_id);
+      return {
+        id: s.id,
+        user_id: s.user_id,
+        document_id: s.document_id,
+        document_name: doc?.file_name || null,
+        document_status: doc?.status || null,
+        page_count: doc?.page_count || 0,
+        title: s.title,
+        created_at: s.created_at,
+        updated_at: s.updated_at,
+        message_count: (s.messages || []).length,
+      };
+    });
+
+    res.json(result);
+  } catch (err) {
+    console.error('Recent chat sessions error:', err.message);
+    res.status(500).json({ detail: 'Lỗi server' });
   }
 });
 

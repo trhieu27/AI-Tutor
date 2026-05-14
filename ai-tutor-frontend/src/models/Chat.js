@@ -32,16 +32,23 @@ export class ChatMessage {
 }
 
 export class ChatSession {
-  constructor({ id, title, document_id, created_at, updated_at, messages = [] }) {
+  constructor({ id, title, document_id, document_name, document_status, page_count, created_at, updated_at, messages = [], message_count }) {
     this.id         = id;
     this.title      = title;
     this.documentId = document_id;
+    this.documentName = document_name;
+    this.documentStatus = document_status;
+    this.pageCount = page_count;
     this.createdAt  = created_at ? new Date(created_at) : new Date();
     this.updatedAt  = updated_at ? new Date(updated_at) : new Date();
     this.messages   = messages.map(m => ChatMessage.fromJSON(m));
+    this.messageCountValue = message_count;
 
     // snake_case aliases for backward-compat
     this.document_id = document_id;
+    this.document_name = document_name;
+    this.document_status = document_status;
+    this.page_count = page_count;
     this.created_at  = created_at;
     this.updated_at  = updated_at;
   }
@@ -50,5 +57,5 @@ export class ChatSession {
     return new ChatSession(json);
   }
 
-  get messageCount() { return this.messages.length; }
+  get messageCount() { return this.messageCountValue ?? this.messages.length; }
 }

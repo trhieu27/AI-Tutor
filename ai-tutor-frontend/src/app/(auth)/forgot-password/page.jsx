@@ -1,56 +1,56 @@
-import { useNavigate } from 'react-router-dom';
-import { useState, useEffect, useRef } from 'react';
-import AuthBranding from '@/components/AuthBranding';
-import { authService } from '@/services/auth.service';
-import { jsx as _jsx, jsxs as _jsxs } from "react/jsx-runtime";
+import { useNavigate } from "react-router-dom";
+import { useEffect, useRef, useState } from "react";
+import AuthBranding from "@/components/AuthBranding";
+import { authService } from "@/services/auth.service";
+import { Button } from "@/components/ui/Premium";
+import { FORGOT_PASSWORD_FLOW_TEXTS } from "@/constants/texts";
+
+const T = FORGOT_PASSWORD_FLOW_TEXTS;
+
 export default function ForgotPasswordPage() {
-  const [step, setStep] = useState('email');
-  const [email, setEmail] = useState('');
-  const [lastEmailSent, setLastEmailSent] = useState('');
-  const [otpValues, setOtpValues] = useState(['', '', '', '', '', '']);
-  const [newPassword, setNewPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
+  const [step, setStep] = useState("email");
+  const [email, setEmail] = useState("");
+  const [lastEmailSent, setLastEmailSent] = useState("");
+  const [otpValues, setOtpValues] = useState(["", "", "", "", "", ""]);
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
-  const [error, setError] = useState('');
+  const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [resendTimer, setResendTimer] = useState(0);
-
-  // OTP Lockout states
   const [failedOtpAttempts, setFailedOtpAttempts] = useState(0);
   const [otpLockoutTimer, setOtpLockoutTimer] = useState(0);
   const navigate = useNavigate();
   const inputRefs = useRef([]);
 
-  // Load OTP lockout state from localStorage
   useEffect(() => {
-    const checkEmail = step === 'email' ? email : lastEmailSent;
+    const checkEmail = step === "email" ? email : lastEmailSent;
     if (!checkEmail) {
       setOtpLockoutTimer(0);
       return;
     }
     const storedLockout = localStorage.getItem(`otp_lockout_${checkEmail}`);
-    if (storedLockout) {
-      const remaining = Math.ceil((parseInt(storedLockout) - Date.now()) / 1000);
-      if (remaining > 0) {
-        setOtpLockoutTimer(remaining);
-        setFailedOtpAttempts(3);
-      } else {
-        setOtpLockoutTimer(0);
-        localStorage.removeItem(`otp_lockout_${checkEmail}`);
-      }
-    } else {
+    if (!storedLockout) {
       setOtpLockoutTimer(0);
       setFailedOtpAttempts(0);
+      return;
+    }
+    const remaining = Math.ceil((parseInt(storedLockout) - Date.now()) / 1000);
+    if (remaining > 0) {
+      setOtpLockoutTimer(remaining);
+      setFailedOtpAttempts(3);
+    } else {
+      setOtpLockoutTimer(0);
+      localStorage.removeItem(`otp_lockout_${checkEmail}`);
     }
   }, [email, lastEmailSent, step]);
 
-  // General Timers (Resend & OTP Lockout)
   useEffect(() => {
     const timer = setInterval(() => {
-      setResendTimer(prev => prev > 0 ? prev - 1 : 0);
-      setOtpLockoutTimer(prev => {
-        const checkEmail = step === 'email' ? email : lastEmailSent;
+      setResendTimer((prev) => (prev > 0 ? prev - 1 : 0));
+      setOtpLockoutTimer((prev) => {
+        const checkEmail = step === "email" ? email : lastEmailSent;
         if (prev <= 1 && prev > 0) {
           localStorage.removeItem(`otp_lockout_${checkEmail}`);
           setFailedOtpAttempts(0);
@@ -61,53 +61,57 @@ export default function ForgotPasswordPage() {
     }, 1000);
     return () => clearInterval(timer);
   }, [email, lastEmailSent, step]);
+
   const handleOtpChange = (index, value) => {
     if (!/^\d*$/.test(value)) return;
-    const newOtp = [...otpValues];
-    newOtp[index] = value.slice(-1);
-    setOtpValues(newOtp);
-    if (value && index < 5) {
-      inputRefs.current[index + 1]?.focus();
-    }
+    const nextOtp = [...otpValues];
+    nextOtp[index] = value.slice(-1);
+    setOtpValues(nextOtp);
+    if (value && index < 5) inputRefs.current[index + 1]?.focus();
   };
-  const handleKeyDown = (index, e) => {
-    if (e.key === 'Backspace' && !otpValues[index] && index > 0) {
+
+  const handleKeyDown = (index, event) => {
+    if (event.key === "Backspace" && !otpValues[index] && index > 0) {
       inputRefs.current[index - 1]?.focus();
     }
   };
-  const handleSendOtp = async (e = null) => {
-    if (e) e.preventDefault();
+
+  const handleSendOtp = async (event = null) => {
+    event?.preventDefault();
     if (resendTimer > 0 && email === lastEmailSent) {
-      setError(`Vui lòng đợi ${resendTimer} giây trước khi yêu cầu mã mới.`);
+      setError(T.errors.waitBeforeResend(resendTimer));
       return;
     }
-    setError('');
+    setError("");
     setIsLoading(true);
     try {
       await authService.forgotPassword(email);
       setLastEmailSent(email);
-      setOtpValues(['', '', '', '', '', '']); // Xóa sạch mã cũ
-      setStep('otp');
+      setOtpValues(["", "", "", "", "", ""]);
+      setStep("otp");
       setResendTimer(60);
     } catch (err) {
-      setError(err.message || "Email không tồn tại trong hệ thống.");
+      setError(err.message || T.errors.emailNotFound);
     } finally {
       setIsLoading(false);
     }
   };
-  const handleVerifyOtp = async e => {
-    e.preventDefault();
+
+  const handleVerifyOtp = async (event) => {
+    event.preventDefault();
     if (otpLockoutTimer > 0) return;
-    const otpString = otpValues.join('');
+    const otpString = otpValues.join("");
     if (otpString.length < 6) {
-      setError("Vui lòng nhập đủ 6 chữ số mã OTP.");
+      setError(T.errors.otpIncomplete);
       return;
     }
-    setError('');
+    setError("");
     setIsLoading(true);
     try {
       await authService.verifyOtp(lastEmailSent, otpString);
-      setStep('reset');
+      setNewPassword("");
+      setConfirmPassword("");
+      setStep("reset");
       localStorage.removeItem(`otp_lockout_${lastEmailSent}`);
     } catch (err) {
       const newAttempts = failedOtpAttempts + 1;
@@ -117,245 +121,232 @@ export default function ForgotPasswordPage() {
         localStorage.setItem(`otp_lockout_${lastEmailSent}`, lockoutUntil.toString());
         setOtpLockoutTimer(60);
       } else {
-        setError(err.message || `Mã xác nhận sai. Bạn còn ${3 - newAttempts} lần thử.`);
+        setError(err.message || T.errors.otpWrong(3 - newAttempts));
       }
     } finally {
       setIsLoading(false);
     }
   };
-  const handleResetPassword = async e => {
-    e.preventDefault();
-    setError('');
+
+  const handleResetPassword = async (event) => {
+    event.preventDefault();
+    setError("");
+    if (newPassword.length < 8) {
+      setError(T.errors.passwordTooShort);
+      return;
+    }
     if (newPassword !== confirmPassword) {
-      setError("Xác nhận mật khẩu không khớp.");
+      setError(T.errors.passwordMismatch);
       return;
     }
     setIsLoading(true);
     try {
-      await authService.resetPassword(lastEmailSent, otpValues.join(''), newPassword);
-      setStep('success');
+      await authService.resetPassword(lastEmailSent, otpValues.join(""), newPassword);
+      setStep("success");
     } catch (err) {
-      setError(err.message || "Không thể đổi mật khẩu.");
+      setError(err.message || T.errors.resetFailed);
     } finally {
       setIsLoading(false);
     }
   };
+
+  const header = {
+    ...T.header[step],
+    subtitle: step === "otp" ? T.header.otp.subtitle(lastEmailSent) : T.header[step].subtitle,
+  };
+
+  const inputClass = "premium-input h-12 px-4 pr-11";
+
   const renderContent = () => {
-    switch (step) {
-      case 'email':
-        return /*#__PURE__*/_jsxs("form", {
-          onSubmit: handleSendOtp,
-          className: "flex flex-col gap-8 w-full",
-          children: [/*#__PURE__*/_jsxs("div", {
-            className: "relative group",
-            children: [/*#__PURE__*/_jsx("input", {
-              type: "email",
-              value: email,
-              onChange: e => {
-                setEmail(e.target.value);
-                setError(''); // Xóa lỗi khi gõ email mới
-              },
-              placeholder: "Nh\u1EADp \u0111\u1ECBa ch\u1EC9 email c\u1EE7a b\u1EA1n...",
-              className: "w-full bg-[var(--surface)] rounded-2xl py-4.5 pl-6 pr-14 outline-none border border-[var(--border-color)] focus:border-[hsl(239_68%_58%)] focus:bg-[var(--surface-raised)] text-[15px] font-medium transition-all text-[var(--foreground)] shadow-sm",
-              required: true,
-              disabled: isLoading
-            }), /*#__PURE__*/_jsx("span", {
-              className: "material-symbols-outlined absolute right-5 top-1/2 -translate-y-1/2 text-[var(--muted)] group-focus-within:text-[hsl(239_68%_58%)] transition-colors",
-              children: "mail"
-            })]
-          }), /*#__PURE__*/_jsx("button", {
-            type: "submit",
-            disabled: isLoading || resendTimer > 0 && email === lastEmailSent,
-            className: "w-full bg-[hsl(239_68%_58%)] text-white font-semibold rounded-2xl py-4.5 hover:bg-[hsl(239_62%_52%)] transition-all shadow-[0_4px_14px_0_hsl(239_68%_58%/0.30)] active:scale-[0.99] disabled:bg-[var(--surface)] disabled:text-[var(--muted)] disabled:shadow-none text-[16px] border border-transparent",
-            children: isLoading ? "Đang xử lý..." : resendTimer > 0 && email === lastEmailSent ? `Thử lại sau ${resendTimer}s` : "Tiếp tục"
-          })]
-        });
-      case 'otp':
-        return /*#__PURE__*/_jsxs("form", {
-          onSubmit: handleVerifyOtp,
-          className: "flex flex-col gap-10 w-full animate-in fade-in slide-in-from-right-4 duration-500",
-          children: [/*#__PURE__*/_jsx("div", {
-            className: "flex justify-between gap-4",
-            children: otpValues.map((digit, idx) => /*#__PURE__*/_jsx("input", {
-              ref: el => {
-                inputRefs.current[idx] = el;
-              },
-              type: "text",
-              maxLength: 1,
-              value: digit,
-              onChange: e => handleOtpChange(idx, e.target.value),
-              onKeyDown: e => handleKeyDown(idx, e),
-              disabled: isLoading || otpLockoutTimer > 0,
-              className: "w-full h-16 sm:h-18 text-center text-3xl font-bold bg-[var(--surface)] border border-[var(--border-color)] rounded-2xl focus:border-[hsl(239_68%_58%)] focus:bg-[var(--surface-raised)] outline-none transition-all text-[var(--foreground)] shadow-sm disabled:opacity-50",
-              required: true
-            }, idx))
-          }), /*#__PURE__*/_jsxs("div", {
-            className: "space-y-6",
-            children: [/*#__PURE__*/_jsx("button", {
-              type: "submit",
-              disabled: isLoading || otpLockoutTimer > 0,
-              className: "w-full bg-[hsl(239_68%_58%)] text-white font-semibold rounded-2xl py-4.5 hover:bg-[hsl(239_62%_52%)] transition-all shadow-[0_4px_14px_0_hsl(239_68%_58%/0.30)] active:scale-[0.99] disabled:bg-[var(--surface)] disabled:text-[var(--muted)] disabled:shadow-none border border-transparent disabled:border-[var(--border-color)]",
-              children: isLoading ? "Đang kiểm tra..." : otpLockoutTimer > 0 ? "Đang bị khóa" : "Xác thực mã OTP"
-            }), /*#__PURE__*/_jsxs("p", {
-              className: "text-center text-[15px] font-medium text-[var(--muted)]",
-              children: ["B\u1EA1n kh\xF4ng nh\u1EADn \u0111\u01B0\u1EE3c m\xE3? ", resendTimer > 0 ? /*#__PURE__*/_jsxs("span", {
-                className: "text-[var(--muted)] italic",
-                children: ["Th\u1EED l\u1EA1i sau ", resendTimer, "s"]
-              }) : /*#__PURE__*/_jsx("button", {
-                type: "button",
-                onClick: () => handleSendOtp(),
-                className: "text-[hsl(239_68%_58%)] font-bold hover:underline",
-                disabled: otpLockoutTimer > 0,
-                children: "G\u1EEDi l\u1EA1i ngay"
-              })]
-            })]
-          })]
-        });
-      case 'reset':
-        return /*#__PURE__*/_jsxs("form", {
-          onSubmit: handleResetPassword,
-          className: "flex flex-col gap-6 w-full animate-in fade-in zoom-in-95 duration-500",
-          children: [/*#__PURE__*/_jsxs("div", {
-            className: "space-y-6",
-            children: [/*#__PURE__*/_jsxs("div", {
-              className: "relative group",
-              children: [/*#__PURE__*/_jsx("input", {
-                type: showPassword ? "text" : "password",
-                value: newPassword,
-                onChange: e => setNewPassword(e.target.value),
-                placeholder: "M\u1EADt kh\u1EA9u m\u1EDBi (t\u1ED1i thi\u1EC3u 8 k\xFD t\u1EF1)",
-                className: "w-full bg-[var(--surface)] rounded-2xl py-4.5 pl-6 pr-14 outline-none border border-[var(--border-color)] focus:border-[hsl(239_68%_58%)] focus:bg-[var(--surface-raised)] text-[15px] font-medium transition-all text-[var(--foreground)] shadow-sm",
-                required: true
-              }), /*#__PURE__*/_jsx("button", {
-                type: "button",
-                tabIndex: -1,
-                onClick: () => setShowPassword(!showPassword),
-                className: "absolute right-5 top-1/2 -translate-y-1/2 text-[var(--muted)] hover:text-[hsl(239_68%_58%)] transition-colors focus:outline-none",
-                children: /*#__PURE__*/_jsx("span", {
-                  className: "material-symbols-outlined",
-                  children: showPassword ? "visibility_off" : "visibility"
-                })
-              })]
-            }), /*#__PURE__*/_jsxs("div", {
-              className: "relative group",
-              children: [/*#__PURE__*/_jsx("input", {
-                type: showConfirmPassword ? "text" : "password",
-                value: confirmPassword,
-                onChange: e => setConfirmPassword(e.target.value),
-                placeholder: "X\xE1c nh\u1EADn l\u1EA1i m\u1EADt kh\u1EA9u m\u1EDBi",
-                className: "w-full bg-[var(--surface)] rounded-2xl py-4.5 pl-6 pr-14 outline-none border border-[var(--border-color)] focus:border-[hsl(239_68%_58%)] focus:bg-[var(--surface-raised)] text-[15px] font-medium transition-all text-[var(--foreground)] shadow-sm",
-                required: true
-              }), /*#__PURE__*/_jsx("button", {
-                type: "button",
-                tabIndex: -1,
-                onClick: () => setShowConfirmPassword(!showConfirmPassword),
-                className: "absolute right-5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-[#0052ff] transition-colors focus:outline-none",
-                children: /*#__PURE__*/_jsx("span", {
-                  className: "material-symbols-outlined",
-                  children: showConfirmPassword ? "visibility_off" : "visibility"
-                })
-              })]
-            })]
-          }), /*#__PURE__*/_jsx("button", {
-            type: "submit",
-            disabled: isLoading,
-            className: "w-full bg-[hsl(239_68%_58%)] text-white font-semibold rounded-2xl py-4.5 hover:bg-[hsl(239_62%_52%)] transition-all shadow-[0_4px_14px_0_hsl(239_68%_58%/0.30)]",
-            children: "C\u1EADp nh\u1EADt m\u1EADt kh\u1EA9u"
-          })]
-        });
-      case 'success':
-        return /*#__PURE__*/_jsxs("div", {
-          className: "text-center py-8 animate-in fade-in zoom-in-95 duration-700",
-          children: [/*#__PURE__*/_jsx("div", {
-            className: "w-20 h-20 bg-emerald-500/10 text-emerald-500 rounded-full flex items-center justify-center mx-auto mb-8",
-            children: /*#__PURE__*/_jsx("span", {
-              className: "material-symbols-outlined text-4xl",
-              children: "verified"
-            })
-          }), /*#__PURE__*/_jsx("h2", {
-            className: "text-2xl font-bold text-[var(--foreground)] mb-4 tracking-tight",
-            children: "C\u1EADp nh\u1EADt th\xE0nh c\xF4ng"
-          }), /*#__PURE__*/_jsx("p", {
-            className: "text-[var(--muted)] text-[16px] mb-10 leading-relaxed font-medium",
-            children: "M\u1EADt kh\u1EA9u c\u1EE7a b\u1EA1n \u0111\xE3 \u0111\u01B0\u1EE3c thay \u0111\u1ED5i. H\xE3y \u0111\u0103ng nh\u1EADp l\u1EA1i \u0111\u1EC3 ti\u1EBFp t\u1EE5c h\u1ECDc t\u1EADp."
-          }), /*#__PURE__*/_jsx("button", {
-            onClick: () => navigate('/login', {
-              replace: true
-            }),
-            className: "w-full bg-[var(--surface)] text-[var(--foreground)] font-semibold rounded-2xl py-4.5 hover:bg-[var(--surface-raised)] border border-[var(--border-color)] transition-all shadow-lg active:scale-[0.99]",
-            children: "\u0110\u0103ng nh\u1EADp ngay"
-          })]
-        });
+    if (step === "email") {
+      return (
+        <form onSubmit={handleSendOtp} className="space-y-5">
+          <label className="block">
+            <span className="mb-1.5 block text-[12px] font-bold text-[var(--muted)]">{T.emailLabel}</span>
+            <span className="relative block">
+              <input
+                type="email"
+                value={email}
+                onChange={(event) => {
+                  setEmail(event.target.value);
+                  setError("");
+                }}
+                placeholder={T.emailPlaceholder}
+                className={inputClass}
+                required
+                disabled={isLoading}
+              />
+              <span className="material-symbols-outlined pointer-events-none absolute right-3.5 top-1/2 -translate-y-1/2 text-[18px] text-[var(--muted-light)]">
+                mail
+              </span>
+            </span>
+          </label>
+          <Button type="submit" disabled={isLoading || (resendTimer > 0 && email === lastEmailSent)} className="w-full">
+            {isLoading ? T.processing : resendTimer > 0 && email === lastEmailSent ? T.retryAfter(resendTimer) : T.continue}
+          </Button>
+        </form>
+      );
     }
-  };
-  const getHeaderInfo = () => {
-    switch (step) {
-      case 'email':
-        return {
-          title: "Quên mật khẩu?",
-          subtitle: "Hãy nhập email của bạn, chúng tôi sẽ giúp bạn khôi phục quyền truy cập nhanh nhất."
-        };
-      case 'otp':
-        return {
-          title: "Xác thực mã",
-          subtitle: `Một mã bảo mật đã được gửi tới ${lastEmailSent}`
-        };
-      case 'reset':
-        return {
-          title: "Mật khẩu mới",
-          subtitle: "Hãy giữ bí mật mật khẩu này để bảo vệ tài khoản của bạn."
-        };
-      case 'success':
-        return {
-          title: "",
-          subtitle: ""
-        };
-      default:
-        return {
-          title: "",
-          subtitle: ""
-        };
+
+    if (step === "otp") {
+      return (
+        <form onSubmit={handleVerifyOtp} className="space-y-7 premium-reveal">
+          <div className="grid grid-cols-6 gap-3">
+            {otpValues.map((digit, index) => (
+              <input
+                key={index}
+                ref={(el) => {
+                  inputRefs.current[index] = el;
+                }}
+                type="text"
+                inputMode="numeric"
+                maxLength={1}
+                value={digit}
+                onChange={(event) => handleOtpChange(index, event.target.value)}
+                onKeyDown={(event) => handleKeyDown(index, event)}
+                disabled={isLoading || otpLockoutTimer > 0}
+                className="h-12 w-full rounded-lg border border-[var(--border-color)] bg-[var(--surface-raised)] text-center text-[20px] font-bold text-[var(--foreground)] outline-none transition-all focus:border-[var(--muted)] disabled:opacity-50"
+                required
+              />
+            ))}
+          </div>
+          <div className="space-y-4">
+            <Button type="submit" disabled={isLoading || otpLockoutTimer > 0} className="w-full">
+              {isLoading ? T.checking : otpLockoutTimer > 0 ? T.locked : T.verifyOtp}
+            </Button>
+            <p className="text-center text-[13px] font-medium text-[var(--muted)]">
+              {T.noCode}{" "}
+              {resendTimer > 0 ? (
+                <span className="text-[var(--muted-light)]">{T.retryAfter(resendTimer)}</span>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => handleSendOtp()}
+                  className="font-bold text-[var(--brand-primary)] hover:text-[var(--brand-primary-strong)]"
+                  disabled={otpLockoutTimer > 0}
+                >
+                  {T.resendNow}
+                </button>
+              )}
+            </p>
+          </div>
+        </form>
+      );
     }
+
+    if (step === "reset") {
+      return (
+        <form onSubmit={handleResetPassword} className="space-y-5 premium-reveal">
+          {[
+            {
+              value: newPassword,
+              setValue: setNewPassword,
+              show: showPassword,
+              setShow: setShowPassword,
+              placeholder: T.passwordFields[0].placeholder,
+            },
+            {
+              value: confirmPassword,
+              setValue: setConfirmPassword,
+              show: showConfirmPassword,
+              setShow: setShowConfirmPassword,
+              placeholder: T.passwordFields[1].placeholder,
+            },
+          ].map((field) => (
+            <span key={field.placeholder} className="relative block">
+              <input
+                type={field.show ? "text" : "password"}
+                value={field.value}
+                onChange={(event) => field.setValue(event.target.value)}
+                placeholder={field.placeholder}
+                className={inputClass}
+                required
+              />
+              <button
+                type="button"
+                tabIndex={-1}
+                onClick={() => field.setShow(!field.show)}
+                className="absolute right-3.5 top-1/2 -translate-y-1/2 text-[var(--muted-light)] hover:text-[var(--brand-primary)]"
+                aria-label={field.show ? T.hidePassword : T.showPassword}
+              >
+                <span className="material-symbols-outlined text-[18px]">
+                  {field.show ? "visibility_off" : "visibility"}
+                </span>
+              </button>
+            </span>
+          ))}
+          <Button type="submit" disabled={isLoading} className="w-full">
+            {isLoading ? T.updating : T.updatePassword}
+          </Button>
+        </form>
+      );
+    }
+
+    return (
+      <div className="premium-reveal py-5 text-center">
+        <h2 className="text-[24px] font-bold text-[var(--foreground)]">{T.successTitle}</h2>
+        <p className="mt-3 text-[14px] font-medium leading-6 text-[var(--muted)]">
+          {T.successSubtitle}
+        </p>
+        <Button onClick={() => navigate("/login", { replace: true })} className="mt-7 w-full">
+          {T.loginNow}
+        </Button>
+      </div>
+    );
   };
-  const header = getHeaderInfo();
-  return /*#__PURE__*/_jsxs("div", {
-    className: "h-[100dvh] overflow-hidden flex w-full font-sans bg-[var(--background)] text-[var(--foreground)]",
-    children: [/*#__PURE__*/_jsx(AuthBranding, {}), /*#__PURE__*/_jsxs("div", {
-      className: "w-full lg:w-1/2 flex flex-col justify-center items-center py-12 px-6 sm:px-12 relative overflow-y-auto h-full",
-      children: [step !== 'success' && /*#__PURE__*/_jsxs("button", {
-        type: "button",
-        onClick: () => step === 'email' ? navigate('/login', {
-          replace: true
-        }) : setStep('email'),
-        className: "absolute top-10 left-8 sm:left-12 flex items-center gap-2 text-[var(--muted)] hover:text-[hsl(239_68%_58%)] transition-all font-semibold text-sm group",
-        children: [/*#__PURE__*/_jsx("span", {
-          className: "material-symbols-outlined text-[20px] group-hover:-translate-x-1 transition-transform",
-          children: "arrow_back"
-        }), /*#__PURE__*/_jsx("span", {
-          children: step === 'email' ? 'Quay lại' : 'Trở lại'
-        })]
-      }), /*#__PURE__*/_jsxs("div", {
-        className: "w-full max-w-[420px]",
-        children: [step !== 'success' && /*#__PURE__*/_jsxs("div", {
-          className: "mb-14 text-center lg:text-left",
-          children: [/*#__PURE__*/_jsx("h2", {
-            className: "text-3xl font-bold text-[var(--foreground)] mb-4 tracking-tight leading-tight",
-            children: header.title
-          }), /*#__PURE__*/_jsx("p", {
-            className: "text-[var(--muted)] text-[16px] leading-relaxed font-medium",
-            children: header.subtitle
-          })]
-        }), (error || step === 'otp' && otpLockoutTimer > 0) && /*#__PURE__*/_jsxs("div", {
-          className: `border-2 rounded-2xl p-4 mb-8 flex items-center gap-3 transition-all animate-in slide-in-from-top-2 ${step === 'otp' && otpLockoutTimer > 0 ? 'bg-red-50 border-red-100' : 'bg-rose-50 border-rose-100'}`,
-          children: [/*#__PURE__*/_jsx("span", {
-            className: `material-symbols-outlined text-[20px] ${step === 'otp' && otpLockoutTimer > 0 ? 'text-red-500 animate-pulse' : 'text-rose-500'}`,
-            children: step === 'otp' && otpLockoutTimer > 0 ? 'timer' : 'info'
-          }), /*#__PURE__*/_jsx("p", {
-            className: `text-sm font-semibold ${step === 'otp' && otpLockoutTimer > 0 ? 'text-red-600' : 'text-rose-600'}`,
-            children: step === 'otp' && otpLockoutTimer > 0 ? `Thử quá nhiều lần. Vui lòng thử lại sau ${otpLockoutTimer} giây.` : error
-          })]
-        }), renderContent()]
-      })]
-    })]
-  });
+
+  return (
+    <div className="flex h-[100dvh] w-full overflow-hidden bg-[var(--background)] font-sans text-[var(--foreground)]">
+      <AuthBranding />
+
+      <div className="relative flex h-full w-full items-center justify-center overflow-y-auto px-5 py-10 lg:w-1/2">
+        <div
+          className="pointer-events-none absolute inset-0 opacity-60"
+          style={{
+            backgroundImage:
+              "linear-gradient(to right, hsl(204 18% 70% / 0.10) 1px, transparent 1px), linear-gradient(to bottom, hsl(204 18% 70% / 0.10) 1px, transparent 1px)",
+            backgroundSize: "36px 36px",
+          }}
+        />
+
+        {step !== "success" && (
+          <button
+            type="button"
+            onClick={() => (step === "email" ? navigate("/login", { replace: true }) : setStep("email"))}
+            className="absolute left-5 top-5 z-20 inline-flex items-center gap-2 rounded-lg px-3 py-2 text-[13px] font-bold text-[var(--muted)] transition-all hover:bg-[var(--surface)] hover:text-[var(--foreground)] sm:left-8 sm:top-8"
+          >
+            <span className="material-symbols-outlined text-[18px]">arrow_back</span>
+            {step === "email" ? T.back : T.return}
+          </button>
+        )}
+
+        <div className="premium-card relative z-10 w-full max-w-[430px] p-5 sm:p-6">
+          {step !== "success" && (
+            <div className="mb-7">
+              <p className="mb-3 font-mono text-[11px] font-semibold text-[var(--muted)]">{header.tag}</p>
+              <h2 className="text-[30px] font-bold leading-[1.05] text-[var(--foreground)]">
+                {header.title}
+              </h2>
+              <p className="mt-3 text-[14px] font-medium leading-6 text-[var(--muted)]">{header.subtitle}</p>
+            </div>
+          )}
+
+          {(error || (step === "otp" && otpLockoutTimer > 0)) && (
+            <div className="mb-5 flex items-center gap-3 rounded-lg border border-[hsl(346_78%_53%/0.24)] bg-[hsl(346_78%_53%/0.08)] p-3">
+              <span className="material-symbols-outlined shrink-0 text-[18px] text-[var(--brand-rose)]">
+                {step === "otp" && otpLockoutTimer > 0 ? "timer" : "info"}
+              </span>
+              <p className="text-[13px] font-semibold text-[var(--brand-rose)]">
+                {step === "otp" && otpLockoutTimer > 0
+                  ? T.errors.otpLockout(otpLockoutTimer)
+                  : error}
+              </p>
+            </div>
+          )}
+
+          {renderContent()}
+        </div>
+      </div>
+    </div>
+  );
 }

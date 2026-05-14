@@ -1,114 +1,162 @@
-import { useState, useEffect, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { useAuth } from '@/context/AuthContext';
-import { authFetch } from '@/services/api.service';
-import { PRICING_PAGE_TEXTS as T } from '@/constants/texts';
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { useAuth } from "@/context/AuthContext";
+import { authFetch } from "@/services/api.service";
+import { PRICING_PAGE_TEXTS as T } from "@/constants/texts";
+import { Button, IconButton, PageFrame, SegmentedControl, Skeleton, cx } from "@/components/ui/Premium";
 
-const API = import.meta.env.VITE_API_URL || 'http://localhost:8081/api/v1';
-const fmt = (n) => n === 0 ? '0đ' : new Intl.NumberFormat('vi-VN').format(n) + 'đ';
+const API = import.meta.env.VITE_API_URL || "http://localhost:8081/api/v1";
 
-/* ── Payment Modal ── */
+const fmt = (value) => {
+  const amount = Number(value || 0);
+  return amount === 0 ? T.price.zeroDong : `${new Intl.NumberFormat("vi-VN").format(amount)}${T.price.dongSuffix}`;
+};
+
+function billingLabel(plan) {
+  return plan.billing_cycle === "annual" ? T.payment.annual : T.payment.monthly;
+}
+
+function visibleFeatures(plan) {
+  return (plan.features || []).filter(
+    (feature) => !T.planFallbacks.hiddenFeatureKeywords.some((keyword) => feature.text?.toLowerCase().includes(keyword))
+  );
+}
+
 function PaymentModal({ plan, onClose, onSuccess }) {
   const P = T.payment;
   const [method, setMethod] = useState(null);
   const [loading, setLoading] = useState(false);
-  const [err, setErr] = useState('');
+  const [err, setErr] = useState("");
   const [done, setDone] = useState(false);
   const price = plan.discounted_price_vnd;
 
+  const methods = [
+    {
+      id: "momo",
+      label: P.method.momo,
+      icon: "account_balance_wallet",
+      className: "border-[var(--danger-border)] bg-[var(--danger-soft)] text-[var(--brand-rose)]",
+    },
+    {
+      id: "vnpay",
+      label: P.method.vnpay,
+      icon: "qr_code_2",
+      className: "border-[var(--info-border)] bg-[var(--info-soft)] text-[var(--brand-secondary)]",
+    },
+  ];
+
   const handlePay = async () => {
-    setErr('');
-    if (!method) { setErr(P.errors.selectMethod); return; }
+    setErr("");
+    if (!method) {
+      setErr(P.errors.selectMethod);
+      return;
+    }
+
     setLoading(true);
     try {
       const res = await authFetch(`${API}/plans/subscribe`, {
-        method: 'POST',
+        method: "POST",
         body: JSON.stringify({ plan_id: plan.id, payment_method: method }),
       });
       if (!res.ok) throw new Error((await res.json()).detail);
       setDone(true);
-    } catch (e) { setErr(e.message); }
-    finally { setLoading(false); }
+    } catch (error) {
+      setErr(error.message);
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const METHODS = [
-    { id: 'momo',  label: 'Ví MoMo',   color: '#A50064', icon: 'account_balance_wallet' },
-    { id: 'vnpay', label: 'VNPay QR',  color: '#1a3f6f', icon: 'qr_code_2' },
-  ];
-
   return (
-    <div className="fixed inset-0 z-[70] flex items-center justify-center p-4"
-      style={{ background: 'hsl(228 25% 5% / 0.65)', backdropFilter: 'blur(8px)' }}
-      onClick={(e) => e.target === e.currentTarget && onClose()}>
-      <div className="w-full max-w-md rounded-3xl overflow-hidden shadow-2xl animate-in zoom-in-95 duration-200"
-        style={{ background: 'var(--background)', border: '1px solid var(--border-color)' }}>
+    <div
+      className="fixed inset-0 z-[70] flex items-center justify-center bg-[hsl(222_29%_8%/0.54)] p-4 backdrop-blur-sm"
+      onClick={(event) => event.target === event.currentTarget && onClose()}
+    >
+      <div className="premium-card w-full max-w-2xl overflow-hidden p-0 animate-dialog-enter">
         {done ? (
-          <div className="p-10 flex flex-col items-center gap-4 text-center">
-            <div className="w-20 h-20 rounded-full flex items-center justify-center text-4xl"
-              style={{ background: 'hsl(158 64% 44% / 0.12)' }}>🎉</div>
-            <h2 className="text-[22px] font-bold" style={{ color: 'var(--foreground)' }}>{P.successTitle}</h2>
-            <p className="text-[14px]" style={{ color: 'var(--muted)' }}>{P.successMsg(plan.display_name)}</p>
-            <button onClick={() => { onSuccess(); onClose(); }}
-              className="mt-2 px-8 py-3 rounded-2xl text-white font-bold text-[14px] transition-all hover:opacity-90 active:scale-95"
-              style={{ background: 'linear-gradient(135deg,hsl(239 68% 58%),hsl(263 70% 62%))' }}>
+          <div className="px-6 py-8 text-center sm:px-8">
+            <span className="mx-auto flex h-14 w-14 items-center justify-center rounded-[var(--radius-panel)] border border-[var(--success-border)] bg-[var(--success-soft)] text-[var(--brand-success)]">
+              <span className="material-symbols-outlined text-[30px]" aria-hidden="true">verified</span>
+            </span>
+            <h2 className="mt-5 text-[21px] font-bold text-[var(--foreground)]">{P.successTitle}</h2>
+            <p className="mx-auto mt-2 max-w-sm text-[13px] font-medium leading-6 text-[var(--muted)]">
+              {P.successMsg(plan.display_name)}
+            </p>
+            <Button onClick={() => { onSuccess(); onClose(); }} className="mt-6 w-full sm:w-auto">
               {P.successBtn}
-            </button>
+            </Button>
           </div>
         ) : (
           <>
-            <div className="px-7 pt-6 pb-5 flex items-center justify-between"
-              style={{ borderBottom: '1px solid var(--border-color)' }}>
-              <div>
-                <h2 className="text-[18px] font-bold" style={{ color: 'var(--foreground)' }}>{P.title}</h2>
-                <p className="text-[13px] mt-0.5" style={{ color: 'var(--muted)' }}>{P.subtitle(plan.display_name)}</p>
+            <div className="flex items-start justify-between gap-4 border-b border-[var(--border-subtle)] px-5 py-4">
+              <div className="min-w-0">
+                <h2 className="text-[17px] font-bold text-[var(--foreground)]">{P.title}</h2>
+                <p className="mt-1 text-[13px] font-medium text-[var(--muted)]">{P.subtitle(plan.display_name)}</p>
               </div>
-              <button onClick={onClose} className="w-8 h-8 rounded-full flex items-center justify-center transition-all hover:opacity-70"
-                style={{ background: 'var(--surface)', color: 'var(--muted)' }}>
-                <span className="material-symbols-outlined" style={{ fontSize: 18 }}>close</span>
-              </button>
+              <IconButton icon="close" label={P.close} onClick={onClose} />
             </div>
-            <div className="px-7 py-5 space-y-4">
-              <div className="p-4 rounded-2xl space-y-2" style={{ background: 'var(--surface)' }}>
-                <p className="text-[11px] font-bold uppercase tracking-wider" style={{ color: 'var(--muted)' }}>{P.orderSummary}</p>
-                <div className="flex justify-between text-[13px]">
-                  <span style={{ color: 'var(--foreground)' }}>{P.plan}</span>
-                  <span className="font-semibold" style={{ color: 'var(--foreground)' }}>{plan.display_name}</span>
-                </div>
-                <div className="flex justify-between text-[13px]">
-                  <span style={{ color: 'var(--muted)' }}>{P.billingCycle}</span>
-                  <span style={{ color: 'var(--muted)' }}>{plan.billing_cycle === 'annual' ? P.annual : P.monthly}</span>
-                </div>
-                <div className="flex justify-between text-[15px] font-bold pt-2" style={{ borderTop: '1px solid var(--border-color)' }}>
-                  <span style={{ color: 'var(--foreground)' }}>{P.total}</span>
-                  <span style={{ color: 'hsl(239 68% 58%)' }}>{fmt(price)}</span>
-                </div>
-              </div>
-              <div className="space-y-2">
-                <p className="text-[11px] font-bold uppercase tracking-wider" style={{ color: 'var(--muted)' }}>{P.method.title}</p>
-                {METHODS.map((m) => (
-                  <button key={m.id} onClick={() => setMethod(m.id)}
-                    className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-left transition-all"
-                    style={{ border: `1.5px solid ${method === m.id ? m.color : 'var(--border-color)'}`, background: method === m.id ? `${m.color}15` : 'transparent' }}>
-                    <span className="material-symbols-outlined" style={{ fontSize: 22, color: m.color }}>{m.icon}</span>
-                    <span className="text-[13px] font-semibold" style={{ color: 'var(--foreground)' }}>{m.label}</span>
-                    {method === m.id && <span className="ml-auto material-symbols-outlined text-[16px]" style={{ color: m.color }}>check_circle</span>}
-                  </button>
-                ))}
-              </div>
-              {err && <p className="text-[12px] font-semibold" style={{ color: 'hsl(343 72% 48%)' }}>{err}</p>}
 
-              <div className="flex gap-3 pt-1">
-                <button onClick={onClose} disabled={loading}
-                  className="flex-1 py-3 rounded-2xl text-[13px] font-semibold transition-all hover:opacity-80"
-                  style={{ background: 'var(--surface)', color: 'var(--muted)', border: '1px solid var(--border-color)' }}>
-                  {P.cancelBtn}
-                </button>
-                <button onClick={handlePay} disabled={loading}
-                  className="flex-[2] py-3 rounded-2xl text-white text-[13px] font-bold transition-all hover:opacity-90 active:scale-95 disabled:opacity-50"
-                  style={{ background: 'linear-gradient(135deg,hsl(239 68% 58%),hsl(263 70% 62%))' }}>
-                  {loading ? P.submitting : P.submitBtn}
-                </button>
-              </div>
+            <div className="grid gap-4 p-5 md:grid-cols-[0.95fr_1.05fr]">
+              <section className="rounded-[var(--radius-panel)] border border-[var(--border-subtle)] bg-[var(--surface)] p-4">
+                <p className="text-[11px] font-bold text-[var(--muted)]">{P.orderSummary}</p>
+                <div className="mt-4 space-y-3 text-[13px]">
+                  <div className="flex justify-between gap-4">
+                    <span className="text-[var(--muted)]">{P.plan}</span>
+                    <span className="text-right font-bold text-[var(--foreground)]">{plan.display_name}</span>
+                  </div>
+                  <div className="flex justify-between gap-4">
+                    <span className="text-[var(--muted)]">{P.billingCycle}</span>
+                    <span className="font-semibold text-[var(--foreground)]">{billingLabel(plan)}</span>
+                  </div>
+                  <div className="border-t border-[var(--border-subtle)] pt-3">
+                    <div className="flex items-end justify-between gap-4">
+                      <span className="pb-1 text-[var(--muted)]">{P.total}</span>
+                      <span className="text-[24px] font-[820] leading-none text-[var(--foreground)]">{fmt(price)}</span>
+                    </div>
+                  </div>
+                </div>
+              </section>
+
+              <section>
+                <p className="text-[11px] font-bold text-[var(--muted)]">{P.method.title}</p>
+                <div className="mt-3 grid gap-2">
+                  {methods.map((paymentMethod) => {
+                    const selected = method === paymentMethod.id;
+                    return (
+                      <button
+                        key={paymentMethod.id}
+                        type="button"
+                        onClick={() => setMethod(paymentMethod.id)}
+                        className={cx(
+                          "flex h-12 w-full items-center gap-3 rounded-[var(--radius-control)] border px-3 text-left transition",
+                          selected
+                            ? `${paymentMethod.className} shadow-[var(--premium-shadow-sm)]`
+                            : "border-[var(--border-color)] bg-[var(--card-bg)] text-[var(--foreground)] hover:border-[var(--border-emphasis)] hover:bg-[var(--card-bg-hover)]"
+                        )}
+                      >
+                        <span className="material-symbols-outlined text-[20px]" aria-hidden="true">{paymentMethod.icon}</span>
+                        <span className="min-w-0 flex-1 truncate text-[13px] font-bold">{paymentMethod.label}</span>
+                        {selected && <span className="material-symbols-outlined text-[17px]" aria-hidden="true">check_circle</span>}
+                      </button>
+                    );
+                  })}
+                </div>
+                {err && <p className="mt-3 text-[12px] font-semibold text-[var(--brand-rose)]">{err}</p>}
+                <div className="mt-4 grid grid-cols-[0.8fr_1.2fr] gap-2">
+                  <Button variant="secondary" onClick={onClose} disabled={loading}>{P.cancelBtn}</Button>
+                  <Button onClick={handlePay} disabled={loading}>
+                    {loading ? (
+                      <span className="flex items-center justify-center gap-2">
+                        <span className="h-4 w-4 animate-spin rounded-full border-2 border-current/30 border-t-current" aria-hidden="true" />
+                        {P.submitting}
+                      </span>
+                    ) : (
+                      P.submitBtn
+                    )}
+                  </Button>
+                </div>
+                <p className="mt-3 text-[11px] font-medium leading-5 text-[var(--muted)]">{P.secureNote}</p>
+              </section>
             </div>
           </>
         )}
@@ -117,118 +165,133 @@ function PaymentModal({ plan, onClose, onSuccess }) {
   );
 }
 
-/* ── Plan Card ── */
-function PlanCard({ plan, isActive, onSelect }) {
+function PlanCard({ plan, isActive, featured, onSelect }) {
   const texts = T.plans[plan.name] || {};
-  const isPopular = plan.is_popular;
-  const isFree = plan.price_vnd === 0;
+  const isFree = Number(plan.price_vnd || 0) === 0;
+  const features = visibleFeatures(plan);
+  const price = isFree ? fmt(0) : fmt(plan.discounted_price_vnd);
+  const unit = T.price.vndByCycle(plan.billing_cycle);
 
   return (
-    <div className="relative flex flex-col rounded-3xl overflow-hidden transition-all duration-300 hover:-translate-y-1"
-      style={{
-        border: isPopular ? '2px solid hsl(239 68% 58%)' : '1px solid var(--border-color)',
-        background: isPopular
-          ? 'linear-gradient(160deg, hsl(239 68% 58% / 0.07) 0%, hsl(263 70% 62% / 0.04) 100%)'
-          : 'var(--surface)',
-        boxShadow: isPopular ? '0 12px 40px hsl(239 68% 58% / 0.18)' : '0 2px 12px hsl(228 20% 5% / 0.06)',
-      }}>
-      {isPopular && (
-        <div className="absolute -top-px left-0 right-0 flex justify-center">
-          <span className="px-4 py-1 rounded-b-xl text-[11px] font-bold text-white"
-            style={{ background: 'linear-gradient(90deg, hsl(239 68% 58%), hsl(263 70% 62%))' }}>
-            {texts.popularBadge || 'Phổ biến nhất'}
-          </span>
-        </div>
+    <article
+      className={cx(
+        "premium-card flex min-h-[420px] flex-col p-5",
+        featured && "border-[var(--border-emphasis)] shadow-[var(--premium-shadow-md)]"
       )}
-
-      <div className="p-7 flex flex-col flex-1" style={{ paddingTop: isPopular ? '2.5rem' : '1.75rem' }}>
-        {/* Header */}
-        <div className="mb-5">
-          <h3 className="text-[19px] font-bold mb-1" style={{ color: isPopular ? 'hsl(239 68% 58%)' : 'var(--foreground)' }}>
-            {plan.display_name}
-          </h3>
-        </div>
-
-
-        {/* Price */}
-        <div className="mb-6">
-          {isFree ? (
-            <div className="flex items-baseline gap-1.5">
-              <span className="text-[40px] font-black leading-none" style={{ color: 'var(--foreground)' }}>₫0</span>
-              <span className="text-[12px]" style={{ color: 'var(--muted)' }}>VND /tháng</span>
-            </div>
-          ) : (
-            <>
-              {plan.discount_percent > 0 && (
-                <div className="flex items-center gap-2 mb-1">
-                  <span className="line-through text-[13px]" style={{ color: 'var(--muted)' }}>
-                    {fmt(plan.price_vnd)}
-                  </span>
-                  <span className="px-2 py-0.5 rounded-lg text-[10px] font-bold text-white"
-                    style={{ background: 'hsl(343 85% 58%)' }}>-{plan.discount_percent}%</span>
-                </div>
+    >
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <div className="flex items-center gap-2">
+            <span
+              className={cx(
+                "flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border",
+                featured
+                  ? "border-[var(--success-border)] bg-[var(--success-soft)] text-[var(--brand-primary)]"
+                  : "border-[var(--border-subtle)] bg-[var(--surface)] text-[var(--muted)]"
               )}
-              <div className="flex items-baseline gap-1.5">
-                <span className="text-[40px] font-black leading-none" style={{ color: 'var(--foreground)' }}>
-                  {fmt(plan.discounted_price_vnd)}
-                </span>
-                <span className="text-[12px]" style={{ color: 'var(--muted)' }}>
-                  VND/{plan.billing_cycle === 'annual' ? 'năm' : 'tháng'}
-                </span>
-              </div>
-              {plan.billing_cycle === 'annual' && plan.discount_percent > 0 && (
-                <p className="text-[11px] mt-1" style={{ color: 'hsl(158 64% 44%)' }}>
-                  Tiết kiệm {plan.discount_percent}% so với tháng
-                </p>
-              )}
-            </>
-          )}
+            >
+              <span className="material-symbols-outlined icon-thin text-[17px]" aria-hidden="true">
+                {isFree ? "school" : "workspace_premium"}
+              </span>
+            </span>
+            <h3 className="truncate text-[18px] font-bold text-[var(--foreground)]">{plan.display_name}</h3>
+          </div>
         </div>
+        {featured && (
+          <span className="shrink-0 rounded-[var(--radius-chip)] bg-[var(--foreground)] px-2.5 py-1 text-[10px] font-bold text-[var(--background)]">
+            {plan.billing_cycle === "annual" ? T.toggle.saveBadge : texts.popularBadge || T.planFallbacks.popular}
+          </span>
+        )}
+      </div>
 
-        {/* CTA */}
+      <div className="mt-6">
+        {!isFree && plan.discount_percent > 0 && (
+          <div className="mb-2 flex flex-wrap items-center gap-2 text-[12px] font-semibold">
+            <span className="text-[var(--muted)] line-through">{fmt(plan.price_vnd)}</span>
+            <span className="rounded-[var(--radius-chip)] border border-[var(--danger-border)] bg-[var(--danger-soft)] px-2 py-0.5 text-[10px] font-bold text-[var(--brand-rose)]">
+              -{plan.discount_percent}%
+            </span>
+          </div>
+        )}
+        <div className="flex flex-wrap items-end gap-x-2 gap-y-1">
+          <span className="text-[38px] font-[860] leading-none text-[var(--foreground)]">{price}</span>
+          <span className="pb-1 text-[12px] font-semibold text-[var(--muted)]">{unit}</span>
+        </div>
+      </div>
+
+      <div className="mt-5">
         {isActive ? (
-          <div className="flex items-center justify-center gap-2 py-3 rounded-2xl mb-6"
-            style={{ background: 'hsl(158 64% 44% / 0.10)', border: '1px solid hsl(158 64% 44% / 0.25)' }}>
-            <span className="material-symbols-outlined" style={{ fontSize: 16, color: 'hsl(158 64% 44%)' }}>verified</span>
-            <span className="text-[13px] font-bold" style={{ color: 'hsl(158 64% 44%)' }}>Gói hiện tại của bạn</span>
+          <div className="flex h-11 items-center justify-center gap-2 rounded-[var(--radius-control)] border border-[var(--success-border)] bg-[var(--success-soft)] text-[13px] font-bold text-[var(--brand-success)]">
+            <span className="material-symbols-outlined text-[17px]" aria-hidden="true">verified</span>
+            {texts.ctaActive || T.planFallbacks.currentPlan}
           </div>
         ) : (
-          <button onClick={() => onSelect(plan)}
-            className="w-full py-3 rounded-2xl text-[13px] font-bold transition-all hover:opacity-90 active:scale-[0.98] mb-6"
-            style={isPopular
-              ? { background: 'linear-gradient(135deg,hsl(239 68% 58%),hsl(263 70% 62%))', color: '#fff', boxShadow: '0 4px 20px hsl(239 68% 58% / 0.35)' }
-              : { background: 'var(--background)', color: 'var(--foreground)', border: '1.5px solid var(--border-color)' }}>
-            {isFree ? 'Dùng miễn phí' : texts.cta || 'Đăng ký ngay'}
-          </button>
+          <Button variant={featured ? "primary" : "secondary"} onClick={() => onSelect(plan)} className="w-full">
+            {texts.cta || (isFree ? T.planFallbacks.freeCta : T.planFallbacks.proCta)}
+          </Button>
         )}
-
-        {/* Features — exclude Hỗ trợ, Lịch sử hội thoại, Ưu tiên xử lý */}
-        <ul className="space-y-3 flex-1">
-          {(plan.features || [])
-            .filter(f => !['hỗ trợ', 'lịch sử', 'ưu tiên'].some(kw => f.text?.toLowerCase().includes(kw)))
-            .map((f, i) => (
-            <li key={i} className="flex items-start gap-2.5">
-              <span className="material-symbols-outlined flex-shrink-0 mt-0.5"
-                style={{ fontSize: 16, color: f.included ? 'hsl(158 64% 44%)' : 'var(--muted)' }}>
-                {f.included ? 'check_circle' : 'remove_circle'}
-              </span>
-              <span className="text-[12.5px]" style={{ color: f.included ? 'var(--foreground)' : 'var(--muted)' }}>
-                {f.text}
-                {f.limit && <span className="ml-1 text-[11px]" style={{ color: 'var(--muted)' }}>· {f.limit}</span>}
-              </span>
-            </li>
-          ))}
-        </ul>
       </div>
+
+      <ul className="mt-5 space-y-2.5">
+        {features.map((feature, index) => (
+          <li key={`${feature.text}-${index}`} className="flex items-start gap-2.5">
+            <span
+              className={cx(
+                "material-symbols-outlined mt-0.5 shrink-0 text-[17px]",
+                feature.included ? "text-[var(--brand-success)]" : "text-[var(--muted-light)]"
+              )}
+              aria-hidden="true"
+            >
+              {feature.included ? "check_circle" : "remove_circle"}
+            </span>
+            <span className={cx("text-[12.5px] font-medium leading-5", feature.included ? "text-[var(--foreground)]" : "text-[var(--muted)]")}>
+              {feature.text}
+              {feature.limit && <span className="ml-1 text-[11px] text-[var(--muted)]">· {feature.limit}</span>}
+            </span>
+          </li>
+        ))}
+      </ul>
+    </article>
+  );
+}
+
+function PricingSkeleton() {
+  return (
+    <div className="grid gap-4 lg:grid-cols-2">
+      <Skeleton className="h-[420px]" />
+      <Skeleton className="h-[420px]" />
     </div>
   );
 }
 
-
-/* ── Main Page ── */
+function BillingToggle({ billingAnnual, onChange }) {
+  return (
+    <div className="flex items-center">
+      <SegmentedControl
+        value={billingAnnual ? "annual" : "monthly"}
+        onChange={(value) => onChange(value === "annual")}
+        options={[
+          { id: "monthly", label: T.toggle.monthly, icon: "calendar_month" },
+          {
+            id: "annual",
+            icon: "savings",
+            label: (
+              <span className="inline-flex items-center gap-1.5">
+                <span>{T.toggle.annual}</span>
+                <span className="rounded-[var(--radius-chip)] border border-[var(--success-border)] bg-[var(--success-soft)] px-1.5 py-0.5 text-[9px] font-[820] leading-none text-[var(--brand-success)]">
+                  {T.toggle.saveShort}
+                </span>
+              </span>
+            ),
+          },
+        ]}
+      />
+    </div>
+  );
+}
 
 export default function PricingPage() {
-  const { user, updateUser } = useAuth();
+  const { updateUser } = useAuth();
   const navigate = useNavigate();
   const [plans, setPlans] = useState([]);
   const [myPlan, setMyPlan] = useState(null);
@@ -243,16 +306,23 @@ export default function PricingPage() {
         authFetch(`${API}/plans/my`),
       ]);
       if (plansRes.ok) setPlans(await plansRes.json());
-      if (myRes.ok) { const d = await myRes.json(); setMyPlan(d.plan); }
-    } finally { setLoading(false); }
+      if (myRes.ok) {
+        const data = await myRes.json();
+        setMyPlan(data.plan);
+      }
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => {
+    load();
+  }, [load]);
 
-  const visiblePlans = plans.filter(p => {
-    if (p.name === 'free') return true;
-    return billingAnnual ? p.billing_cycle === 'annual' : p.billing_cycle === 'monthly';
-  });
+  const visiblePlans = useMemo(
+    () => plans.filter((plan) => plan.name === "free" || (billingAnnual ? plan.billing_cycle === "annual" : plan.billing_cycle === "monthly")),
+    [billingAnnual, plans]
+  );
 
   const handleSuccess = () => {
     updateUser({ is_pro: true, isPro: true });
@@ -260,76 +330,56 @@ export default function PricingPage() {
   };
 
   return (
-    <div className="min-h-screen bg-[var(--background)]">
-
-      {/* ── Close button ── */}
-      <button onClick={() => navigate(-1)}
-        className="fixed top-4 right-4 z-10 w-8 h-8 rounded-lg flex items-center justify-center transition-all hover:opacity-70"
-        style={{ border: '1px solid var(--border-color)', background: 'var(--background)', color: 'var(--muted)' }}>
-        <span className="material-symbols-outlined" style={{ fontSize: 18 }}>close</span>
-      </button>
-
-      <div className="max-w-5xl mx-auto px-6 py-14">
-
-        {/* ── Hero ── */}
-        <div className="text-center mb-12">
-          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-bold uppercase tracking-wider mb-4"
-            style={{ background: 'hsl(239 68% 58% / 0.10)', color: 'hsl(239 55% 50%)' }}>
-            <span className="material-symbols-outlined" style={{ fontSize: 14 }}>diamond</span>
-            Bảng giá
-          </span>
-          <h1 className="text-[38px] font-extrabold tracking-[-0.03em] leading-[1.05] mb-3" style={{ color: 'var(--foreground)' }}>
-            Nâng cấp gói của bạn
+    <PageFrame className="min-h-[calc(100svh-72px)] space-y-5 py-6 lg:py-7">
+      <div className="flex items-center justify-between gap-4">
+        <div className="min-w-0">
+          <p className="text-[11px] font-bold text-[var(--muted)]">{T.hero.badge}</p>
+          <h1 className="mt-2 text-[30px] font-semibold leading-tight text-[var(--foreground)] sm:text-[34px]">
+            {T.hero.title}
           </h1>
-
-
-          {/* Billing toggle */}
-          <div className="mt-8 inline-flex items-center gap-1 p-1 rounded-2xl"
-            style={{ background: 'var(--surface)', border: '1px solid var(--border-color)' }}>
-            {[false, true].map((annual) => (
-              <button key={String(annual)} onClick={() => setBillingAnnual(annual)}
-                className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-[13px] font-semibold transition-all"
-                style={billingAnnual === annual
-                  ? { background: 'hsl(239 68% 58%)', color: '#fff', boxShadow: '0 2px 12px hsl(239 68% 58% / 0.35)' }
-                  : { color: 'var(--muted)' }}>
-                {annual ? 'Hàng năm' : 'Hàng tháng'}
-                {annual && (
-                  <span className="px-1.5 py-0.5 rounded-md text-[10px] font-bold"
-                    style={{ background: 'hsl(158 64% 44% / 0.20)', color: 'hsl(158 64% 44%)' }}>
-                    Tiết kiệm 40%
-                  </span>
-                )}
-              </button>
-            ))}
-          </div>
+          <p className="mt-2 max-w-2xl text-[13px] font-medium leading-6 text-[var(--muted)] sm:text-[14px]">
+            {T.hero.subtitle}
+          </p>
         </div>
-
-        {/* ── Plan cards ── */}
-        {loading ? (
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            {[1, 2, 3].map(i => (
-              <div key={i} className="h-[440px] rounded-3xl animate-pulse" style={{ background: 'var(--surface)' }} />
-            ))}
-          </div>
-        ) : visiblePlans.length === 0 ? (
-          <div className="text-center py-20" style={{ color: 'var(--muted)' }}>
-            <span className="material-symbols-outlined text-[48px] mb-4 block">info</span>
-            <p>Không có gói nào khả dụng.</p>
-          </div>
-        ) : (
-          <div className={`grid gap-6 ${visiblePlans.length === 2 ? 'grid-cols-1 md:grid-cols-2 max-w-2xl mx-auto' : 'grid-cols-1 md:grid-cols-3'}`}>
-            {visiblePlans.map(plan => (
-              <PlanCard key={plan.id} plan={plan}
-                isActive={myPlan?.id === plan.id}
-                onSelect={setSelectedPlan} />
-            ))}
-          </div>
-        )}
+        <IconButton icon="close" label={T.payment.close} onClick={() => navigate(-1)} className="shrink-0" />
       </div>
+
+      <div className="premium-card p-4 sm:p-5">
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+          <div>
+            <h2 className="text-[15px] font-bold text-[var(--foreground)]">{T.toggle.title}</h2>
+            <p className="mt-1 text-[12px] font-medium leading-5 text-[var(--muted)]">
+              {billingAnnual ? T.toggle.annualNote : T.toggle.monthlyNote}
+            </p>
+          </div>
+          <BillingToggle billingAnnual={billingAnnual} onChange={setBillingAnnual} />
+        </div>
+      </div>
+
+      {loading ? (
+        <PricingSkeleton />
+      ) : visiblePlans.length === 0 ? (
+        <div className="premium-card p-10 text-center text-[13px] font-medium text-[var(--muted)]">
+          <span className="material-symbols-outlined mb-3 block text-[34px]" aria-hidden="true">info</span>
+          <p>{T.empty.noPlans}</p>
+        </div>
+      ) : (
+        <div className={cx("grid gap-4", visiblePlans.length === 2 ? "mx-auto max-w-5xl lg:grid-cols-2" : "lg:grid-cols-3")}>
+          {visiblePlans.map((plan) => (
+            <PlanCard
+              key={plan.id}
+              plan={plan}
+              featured={plan.price_vnd > 0}
+              isActive={myPlan?.id === plan.id}
+              onSelect={setSelectedPlan}
+            />
+          ))}
+        </div>
+      )}
 
       {selectedPlan && (
         <PaymentModal plan={selectedPlan} onClose={() => setSelectedPlan(null)} onSuccess={handleSuccess} />
       )}
-    </div>
+    </PageFrame>
   );
 }

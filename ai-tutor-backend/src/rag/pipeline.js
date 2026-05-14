@@ -11,6 +11,13 @@ const { chunkText } = require('./chunker');
 const { embedTexts, embedQuery, generateText, generateStream } = require('./gemini');
 const vectorstore = require('./vectorstore');
 
+function throwIfAborted(signal) {
+  if (!signal?.aborted) return;
+  const err = new Error('Request aborted');
+  err.name = 'AbortError';
+  throw err;
+}
+
 // ── Ingest ────────────────────────────────────────────────────────────────────
 
 /**
@@ -20,13 +27,24 @@ const vectorstore = require('./vectorstore');
  * @returns { collection_name: string, page_count: number }
  */
 async function ingest(filePath, documentId) {
-  const { text, pageCount } = await extractText(filePath);
+  const { text, pageCount, pages } = await extractText(filePath);
 
   if (!text || text.trim().length < 10) {
     throw new Error('Không thể đọc nội dung tài liệu. File có thể bị hỏng hoặc chỉ chứa ảnh.');
   }
 
-  const chunks = chunkText(text);
+  const chunkRecords = Array.isArray(pages) && pages.length > 0
+    ? pages.flatMap(page =>
+        chunkText(page.text || '').map(chunk => ({
+          text: chunk,
+          metadata: { page_number: page.page_number, document_id: documentId },
+        }))
+      )
+    : chunkText(text).map(chunk => ({
+        text: chunk,
+        metadata: { document_id: documentId },
+      }));
+  const chunks = chunkRecords.map(record => record.text);
   if (chunks.length === 0) {
     throw new Error('Tài liệu không có nội dung văn bản.');
   }
@@ -35,7 +53,7 @@ async function ingest(filePath, documentId) {
   const ids = chunks.map((_, i) => `${documentId}_chunk_${i}`);
   const collectionName = `doc_${documentId}`.replace(/-/g, '_');
 
-  await vectorstore.addDocuments(collectionName, ids, embeddings, chunks);
+  await vectorstore.addDocuments(collectionName, ids, embeddings, chunks, chunkRecords.map(record => record.metadata));
 
   return { collection_name: collectionName, page_count: pageCount };
 }
@@ -50,10 +68,15 @@ async function ingest(filePath, documentId) {
  * @param {Array<{role:'human'|'ai', content:string}>} chatHistory
  * @returns {{ answer: string, sources: string[] }}
  */
-async function ask(collectionName, question, chatHistory = []) {
+async function ask(collectionName, question, chatHistory = [], options = {}) {
+  const { signal } = options;
+  throwIfAborted(signal);
   // Retrieve relevant context
-  const queryVec = await embedQuery(question);
-  const chunks = await vectorstore.queryCollection(collectionName, queryVec, 6);
+  const queryVec = await embedQuery(question, signal ? { signal } : undefined);
+  throwIfAborted(signal);
+  const sourceChunks = await vectorstore.queryCollectionWithMetadata(collectionName, queryVec, 6);
+  const chunks = sourceChunks.map(source => source.text);
+  throwIfAborted(signal);
 
   const context = chunks.join('\n\n---\n\n');
 
@@ -72,11 +95,17 @@ CÂU HỎI: ${question}
 
 Hãy trả lời dựa trên nội dung tài liệu. Nếu câu hỏi không liên quan đến tài liệu hoặc thông tin không có trong tài liệu, hãy nói rõ điều đó một cách lịch sự.`;
 
-  const answer = await generateText(prompt, { temperature: 0.2 });
+  const answer = await generateText(prompt, { temperature: 0.2, signal });
+  throwIfAborted(signal);
 
   return {
     answer,
-    sources: chunks.slice(0, 3).map(c => c.slice(0, 200) + (c.length > 200 ? '...' : '')),
+    sources: sourceChunks.slice(0, 3).map((source, index) => ({
+      title: `Trích dẫn ${index + 1}`,
+      text: source.text.slice(0, 320) + (source.text.length > 320 ? '...' : ''),
+      page_number: source.metadata?.page_number,
+      document_id: source.metadata?.document_id,
+    })),
   };
 }
 
@@ -113,17 +142,27 @@ ${context}`;
  */
 async function* quiz(collectionName) {
   const chunks = await vectorstore.getAllDocuments(collectionName);
-  const context = chunks.slice(0, 25).join('\n\n');
+  const context = chunks.slice(0, 40).join('\n\n');
+  const chunkCount = chunks.length;
+  const questionRange =
+    chunkCount <= 4 ? '4-6' :
+    chunkCount <= 10 ? '6-10' :
+    chunkCount <= 20 ? '10-15' :
+    chunkCount <= 35 ? '15-22' :
+    '22-30';
 
-  const prompt = `Bạn là chuyên gia tạo đề kiểm tra. Dựa vào nội dung tài liệu học tập bên dưới, hãy tạo 10 câu hỏi trắc nghiệm (4 đáp án) để kiểm tra kiến thức.
+  const prompt = `Bạn là chuyên gia tạo đề kiểm tra. Dựa vào nội dung tài liệu học tập bên dưới, hãy tạo số lượng câu hỏi trắc nghiệm (4 đáp án) phù hợp với độ dài và mật độ kiến thức của tài liệu.
 
 Yêu cầu:
+- Không cố định 10 câu. Với tài liệu này, hãy tạo khoảng ${questionRange} câu nếu nội dung đủ căn cứ
+- Nếu tài liệu ngắn hoặc ít ý chính, tạo ít câu hơn thay vì lặp ý
+- Nếu tài liệu dài và nhiều ý chính, tạo nhiều hơn 10 câu để bao phủ nội dung
 - Câu hỏi đa dạng: kiến thức, hiểu biết, áp dụng
 - Mỗi câu có đúng 1 đáp án đúng
 - Giải thích ngắn gọn tại sao đáp án đó đúng
 - Viết hoàn toàn bằng tiếng Việt
 
-Trả về ĐÚNH định dạng JSON sau, không thêm text nào ngoài JSON:
+Trả về ĐÚNG định dạng JSON sau, không thêm text nào ngoài JSON:
 [
   {
     "question": "Câu hỏi...",
@@ -133,7 +172,7 @@ Trả về ĐÚNH định dạng JSON sau, không thêm text nào ngoài JSON:
   }
 ]
 
-QUY TẮc:
+QUY TẮC:
 - "options" là mảng 4 phần tử (chuỗi)
 - "correct_index" là số nguyên 0-3 (vị trí đáp án đúng trong mảng options)
 
@@ -218,6 +257,7 @@ Yêu cầu:
 - Ngắn gọn, rõ ràng
 - Viết bằng tiếng Việt
 - Mỗi câu hỏi trên một dòng riêng, bắt đầu bằng số thứ tự (1. 2. 3. ...)
+- Chỉ trả về danh sách 10 câu hỏi, không chào hỏi, không mở đầu, không kết luận
 
 NỘI DUNG TÀI LIỆU:
 ${context}`;

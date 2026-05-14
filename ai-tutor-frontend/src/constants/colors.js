@@ -1,12 +1,12 @@
 export const APP_COLORS = {
-  primary: '#3b28cc',
-  primaryContainer: '#ebe8ff',
-  onPrimaryContainer: '#3b28cc',
-  surface: '#f8f9fc',
-  surfaceContainer: '#ffffff',
-  onSurface: '#1a1a24',
-  onSurfaceVariant: '#5f6368',
-  outline: '#e2e2ec',
+  primary: '#217d68',
+  primaryContainer: '#dcefe9',
+  onPrimaryContainer: '#145343',
+  surface: '#f3f6f8',
+  surfaceContainer: '#fbfcfd',
+  onSurface: '#27313f',
+  onSurfaceVariant: '#687384',
+  outline: '#d5dde5',
   // Status Colors
   success: '#2E7D32',
   successBg: '#E8F5E9',
@@ -19,10 +19,8 @@ export const APP_COLORS = {
   // red-500
   pdfBg: '#fef2f2',
   // red-50
-  docIcon: '#3b82f6',
-  // blue-500
-  docBg: '#eff6ff',
-  // blue-50
+  docIcon: '#236fd5',
+  docBg: '#edf4ff',
 
-  bgBrand: '#021533'
+  bgBrand: '#111923'
 };

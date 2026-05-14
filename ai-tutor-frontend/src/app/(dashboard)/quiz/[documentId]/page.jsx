@@ -1,453 +1,348 @@
-import { useState, useEffect, useRef } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useNavigate, useParams } from "react-router-dom";
 import { fetchDocument, fetchDocumentQuiz, fetchDocumentQuizStream, QuotaError } from "@/services/api.service";
-import { QUIZ_PAGE_TEXTS, QUOTA_TEXTS } from "@/constants/texts";
 import ConfirmDialog from "@/components/ConfirmDialog";
-import { jsx as _jsx, jsxs as _jsxs, Fragment as _Fragment } from "react/jsx-runtime";
+import Button from "@/components/ui/Button";
+import LiquidGlassButton from "@/components/ui/LiquidGlassButton";
+import { EmptyState, ErrorState } from "@/components/ui/States";
+import { PageFrame, PageHeader, Surface, cx } from "@/components/ui/Premium";
+import QuizOption from "@/components/quiz/QuizOption";
+import QuizResultPanel from "@/components/quiz/QuizResultPanel";
+import { getDocumentName } from "@/components/documents/documentUtils";
+import { QUIZ_WORKSPACE_TEXTS } from "@/constants/texts";
+
+const T = QUIZ_WORKSPACE_TEXTS;
+
+function parseStreamedQuiz(text) {
+  let jsonStr = text.trim();
+  if (jsonStr.includes("```json")) {
+    jsonStr = jsonStr.split("```json")[1].split("```")[0];
+  } else if (jsonStr.includes("```")) {
+    jsonStr = jsonStr.split("```")[1].split("```")[0];
+  }
+  return JSON.parse(jsonStr.trim());
+}
+
+function QuizLoadingState() {
+  return (
+    <div
+      className="flex min-h-[420px] flex-col items-center justify-center gap-4 px-6 py-14 text-center"
+      role="status"
+      aria-label={T.loading.title}
+      aria-busy="true"
+    >
+      <span className="flex h-14 w-14 items-center justify-center rounded-[var(--radius-panel)] border border-[var(--border-color)] bg-[var(--surface)] text-[var(--brand-primary)] shadow-[var(--premium-shadow-sm)]">
+        <span className="h-7 w-7 animate-spin rounded-full border-[3px] border-[var(--border-subtle)] border-t-[var(--brand-primary)]" aria-hidden="true" />
+      </span>
+      <div className="max-w-md">
+        <h3 className="text-[17px] font-semibold text-[var(--foreground)]">{T.loading.title}</h3>
+        <p className="mt-2 text-[13px] font-medium leading-6 text-[var(--muted)]">{T.loading.subtitle}</p>
+      </div>
+    </div>
+  );
+}
+
 export default function InteractiveQuizPage() {
-  const params = useParams();
+  const { documentId } = useParams();
   const navigate = useNavigate();
-  const documentId = params.documentId;
+  const abortRef = useRef(null);
   const [docData, setDocData] = useState(null);
   const [quiz, setQuiz] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [quotaExceeded, setQuotaExceeded] = useState(false);
-
-  // User performance state
-  const [userAnswers, setUserAnswers] = useState({});
-  const [isSubmitted, setIsSubmitted] = useState(false);
-  const [score, setScore] = useState(0);
-
-  // Confirm dialogs
-  const [showSubmitConfirm, setShowSubmitConfirm] = useState(false);
+  const [answers, setAnswers] = useState({});
+  const [completed, setCompleted] = useState(false);
   const [showRegenConfirm, setShowRegenConfirm] = useState(false);
 
-  // AbortController — hủy stream khi chuyển trang hoặc tạo lại
-  const abortRef = useRef(null);
-  const loadQuiz = async (force = false) => {
-    // Hủy request cũ nếu đang chạy
-    abortRef.current?.abort();
-    const controller = new AbortController();
-    abortRef.current = controller;
+  const score = useMemo(
+    () => quiz.reduce((total, question, index) => total + (answers[index] === question.correct_index ? 1 : 0), 0),
+    [answers, quiz]
+  );
+  const answeredCount = useMemo(
+    () => quiz.reduce((total, _question, index) => total + (answers[index] !== undefined ? 1 : 0), 0),
+    [answers, quiz]
+  );
+  const progress = quiz.length > 0 ? Math.round((answeredCount / quiz.length) * 100) : 0;
+  const allAnswered = quiz.length > 0 && answeredCount === quiz.length;
 
-    // Helper: chỉ apply state nếu request này vẫn là active
-    const isActive = () => abortRef.current === controller;
-    setLoading(true);
-    setError(null);
-    setQuiz([]);
-    setUserAnswers({});
-    setIsSubmitted(false);
-    setScore(0);
-    try {
-      if (!docData) {
+  const loadQuiz = useCallback(
+    async (force = false) => {
+      abortRef.current?.abort();
+      const controller = new AbortController();
+      abortRef.current = controller;
+      const isActive = () => abortRef.current === controller;
+
+      setLoading(true);
+      setError(null);
+      setQuotaExceeded(false);
+      setQuiz([]);
+      setAnswers({});
+      setCompleted(false);
+
+      try {
         const doc = await fetchDocument(documentId);
         if (isActive()) setDocData(doc);
-      }
-      let data = [];
-      if (!force) {
-        data = await fetchDocumentQuiz(documentId, controller.signal);
-      }
-      if (!data || data.length === 0) {
-        let accumulated = "";
-        await fetchDocumentQuizStream(documentId, chunk => {
-          accumulated += chunk;
-        }, force, controller.signal);
-        try {
-          let jsonStr = accumulated.trim();
-          if (jsonStr.includes("```json")) {
-            jsonStr = jsonStr.split("```json")[1].split("```")[0];
-          } else if (jsonStr.includes("```")) {
-            jsonStr = jsonStr.split("```")[1].split("```")[0];
-          }
-          data = JSON.parse(jsonStr.trim());
-        } catch (e) {
-          console.error("Failed to parse streamed quiz", e);
+
+        let data = [];
+        if (!force) data = await fetchDocumentQuiz(documentId, controller.signal);
+
+        if (!Array.isArray(data) || data.length === 0) {
+          let accumulated = "";
+          await fetchDocumentQuizStream(
+            documentId,
+            (chunk) => {
+              accumulated += chunk;
+            },
+            force,
+            controller.signal
+          );
+          data = parseStreamedQuiz(accumulated);
         }
-      }
-      if (!isActive()) return; // request bị huỷ sau khi fetch xong
 
-      if (data && Array.isArray(data) && data.length > 0) {
-        setQuiz(data);
-      } else {
-        setError("Không thể tạo bộ câu hỏi trắc nghiệm cho tài liệu này.");
+        if (!isActive()) return;
+        const valid = Array.isArray(data)
+          ? data.filter((item) => item?.question && Array.isArray(item?.options) && item.options.length > 0)
+          : [];
+
+        if (valid.length > 0) setQuiz(valid);
+        else setError(T.errors.cannotGenerate);
+      } catch (err) {
+        if (err?.name === "AbortError" || !isActive()) return;
+        if (err instanceof QuotaError) {
+          setQuotaExceeded(true);
+          return;
+        }
+        console.error(err);
+        setError(T.errors.loadFailed);
+      } finally {
+        if (isActive()) setLoading(false);
       }
-    } catch (err) {
-      if (err?.name === "AbortError") return; // bị huỷ chủ động — không cập nhật UI
-      if (!isActive()) return;
-      if (err instanceof QuotaError) {
-        setQuotaExceeded(true);
-        return;
-      }
-      console.error(err);
-      setError("Đã xảy ra lỗi khi tải bài kiểm tra.");
-    } finally {
-      // Chỉ tắt loading nếu đây vẫn là request mới nhất
-      if (isActive()) setLoading(false);
-    }
-  };
+    },
+    [documentId]
+  );
+
   useEffect(() => {
-    const init = async () => {
-      const doc = await fetchDocument(documentId);
-      setDocData(doc);
-      await loadQuiz();
-    };
-    init();
+    loadQuiz();
+    return () => abortRef.current?.abort();
+  }, [loadQuiz]);
 
-    // Cleanup: hủy stream khi rời trang (tránh tốn token)
-    return () => {
-      abortRef.current?.abort();
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [documentId]);
-  const handleSelectOption = (qIdx, oIdx) => {
-    if (isSubmitted) return;
-    setUserAnswers(prev => ({
-      ...prev,
-      [qIdx]: oIdx
-    }));
+  const handleSelect = (questionIndex, optionIndex) => {
+    if (completed) return;
+    setAnswers((prev) => ({ ...prev, [questionIndex]: optionIndex }));
   };
+
   const handleSubmit = () => {
-    if (Object.keys(userAnswers).length < quiz.length) {
-      setShowSubmitConfirm(true);
-      return;
-    }
-    doSubmit();
-  };
-  const doSubmit = () => {
-    let correctCount = 0;
-    quiz.forEach((q, idx) => {
-      if (userAnswers[idx] === q.correct_index) correctCount++;
-    });
-    setScore(correctCount);
-    setIsSubmitted(true);
-    window.scrollTo({
-      top: 0,
-      behavior: "smooth"
-    });
+    if (!allAnswered) return;
+    setCompleted(true);
+    window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
-  /* ── Loading state ─────────────────────────────────────── */
+  const handleRetake = () => {
+    setAnswers({});
+    setCompleted(false);
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
   if (loading) {
-    return /*#__PURE__*/_jsx("div", {
-      className: "flex flex-col items-center justify-center min-h-[80vh]",
-      children: /*#__PURE__*/_jsxs("div", {
-        className: "flex flex-col items-center gap-6 bg-[var(--card-bg)] backdrop-blur-xl px-14 py-10 rounded-[28px] border border-[var(--border-color)] shadow-[0_8px_32px_hsl(222_47%_4%/0.08)]",
-        children: [/*#__PURE__*/_jsxs("div", {
-          className: "relative",
-          children: [/*#__PURE__*/_jsx("div", {
-            className: "absolute inset-0 rounded-2xl blur-xl opacity-40",
-            style: {
-              background: "radial-gradient(circle, hsl(38 92% 50%) 0%, hsl(27 96% 54%) 100%)"
-            }
-          }), /*#__PURE__*/_jsx("div", {
-            className: "relative w-14 h-14 rounded-2xl bg-gradient-to-br from-[hsl(38_92%_50%)] to-[hsl(27_80%_45%)] flex items-center justify-center shadow-[0_4px_16px_hsl(38_92%_50%/0.30)]",
-            children: /*#__PURE__*/_jsx("span", {
-              className: "material-symbols-outlined icon-thin text-white text-[26px]",
-              children: "quiz"
-            })
-          })]
-        }), /*#__PURE__*/_jsxs("div", {
-          className: "text-center space-y-1.5",
-          children: [/*#__PURE__*/_jsx("p", {
-            className: "text-[13px] font-bold text-[var(--foreground)]",
-            children: QUIZ_PAGE_TEXTS.status.loading.title
-          }), /*#__PURE__*/_jsx("p", {
-            className: "text-[11px] text-[var(--muted)] font-medium",
-            children: QUIZ_PAGE_TEXTS.status.loading.desc
-          })]
-        }), /*#__PURE__*/_jsx("div", {
-          className: "flex items-center gap-1.5",
-          children: [0, 1, 2].map(i => /*#__PURE__*/_jsx("div", {
-            className: "w-1.5 h-1.5 rounded-full bg-[hsl(38_92%_50%)] animate-jumping-dot",
-            style: {
-              animationDelay: `${i * 0.16}s`
-            }
-          }, i))
-        })]
-      })
-    });
+    return (
+      <PageFrame narrow>
+        <QuizLoadingState />
+      </PageFrame>
+    );
   }
 
-  /* ── Quota exceeded state ───────────────────────────────── */
   if (quotaExceeded) {
-    return /*#__PURE__*/_jsxs("div", {
-      className: "flex flex-col items-center justify-center min-h-[80vh] p-8 text-center",
-      children: [/*#__PURE__*/_jsx("div", {
-        className: "w-20 h-20 bg-gradient-to-br from-amber-400/20 to-orange-400/20 rounded-3xl flex items-center justify-center mb-6 border border-amber-400/20",
-        children: /*#__PURE__*/_jsx("span", {
-          className: "material-symbols-outlined text-[36px] text-amber-500",
-          children: "bolt"
-        })
-      }), /*#__PURE__*/_jsx("h2", {
-        className: "text-xl font-bold text-[var(--foreground)] mb-2",
-        children: QUOTA_TEXTS.exceeded.title
-      }), /*#__PURE__*/_jsx("p", {
-        className: "text-[var(--muted)] text-[13px] mb-1",
-        children: QUOTA_TEXTS.exceeded.ai
-      }), /*#__PURE__*/_jsx("p", {
-        className: "text-[var(--muted-light)] text-[12px] mb-6",
-        children: QUOTA_TEXTS.exceeded.desc
-      }), /*#__PURE__*/_jsxs("div", {
-        className: "flex items-center gap-3",
-        children: [/*#__PURE__*/_jsx("button", {
-          onClick: () => navigate("/settings"),
-          className: "px-6 py-2.5 rounded-xl bg-gradient-to-r from-[hsl(239_68%_58%)] to-[hsl(263_70%_62%)] text-white text-[13px] font-bold hover:opacity-90 transition-all active:scale-95 shadow-[0_4px_16px_hsl(239_68%_58%/0.3)]",
-          children: QUOTA_TEXTS.exceeded.upgradeBtn
-        }), /*#__PURE__*/_jsx("button", {
-          onClick: () => navigate(-1),
-          className: "px-5 py-2.5 rounded-xl bg-[var(--surface)] text-[var(--muted)] text-[13px] font-bold border border-[var(--border-color)] hover:bg-[var(--card-bg)] transition-all active:scale-95",
-          children: QUIZ_PAGE_TEXTS.status.error.back
-        })]
-      })]
-    });
+    return (
+      <PageFrame narrow>
+        <ErrorState
+          icon="bolt"
+          title={T.quota.title}
+          subtitle={T.quota.subtitle}
+          action={<Button to="/pricing" icon="workspace_premium">{T.quota.action}</Button>}
+        />
+      </PageFrame>
+    );
   }
 
-  /* ── Error state ─────────────────────────────────────────── */
   if (error) {
-    return /*#__PURE__*/_jsxs("div", {
-      className: "flex flex-col items-center justify-center min-h-[80vh] p-8 text-center",
-      children: [/*#__PURE__*/_jsx("div", {
-        className: "w-20 h-20 bg-[hsl(343_85%_58%/0.08)] text-[hsl(343_72%_48%)] rounded-3xl flex items-center justify-center mb-6 border border-[hsl(343_85%_58%/0.15)]",
-        children: /*#__PURE__*/_jsx("span", {
-          className: "material-symbols-outlined icon-thin text-[36px]",
-          children: "error"
-        })
-      }), /*#__PURE__*/_jsx("h2", {
-        className: "text-xl font-bold text-[var(--foreground)] mb-2",
-        children: error
-      }), /*#__PURE__*/_jsx("p", {
-        className: "text-[var(--muted)] text-[13px] mb-6",
-        children: QUIZ_PAGE_TEXTS.status.error.retry
-      }), /*#__PURE__*/_jsxs("div", {
-        className: "flex items-center gap-3",
-        children: [/*#__PURE__*/_jsx("button", {
-          onClick: () => loadQuiz(true),
-          className: "px-5 py-2.5 rounded-xl bg-[hsl(239_68%_58%)] text-white text-[13px] font-bold hover:bg-[hsl(239_55%_50%)] transition-all active:scale-95",
-          children: QUIZ_PAGE_TEXTS.status.error.retryBtn
-        }), /*#__PURE__*/_jsx("button", {
-          onClick: () => navigate(-1),
-          className: "px-5 py-2.5 rounded-xl bg-[var(--surface)] text-[var(--muted)] text-[13px] font-bold border border-[var(--border-color)] hover:bg-[var(--card-bg)] transition-all active:scale-95",
-          children: QUIZ_PAGE_TEXTS.status.error.back
-        })]
-      })]
-    });
+    return (
+      <PageFrame narrow>
+        <ErrorState
+          title={error}
+          subtitle={T.errorState.subtitle}
+          action={
+            <div className="flex flex-wrap justify-center gap-2">
+              <Button icon="refresh" onClick={() => loadQuiz(true)}>
+                {T.errorState.regenerate}
+              </Button>
+              <Button variant="secondary" icon="arrow_back" onClick={() => navigate("/practice")}>
+                {T.errorState.back}
+              </Button>
+            </div>
+          }
+        />
+      </PageFrame>
+    );
   }
 
-  /* ── Main quiz ──────────────────────────────────────────── */
-  return /*#__PURE__*/_jsxs(_Fragment, {
-    children: [/*#__PURE__*/_jsxs("div", {
-      className: "min-h-screen bg-[var(--background)] pb-12",
-      children: [/*#__PURE__*/_jsxs("header", {
-        className: "sticky top-16 z-30 bg-[var(--header-bg)] backdrop-blur-xl border-b border-[var(--border-color)] px-4 sm:px-6 h-12 flex items-center justify-between",
-        children: [/*#__PURE__*/_jsxs("div", {
-          className: "flex items-center gap-3",
-          children: [/*#__PURE__*/_jsx("button", {
-            onClick: () => navigate(-1),
-            className: "w-9 h-9 flex items-center justify-center rounded-xl hover:bg-[var(--surface)] text-[var(--muted)] hover:text-[var(--foreground)] transition-all active:scale-90",
-            children: /*#__PURE__*/_jsx("span", {
-              className: "material-symbols-outlined icon-thin text-[20px]",
-              children: "arrow_back"
-            })
-          }), /*#__PURE__*/_jsxs("div", {
-            className: "hidden md:block",
-            children: [/*#__PURE__*/_jsx("h1", {
-              className: "text-[13px] font-bold text-[var(--foreground)] truncate max-w-md leading-none",
-              children: docData?.file_name
-            }), /*#__PURE__*/_jsx("p", {
-              className: "text-[10px] font-bold text-[hsl(239_55%_50%)] mt-0.5",
-              children: QUIZ_PAGE_TEXTS.header.badge
-            })]
-          })]
-        }), /*#__PURE__*/_jsxs("div", {
-          className: "flex items-center gap-2",
-          children: [/*#__PURE__*/_jsxs("button", {
-            onClick: () => setShowRegenConfirm(true),
-            className: "flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-[var(--border-color)] text-[var(--muted)] hover:text-[hsl(343_72%_48%)] hover:border-[hsl(343_85%_58%/0.25)] hover:bg-[hsl(343_85%_58%/0.04)] text-[11px] font-bold transition-all active:scale-95",
-            title: QUIZ_PAGE_TEXTS.actions.regenTooltip,
-            children: [/*#__PURE__*/_jsx("span", {
-              className: "material-symbols-outlined icon-thin text-[14px]",
-              children: "refresh"
-            }), QUIZ_PAGE_TEXTS.actions.regenBtn]
-          }), isSubmitted ? /*#__PURE__*/_jsxs("div", {
-            className: "flex items-center gap-2",
-            children: [/*#__PURE__*/_jsx("div", {
-              className: "px-3 py-1.5 bg-[hsl(239_68%_58%)] text-white rounded-xl text-[11px] font-bold",
-              children: QUIZ_PAGE_TEXTS.header.scoreBadge(score, quiz.length)
-            }), /*#__PURE__*/_jsx("button", {
-              onClick: () => {
-                setIsSubmitted(false);
-                setUserAnswers({});
-                window.scrollTo({
-                  top: 0
-                });
-              },
-              className: "px-3 py-1.5 bg-[var(--surface)] text-[var(--muted)] rounded-xl text-[11px] font-bold hover:bg-[var(--card-bg)] border border-[var(--border-color)] transition-all active:scale-95",
-              children: QUIZ_PAGE_TEXTS.header.retake
-            })]
-          }) : /*#__PURE__*/_jsxs("div", {
-            className: "text-[11px] font-bold text-[var(--muted)] bg-[var(--surface)] px-3 py-1.5 rounded-xl border border-[var(--border-color)]",
-            children: [QUIZ_PAGE_TEXTS.header.completed, " / ", quiz.length]
-          })]
-        })]
-      }), /*#__PURE__*/_jsxs("main", {
-        className: "max-w-3xl mx-auto px-6 pt-8 pb-4 space-y-10",
-        children: [isSubmitted && /*#__PURE__*/_jsxs("div", {
-          className: "bg-[var(--card-bg)] rounded-3xl p-8 border border-[var(--border-color)] shadow-sm flex flex-col md:flex-row items-center gap-8",
-          children: [/*#__PURE__*/_jsxs("div", {
-            className: "relative shrink-0",
-            children: [/*#__PURE__*/_jsxs("svg", {
-              className: "w-24 h-24 transform -rotate-90",
-              children: [/*#__PURE__*/_jsx("circle", {
-                cx: "48",
-                cy: "48",
-                r: "42",
-                stroke: "currentColor",
-                strokeWidth: "6",
-                fill: "transparent",
-                className: "text-[var(--surface)]"
-              }), /*#__PURE__*/_jsx("circle", {
-                cx: "48",
-                cy: "48",
-                r: "42",
-                stroke: "currentColor",
-                strokeWidth: "6",
-                fill: "transparent",
-                strokeDasharray: 263.8,
-                strokeDashoffset: 263.8 - 263.8 * score / quiz.length,
-                strokeLinecap: "round",
-                className: "text-[hsl(239_68%_58%)] transition-all duration-1000"
-              })]
-            }), /*#__PURE__*/_jsx("div", {
-              className: "absolute inset-0 flex flex-col items-center justify-center",
-              children: /*#__PURE__*/_jsxs("span", {
-                className: "text-xl font-bold text-[var(--foreground)]",
-                children: [Math.round(score / quiz.length * 100), "%"]
-              })
-            })]
-          }), /*#__PURE__*/_jsxs("div", {
-            className: "flex-1 space-y-3 text-center md:text-left",
-            children: [/*#__PURE__*/_jsx("h2", {
-              className: "font-display text-2xl text-[hsl(222_47%_10%)] dark:text-white",
-              children: QUIZ_PAGE_TEXTS.results.title
-            }), /*#__PURE__*/_jsx("p", {
-              className: "text-[var(--muted)] text-[14px] font-medium leading-relaxed",
-              children: score === quiz.length ? QUIZ_PAGE_TEXTS.results.perfect : score > quiz.length / 2 ? QUIZ_PAGE_TEXTS.results.good : QUIZ_PAGE_TEXTS.results.keepTrying
-            }), /*#__PURE__*/_jsxs("div", {
-              className: "flex flex-wrap justify-center md:justify-start gap-3 pt-1",
-              children: [/*#__PURE__*/_jsxs("div", {
-                className: "bg-[hsl(158_64%_44%/0.08)] px-3 py-1.5 rounded-xl border border-[hsl(158_64%_44%/0.20)] flex items-center gap-2",
-                children: [/*#__PURE__*/_jsx("span", {
-                  className: "w-2 h-2 rounded-full bg-[hsl(158_64%_44%)]"
-                }), /*#__PURE__*/_jsxs("span", {
-                  className: "font-bold text-[12px] text-[hsl(158_55%_36%)]",
-                  children: [score, " ", QUIZ_PAGE_TEXTS.results.correct]
-                })]
-              }), /*#__PURE__*/_jsxs("div", {
-                className: "bg-[hsl(343_85%_58%/0.08)] px-3 py-1.5 rounded-xl border border-[hsl(343_85%_58%/0.20)] flex items-center gap-2",
-                children: [/*#__PURE__*/_jsx("span", {
-                  className: "w-2 h-2 rounded-full bg-[hsl(343_85%_58%)]"
-                }), /*#__PURE__*/_jsxs("span", {
-                  className: "font-bold text-[12px] text-[hsl(343_72%_48%)]",
-                  children: [quiz.length - score, " ", QUIZ_PAGE_TEXTS.results.incorrect]
-                })]
-              })]
-            })]
-          })]
-        }), /*#__PURE__*/_jsx("div", {
-          className: "space-y-8",
-          children: quiz.filter(item => item?.question && Array.isArray(item?.options)).map((item, qIdx) => /*#__PURE__*/_jsxs("div", {
-            className: "space-y-4",
-            children: [/*#__PURE__*/_jsxs("h3", {
-              className: "text-[15px] font-bold text-[var(--foreground)] leading-snug",
-              children: [/*#__PURE__*/_jsxs("span", {
-                className: "text-[hsl(239_55%_50%)] mr-2",
-                children: [QUIZ_PAGE_TEXTS.question(qIdx + 1)]
-              }), item.question]
-            }), /*#__PURE__*/_jsxs("div", {
-              className: "grid grid-cols-1 gap-2.5 md:pl-10",
-              children: [(Array.isArray(item.options) ? item.options : []).map((opt, oIdx) => {
-                const isSelected = userAnswers[qIdx] === oIdx;
-                const isCorrect = oIdx === item.correct_index;
-                const showResult = isSubmitted;
-                let cardCls = "bg-[var(--card-bg)] border-[var(--border-color)] hover:border-[hsl(239_68%_58%/0.40)] cursor-pointer";
-                if (isSelected && !showResult) cardCls = "bg-[hsl(239_68%_58%/0.05)] border-[hsl(239_68%_58%)] ring-1 ring-[hsl(239_68%_58%/0.10)]";
-                if (showResult) {
-                  if (isCorrect) cardCls = "bg-[hsl(158_64%_44%/0.06)] border-[hsl(158_64%_44%/0.40)] cursor-default";else if (isSelected) cardCls = "bg-[hsl(343_85%_58%/0.06)] border-[hsl(343_85%_58%/0.40)] cursor-default";else cardCls = "bg-[var(--card-bg)] border-[var(--border-subtle)] opacity-50 cursor-default";
-                }
-                return /*#__PURE__*/_jsxs("div", {
-                  onClick: () => handleSelectOption(qIdx, oIdx),
-                  className: `group p-3.5 rounded-xl border transition-all duration-200 flex items-center gap-3.5 ${cardCls}`,
-                  children: [/*#__PURE__*/_jsx("div", {
-                    className: `w-5 h-5 rounded-full border flex items-center justify-center shrink-0 transition-all ${showResult ? isCorrect ? "border-[hsl(158_64%_44%)] bg-[hsl(158_64%_44%)]" : isSelected ? "border-[hsl(343_85%_58%)] bg-[hsl(343_85%_58%)]" : "border-[var(--border-color)]" : isSelected ? "border-[hsl(239_68%_58%)] bg-[hsl(239_68%_58%)]" : "border-[var(--border-color)] group-hover:border-[hsl(239_68%_58%/0.50)]"}`,
-                    children: showResult ? isCorrect ? /*#__PURE__*/_jsx("span", {
-                      className: "material-symbols-outlined text-[12px] text-white",
-                      children: "check"
-                    }) : isSelected ? /*#__PURE__*/_jsx("span", {
-                      className: "material-symbols-outlined text-[12px] text-white",
-                      children: "close"
-                    }) : null : isSelected && /*#__PURE__*/_jsx("div", {
-                      className: "w-1.5 h-1.5 bg-white rounded-full"
-                    })
-                  }), /*#__PURE__*/_jsx("span", {
-                    className: `text-[13px] font-medium leading-relaxed ${showResult ? isCorrect ? "text-[hsl(158_55%_36%)]" : isSelected ? "text-[hsl(343_72%_48%)]" : "text-[var(--muted)]" : isSelected ? "text-[hsl(239_55%_50%)]" : "text-[var(--foreground)]"}`,
-                    children: opt
-                  })]
-                }, oIdx);
-              }), isSubmitted && /*#__PURE__*/_jsxs("div", {
-                className: "mt-4 p-5 bg-[hsl(239_68%_58%/0.05)] rounded-2xl border border-[hsl(239_68%_58%/0.15)]",
-                children: [/*#__PURE__*/_jsxs("div", {
-                  className: "flex items-center gap-2 mb-3",
-                  children: [/*#__PURE__*/_jsx("div", {
-                    className: "w-7 h-7 rounded-lg bg-[hsl(239_68%_58%/0.10)] text-[hsl(239_55%_50%)] flex items-center justify-center",
-                    children: /*#__PURE__*/_jsx("span", {
-                      className: "material-symbols-outlined icon-thin text-[16px]",
-                      children: "lightbulb"
-                    })
-                  }), /*#__PURE__*/_jsx("h4", {
-                    className: "text-[10px] font-bold text-[hsl(239_55%_50%)] uppercase tracking-wider",
-                    children: QUIZ_PAGE_TEXTS.results.expertExplanation
-                  })]
-                }), /*#__PURE__*/_jsx("p", {
-                  className: "text-[var(--foreground)] text-[13px] leading-loose font-medium",
-                  children: item.explanation
-                })]
-              })]
-            })]
-          }, qIdx))
-        }), !isSubmitted && /*#__PURE__*/_jsx("div", {
-          className: "pt-4 text-center",
-          children: /*#__PURE__*/_jsx("button", {
-            onClick: handleSubmit,
-            className: "px-8 py-3 bg-gradient-to-br from-[hsl(239_68%_58%)] to-[hsl(263_70%_62%)] text-white rounded-2xl font-bold text-[13px] shadow-[0_4px_16px_hsl(239_68%_58%/0.25)] hover:scale-105 active:scale-95 transition-all",
-            children: QUIZ_PAGE_TEXTS.actions.submit
-          })
-        })]
-      })]
-    }), /*#__PURE__*/_jsx(ConfirmDialog, {
-      open: showSubmitConfirm,
-      title: QUIZ_PAGE_TEXTS.confirm.submitTitle,
-      message: QUIZ_PAGE_TEXTS.confirm.submitMessage(quiz.length - Object.keys(userAnswers).length),
-      confirmLabel: QUIZ_PAGE_TEXTS.confirm.submitConfirm,
-      cancelLabel: QUIZ_PAGE_TEXTS.confirm.submitCancel,
-      variant: "warning",
-      onConfirm: () => {
-        setShowSubmitConfirm(false);
-        doSubmit();
-      },
-      onCancel: () => setShowSubmitConfirm(false)
-    }), /*#__PURE__*/_jsx(ConfirmDialog, {
-      open: showRegenConfirm,
-      title: QUIZ_PAGE_TEXTS.confirm.regenTitle,
-      message: QUIZ_PAGE_TEXTS.confirm.regenMessage,
-      confirmLabel: QUIZ_PAGE_TEXTS.confirm.regenConfirm,
-      cancelLabel: QUIZ_PAGE_TEXTS.confirm.regenCancel,
-      variant: "info",
-      onConfirm: () => {
-        setShowRegenConfirm(false);
-        loadQuiz(true);
-      },
-      onCancel: () => setShowRegenConfirm(false)
-    })]
-  });
+  if (quiz.length === 0) {
+    return (
+      <PageFrame narrow>
+        <EmptyState
+          icon="quiz"
+          title={T.empty.title}
+          subtitle={T.empty.subtitle}
+          action={<Button to="/practice" icon="arrow_back">{T.empty.action}</Button>}
+        />
+      </PageFrame>
+    );
+  }
+
+  return (
+    <>
+      <PageFrame className="space-y-6" narrow>
+        <PageHeader
+          icon="quiz"
+          title={T.header.title}
+          subtitle={docData ? getDocumentName(docData) : T.header.fallbackDocument}
+          actions={
+            <>
+              <Button variant="secondary" icon="forum" to={`/chat/${documentId}`}>
+                {T.header.chat}
+              </Button>
+              <Button variant="outline" icon="refresh" onClick={() => setShowRegenConfirm(true)}>
+                {T.header.regenerate}
+              </Button>
+            </>
+          }
+        />
+
+        {completed ? (
+          <>
+            <QuizResultPanel
+              score={score}
+              total={quiz.length}
+              onRetake={handleRetake}
+            />
+            <Surface className="p-4 sm:p-5">
+              <h2 className="text-[15px] font-semibold text-[var(--foreground)]">{T.review.title}</h2>
+              <div className="mt-4 space-y-3">
+                {quiz.map((question, index) => {
+                  const correct = answers[index] === question.correct_index;
+                  const userAnswer = question.options?.[answers[index]] || T.review.notSelected;
+                  const correctAnswer = question.options?.[question.correct_index] || T.review.notSelected;
+                  return (
+                    <article key={index} className="rounded-[var(--radius-panel)] border border-[var(--border-subtle)] bg-[var(--surface)] p-4">
+                      <div className="flex items-start gap-3">
+                        <span className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-white ${correct ? "bg-[var(--brand-success)]" : "bg-[var(--brand-rose)]"}`}>
+                          <span className="material-symbols-outlined text-[15px]">{correct ? "check" : "close"}</span>
+                        </span>
+                        <div className="min-w-0 flex-1">
+                          <h3 className="text-[13px] font-semibold leading-6 text-[var(--foreground)]">{question.question}</h3>
+                          <div className="mt-3 grid gap-2 md:grid-cols-2">
+                            <div
+                              className={cx(
+                                "rounded-[var(--radius-panel)] border p-3",
+                                correct
+                                  ? "border-[var(--success-border)] bg-[var(--success-soft)]"
+                                  : "border-[var(--danger-border)] bg-[var(--danger-soft)]"
+                              )}
+                            >
+                              <p className="text-[11px] font-bold text-[var(--muted)]">{T.review.yourAnswer}</p>
+                              <p className="mt-1 text-[12px] font-semibold leading-5 text-[var(--foreground)]">{userAnswer}</p>
+                            </div>
+                            <div className="rounded-[var(--radius-panel)] border border-[var(--success-border)] bg-[var(--success-soft)] p-3">
+                              <p className="text-[11px] font-bold text-[var(--muted)]">{T.review.correctAnswer}</p>
+                              <p className="mt-1 text-[12px] font-semibold leading-5 text-[var(--foreground)]">{correctAnswer}</p>
+                            </div>
+                          </div>
+                          {question.explanation && (
+                            <div className="mt-3 rounded-[var(--radius-panel)] border border-[var(--border-subtle)] bg-[var(--card-bg)] p-3">
+                              <p className="text-[11px] font-bold text-[var(--muted)]">{T.review.explanation}</p>
+                              <p className="mt-1 text-[12px] font-medium leading-6 text-[var(--muted)]">{question.explanation}</p>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </article>
+                  );
+                })}
+              </div>
+            </Surface>
+          </>
+        ) : (
+          <Surface className="overflow-hidden">
+            <div className="border-b border-[var(--border-subtle)] p-4 sm:p-5">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <p className="font-mono text-[10px] font-bold uppercase tracking-normal text-[var(--muted)]">
+                    {T.question.answered(answeredCount, quiz.length)}
+                  </p>
+                  <h2 className="mt-2 text-[20px] font-bold leading-snug text-[var(--foreground)]">{T.question.listTitle}</h2>
+                  <p className="mt-2 text-[13px] font-medium leading-6 text-[var(--muted)]">{T.question.listSubtitle}</p>
+                </div>
+                <span className="w-fit rounded-[var(--radius-chip)] border border-[var(--border-subtle)] bg-[var(--surface)] px-2.5 py-1 font-mono text-[10px] font-bold text-[var(--muted)]">
+                  {T.question.completion(progress)}
+                </span>
+              </div>
+              <div className="mt-4 h-2 overflow-hidden rounded-full bg-[var(--surface)]">
+                <div className="h-full rounded-full bg-[var(--brand-primary)] transition-all duration-300" style={{ width: `${progress}%` }} />
+              </div>
+            </div>
+
+            <div className="space-y-4 p-4 sm:p-5">
+              {quiz.map((question, questionIndex) => (
+                <article key={questionIndex} className="rounded-[var(--radius-panel)] border border-[var(--border-subtle)] bg-[var(--surface)] p-4">
+                  <p className="font-mono text-[10px] font-bold uppercase tracking-normal text-[var(--muted)]">
+                    {T.question.progress(questionIndex + 1, quiz.length)}
+                  </p>
+                  <h3 className="mt-2 text-[15px] font-semibold leading-7 text-[var(--foreground)]">{question.question}</h3>
+                  <div className="mt-4 grid gap-2">
+                    {question.options.map((option, optionIndex) => (
+                      <QuizOption
+                        key={optionIndex}
+                        option={option}
+                        index={optionIndex}
+                        selected={answers[questionIndex] === optionIndex}
+                        correct={optionIndex === question.correct_index}
+                        checked={false}
+                        disabled={false}
+                        onSelect={() => handleSelect(questionIndex, optionIndex)}
+                      />
+                    ))}
+                  </div>
+                </article>
+              ))}
+            </div>
+
+            <div className="flex flex-col gap-3 border-t border-[var(--border-subtle)] p-4 sm:flex-row sm:items-center sm:justify-between sm:p-5">
+              <p className="text-[12px] font-semibold text-[var(--muted)]">
+                {allAnswered ? T.question.answered(answeredCount, quiz.length) : T.question.unansweredHint}
+              </p>
+              <div className="flex flex-wrap justify-end gap-2">
+                <LiquidGlassButton icon="task_alt" onClick={handleSubmit} disabled={!allAnswered}>
+                  {T.question.submit}
+                </LiquidGlassButton>
+              </div>
+            </div>
+          </Surface>
+        )}
+      </PageFrame>
+
+      <ConfirmDialog
+        open={showRegenConfirm}
+        title={T.confirm.title}
+        message={T.confirm.message}
+        confirmLabel={T.confirm.confirm}
+        cancelLabel={T.confirm.cancel}
+        variant="info"
+        onConfirm={() => {
+          setShowRegenConfirm(false);
+          loadQuiz(true);
+        }}
+        onCancel={() => setShowRegenConfirm(false)}
+      />
+    </>
+  );
 }

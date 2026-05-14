@@ -58,13 +58,17 @@ async function getOrCreateCollectionId(name) {
  * Add chunks + embeddings to a collection.
  * ids: string[], embeddings: number[][], documents: string[]
  */
-async function addDocuments(collectionName, ids, embeddings, documents) {
+async function addDocuments(collectionName, ids, embeddings, documents, metadatas) {
   const id = await getOrCreateCollectionId(collectionName);
-  await chromaFetch('POST', `/collections/${id}/add`, {
+  const body = {
     ids,
     embeddings,
     documents,
-  });
+  };
+  if (Array.isArray(metadatas) && metadatas.length === documents.length) {
+    body.metadatas = metadatas;
+  }
+  await chromaFetch('POST', `/collections/${id}/add`, body);
 }
 
 /**
@@ -82,6 +86,30 @@ async function queryCollection(collectionName, queryEmbedding, nResults = 5) {
     return res.documents?.[0] || [];
   } catch (e) {
     console.error('queryCollection error:', e.message);
+    return [];
+  }
+}
+
+/**
+ * Query top-k chunks with stored metadata.
+ * Returns { text, metadata }[].
+ */
+async function queryCollectionWithMetadata(collectionName, queryEmbedding, nResults = 5) {
+  try {
+    const id  = await getOrCreateCollectionId(collectionName);
+    const res = await chromaFetch('POST', `/collections/${id}/query`, {
+      query_embeddings: [queryEmbedding],
+      n_results: nResults,
+      include: ['documents', 'metadatas'],
+    });
+    const documents = res.documents?.[0] || [];
+    const metadatas = res.metadatas?.[0] || [];
+    return documents.map((text, index) => ({
+      text,
+      metadata: metadatas[index] || {},
+    }));
+  } catch (e) {
+    console.error('queryCollectionWithMetadata error:', e.message);
     return [];
   }
 }
@@ -117,4 +145,4 @@ async function deleteCollection(collectionName) {
   }
 }
 
-module.exports = { addDocuments, queryCollection, getAllDocuments, deleteCollection };
+module.exports = { addDocuments, queryCollection, queryCollectionWithMetadata, getAllDocuments, deleteCollection };

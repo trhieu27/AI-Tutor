@@ -95,6 +95,22 @@ export async function fetchDocument(documentId) {
   if (!res.ok) throw new Error('Không tìm thấy tài liệu');
   return Document.fromJSON(await res.json());
 }
+export async function fetchDocumentFileBlob(documentId) {
+  const res = await authFetch(`${API_BASE}/documents/${documentId}/file`);
+  if (!res.ok) throw new Error('Không thể mở file tài liệu');
+  return res.blob();
+}
+export async function locateDocumentCitation(documentId, text) {
+  const res = await authFetch(`${API_BASE}/documents/${documentId}/locate`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({ text })
+  });
+  if (!res.ok) throw new Error('Không thể tìm trang trích dẫn');
+  return res.json();
+}
 export async function deleteDocument(documentId) {
   const res = await authFetch(`${API_BASE}/documents/${documentId}`, {
     method: 'DELETE'
@@ -135,6 +151,12 @@ export async function askQuestion(documentId, request, signal) {
 export async function fetchChatSessions(documentId) {
   const res = await authFetch(`${API_BASE}/chat/${documentId}/sessions`);
   if (!res.ok) throw new Error('Không thể tải lịch sử chat');
+  const data = await res.json();
+  return data.map(s => ChatSession.fromJSON(s));
+}
+export async function fetchRecentChatSessions(limit = 5) {
+  const res = await authFetch(`${API_BASE}/chat/sessions/recent?limit=${encodeURIComponent(limit)}`);
+  if (!res.ok) throw new Error('Không thể tải lịch sử chat gần đây');
   const data = await res.json();
   return data.map(s => ChatSession.fromJSON(s));
 }

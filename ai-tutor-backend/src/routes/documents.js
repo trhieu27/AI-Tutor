@@ -10,8 +10,54 @@ const { requireDocQuota } = require('../utils/quota');
 const { sendNotification } = require('../utils/notifications');
 const config = require('../config');
 const rag = require('../rag/pipeline');
+const { extractText } = require('../rag/extractor');
 
 const ALLOWED_EXTENSIONS = new Set(['.pdf', '.doc', '.docx']);
+
+function findStoredFile(documentId) {
+  for (const ext of ['.pdf', '.docx', '.doc']) {
+    const filePath = path.join(config.uploadDir, `${documentId}${ext}`);
+    if (fs.existsSync(filePath)) return { filePath, ext };
+  }
+  return null;
+}
+
+function normalizeSearchText(text) {
+  return String(text || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[đĐ]/g, 'd')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, ' ')
+    .trim();
+}
+
+function pageMatchScore(pageText, snippetText) {
+  const page = normalizeSearchText(pageText);
+  const words = normalizeSearchText(snippetText).split(/\s+/).filter(Boolean).slice(0, 90);
+  if (!page || words.length < 4) return 0;
+
+  const windowSize = Math.min(10, words.length);
+  const starts = [0, Math.max(0, Math.floor((words.length - windowSize) / 2)), Math.max(0, words.length - windowSize)];
+  let score = 0;
+
+  for (const start of starts) {
+    const phrase = words.slice(start, start + windowSize).join(' ');
+    if (phrase && page.includes(phrase)) score += 10;
+  }
+
+  const uniqueWords = [...new Set(words.filter(word => word.length > 2))];
+  score += uniqueWords.reduce((total, word) => total + (page.includes(word) ? 1 : 0), 0) / Math.max(uniqueWords.length, 1);
+  return score;
+}
+
+function inferPageNumberFromSnippet(snippetText) {
+  const text = String(snippetText || '');
+  const match = text.match(/\bOOAD\s+(\d{1,4})\b/i) || text.match(/\b(?:trang|slide|page)\s+(\d{1,4})\b/i);
+  if (!match) return null;
+  const page = Number(match[1]);
+  return Number.isFinite(page) && page > 0 ? page : null;
+}
 
 // Multer setup
 const storage = multer.diskStorage({
@@ -116,15 +162,11 @@ router.post('/:documentId/retry', authMiddleware, async (req, res) => {
     const doc = await Document.findOne({ id: req.params.documentId, owner_id: req.userId });
     if (!doc) return res.status(404).json({ detail: 'Tài liệu không tồn tại.' });
 
-    let filePath = null;
-    for (const ext of ['.pdf', '.docx', '.doc']) {
-      const p = path.join(config.uploadDir, `${req.params.documentId}${ext}`);
-      if (fs.existsSync(p)) { filePath = p; break; }
-    }
-    if (!filePath) return res.status(400).json({ detail: 'Không tìm thấy file tài liệu trên server.' });
+    const storedFile = findStoredFile(req.params.documentId);
+    if (!storedFile) return res.status(400).json({ detail: 'Không tìm thấy file tài liệu trên server.' });
 
     await Document.updateOne({ id: req.params.documentId }, { $set: { status: 'PROCESSING' } });
-    processDocumentBackground(req.params.documentId, filePath, req.userId).catch(console.error);
+    processDocumentBackground(req.params.documentId, storedFile.filePath, req.userId).catch(console.error);
 
     const updated = await Document.findOne({ id: req.params.documentId }).lean();
     res.json({ ...updated, id: updated.id, status: 'PROCESSING' });
@@ -139,6 +181,64 @@ router.get('/', authMiddleware, async (req, res) => {
     const docs = await Document.find({ owner_id: req.userId }).sort({ uploaded_at: -1 }).limit(100).lean();
     res.json(docs.map(d => ({ ...d, _id: undefined })));
   } catch (err) {
+    res.status(500).json({ detail: 'Lỗi server' });
+  }
+});
+
+// GET /api/v1/documents/:documentId/file
+router.get('/:documentId/file', authMiddleware, async (req, res) => {
+  try {
+    const doc = await Document.findOne({ id: req.params.documentId, owner_id: req.userId }).lean();
+    if (!doc) return res.status(404).json({ detail: 'Tài liệu không tồn tại.' });
+
+    const storedFile = findStoredFile(req.params.documentId);
+    if (!storedFile) return res.status(404).json({ detail: 'Không tìm thấy file tài liệu.' });
+
+    const contentTypes = {
+      '.pdf': 'application/pdf',
+      '.docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      '.doc': 'application/msword',
+    };
+    res.setHeader('Content-Type', contentTypes[storedFile.ext] || 'application/octet-stream');
+    res.setHeader('Content-Disposition', `inline; filename="${encodeURIComponent(doc.file_name)}"`);
+    res.sendFile(path.resolve(storedFile.filePath));
+  } catch (err) {
+    console.error('Document file error:', err);
+    res.status(500).json({ detail: 'Lỗi server' });
+  }
+});
+
+// POST /api/v1/documents/:documentId/locate
+router.post('/:documentId/locate', authMiddleware, async (req, res) => {
+  try {
+    const doc = await Document.findOne({ id: req.params.documentId, owner_id: req.userId }).lean();
+    if (!doc) return res.status(404).json({ detail: 'Tài liệu không tồn tại.' });
+
+    const snippet = String(req.body?.text || '').trim();
+    if (snippet.length < 12) return res.status(400).json({ detail: 'Đoạn trích dẫn quá ngắn.' });
+
+    const storedFile = findStoredFile(req.params.documentId);
+    if (!storedFile) return res.status(404).json({ detail: 'Không tìm thấy file tài liệu.' });
+
+    const { pages = [] } = await extractText(storedFile.filePath);
+    let best = { page_number: null, score: 0 };
+    for (const page of pages) {
+      const score = pageMatchScore(page.text, snippet);
+      if (score > best.score) best = { page_number: page.page_number, score };
+    }
+
+    if (best.page_number && best.score >= 1) {
+      return res.json({ page_number: best.page_number });
+    }
+
+    const hintedPage = inferPageNumberFromSnippet(snippet);
+    if (hintedPage && pages.some(page => Number(page.page_number) === hintedPage)) {
+      return res.json({ page_number: hintedPage });
+    }
+
+    return res.status(404).json({ detail: 'Không tìm thấy trang chứa trích dẫn.' });
+  } catch (err) {
+    console.error('Document locate error:', err);
     res.status(500).json({ detail: 'Lỗi server' });
   }
 });

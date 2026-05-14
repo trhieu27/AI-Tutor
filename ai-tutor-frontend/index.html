@@ -13,10 +13,10 @@
       both when the user has explicitly selected a theme different from their
       system preference.
     -->
-    <meta name="theme-color" content="#f8fafc" media="(prefers-color-scheme: light)" />
-    <meta name="theme-color" content="#0a0a0a" media="(prefers-color-scheme: dark)" />
+    <meta name="theme-color" content="#f3f6f8" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#0f1218" media="(prefers-color-scheme: dark)" />
     <!-- Plain tag (no media) = user-selected theme override — set by script below -->
-    <meta name="theme-color" content="#f8fafc" id="tc" />
+    <meta name="theme-color" content="#f3f6f8" id="tc" />
 
     <meta name="color-scheme" content="light dark" id="cs" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
@@ -37,7 +37,7 @@
       (function () {
         var stored = localStorage.getItem('theme') || 'light';
         var isDark  = stored === 'dark';
-        var bg      = isDark ? '#0a0a0a' : '#f8fafc';
+        var bg      = isDark ? '#0f1218' : '#f3f6f8';
         var scheme  = isDark ? 'dark'    : 'light';
 
         var root = document.documentElement;

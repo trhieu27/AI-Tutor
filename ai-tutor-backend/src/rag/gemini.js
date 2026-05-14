@@ -15,7 +15,7 @@ const CHAT_MODEL = 'gemini-flash-latest'; // Python cũ dùng gemini-flash-lates
  * Returns float32 array[] (one per text).
  * Batches internally to stay within API limits.
  */
-async function embedTexts(texts) {
+async function embedTexts(texts, requestOptions = {}) {
   // gemini-embedding-001 requires apiVersion:'v1beta'
   const model = genAI.getGenerativeModel({ model: EMBED_MODEL }, { apiVersion: 'v1beta' });
   const BATCH = 20; // max per request
@@ -24,7 +24,7 @@ async function embedTexts(texts) {
   for (let i = 0; i < texts.length; i += BATCH) {
     const batch = texts.slice(i, i + BATCH);
     const results = await Promise.all(
-      batch.map(t => model.embedContent(t))
+      batch.map(t => model.embedContent(t, requestOptions))
     );
     results.forEach(r => all.push(r.embedding.values));
   }
@@ -35,8 +35,8 @@ async function embedTexts(texts) {
 /**
  * Embed a single query string.
  */
-async function embedQuery(text) {
-  const [vec] = await embedTexts([text]);
+async function embedQuery(text, requestOptions = {}) {
+  const [vec] = await embedTexts([text], requestOptions);
   return vec;
 }
 
@@ -45,25 +45,25 @@ async function embedQuery(text) {
 /**
  * Generate text (non-streaming).
  */
-async function generateText(prompt, { temperature = 0.3, maxTokens = 8192 } = {}) {
+async function generateText(prompt, { temperature = 0.3, maxTokens = 8192, signal } = {}) {
   const model = genAI.getGenerativeModel({
     model: CHAT_MODEL,
     generationConfig: { temperature, maxOutputTokens: maxTokens },
   });
-  const result = await model.generateContent(prompt);
+  const result = await model.generateContent(prompt, signal ? { signal } : undefined);
   return result.response.text();
 }
 
 /**
  * Async generator that yields text chunks from Gemini streaming.
  */
-async function* generateStream(prompt, { temperature = 0.3, maxTokens = 8192 } = {}) {
+async function* generateStream(prompt, { temperature = 0.3, maxTokens = 8192, signal } = {}) {
   const model = genAI.getGenerativeModel({
     model: CHAT_MODEL,
     generationConfig: { temperature, maxOutputTokens: maxTokens },
   });
   try {
-    const result = await model.generateContentStream(prompt);
+    const result = await model.generateContentStream(prompt, signal ? { signal } : undefined);
     for await (const chunk of result.stream) {
       try {
         const text = chunk.text();

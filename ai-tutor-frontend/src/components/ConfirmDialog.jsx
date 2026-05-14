@@ -1,18 +1,19 @@
 import { useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
+import { COMMON_ACTION_TEXTS } from "@/constants/texts";
 
 // ─── All logic unchanged — only visual layer updated ───────────────────────
 // Anti-patterns fixed:
 //   - #FEF2F2, #B91C1C, #FFFBEB, #111827 hex → HSL + CSS vars
 //   - rgba(185,28,28,0.25) shadow → hsl() with alpha
 //   - bg-white hardcoded → var(--card-bg)
-//   - border-[#E5E7EB] → var(--border-color)
+//   - border-[var(--border-color)] → var(--border-color)
 
 const VARIANT_CONFIG = {
   danger: {
     icon: "delete_forever",
-    iconWrapCls: "bg-[hsl(343_85%_58%/0.10)] text-[hsl(343_72%_48%)]",
-    confirmCls: "bg-[hsl(343_72%_48%)] hover:bg-[hsl(343_65%_42%)] text-white shadow-[0_4px_16px_hsl(343_72%_48%/0.30)] hover:shadow-[0_8px_24px_hsl(343_72%_48%/0.40)]",
+    iconWrapCls: "bg-[hsl(343_85%_58%/0.10)] text-[hsl(4_72%_52%)]",
+    confirmCls: "bg-[hsl(4_72%_52%)] hover:bg-[hsl(343_65%_42%)] text-white shadow-[0_4px_16px_hsl(343_72%_48%/0.30)] hover:shadow-[0_8px_24px_hsl(343_72%_48%/0.40)]",
   },
   warning: {
     icon: "warning",
@@ -21,8 +22,8 @@ const VARIANT_CONFIG = {
   },
   info: {
     icon: "info",
-    iconWrapCls: "bg-[hsl(239_68%_58%/0.10)] text-[hsl(239_68%_58%)]",
-    confirmCls: "bg-[hsl(239_68%_58%)] hover:bg-[hsl(239_62%_52%)] text-white shadow-[0_4px_16px_hsl(239_68%_58%/0.30)]",
+    iconWrapCls: "bg-[hsl(166_61%_35%/0.10)] text-[var(--brand-primary)]",
+    confirmCls: "bg-[var(--brand-primary)] hover:bg-[var(--brand-primary-strong)] text-white shadow-[0_4px_16px_hsl(166_61%_35%/0.28)]",
   },
 };
 
@@ -30,8 +31,8 @@ export default function ConfirmDialog({
   open,
   title,
   message,
-  confirmLabel = "Xác nhận",
-  cancelLabel = "Hủy",
+  confirmLabel = COMMON_ACTION_TEXTS.confirm,
+  cancelLabel = COMMON_ACTION_TEXTS.cancel,
   variant = "danger",
   onConfirm,
   onCancel,
@@ -73,11 +74,11 @@ export default function ConfirmDialog({
       />
 
       {/* Dialog card — glass on floating = allowed */}
-      <div className="animate-dialog-enter relative z-10 w-full max-w-[400px] bg-[var(--card-bg)] rounded-2xl border border-[var(--border-color)] shadow-[0_24px_64px_hsl(228_25%_5%/0.5)] overflow-hidden">
+      <div className="animate-dialog-enter relative z-10 w-full max-w-[400px] bg-[var(--card-bg)] rounded-lg border border-[var(--border-color)] shadow-[0_24px_64px_hsl(228_25%_5%/0.5)] overflow-hidden">
         {/* Body */}
         <div className="px-6 pt-6 pb-5 space-y-4">
           <div className="flex items-center gap-3.5">
-            <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${cfg.iconWrapCls}`}>
+            <div className={`w-9 h-9 rounded-lg flex items-center justify-center shrink-0 ${cfg.iconWrapCls}`}>
               <span className="material-symbols-outlined icon-thin text-[18px]">{cfg.icon}</span>
             </div>
             <h2
@@ -102,14 +103,14 @@ export default function ConfirmDialog({
         <div className="px-6 py-4 flex items-center justify-end gap-2.5">
           <button
             onClick={onCancel}
-            className="px-4 py-2 rounded-xl border border-[var(--border-color)] bg-[var(--surface)] text-[13px] font-semibold text-[var(--muted)] hover:text-[var(--foreground)] hover:bg-[var(--card-bg-hover)] transition-all duration-150 active:scale-[0.97] focus-visible:outline-2 focus-visible:outline-[hsl(239_68%_58%/0.6)] focus-visible:outline-offset-2"
+            className="px-4 py-2 rounded-lg border border-[var(--border-color)] bg-[var(--surface)] text-[13px] font-semibold text-[var(--muted)] hover:text-[var(--foreground)] hover:bg-[var(--card-bg-hover)] transition-all duration-150 active:scale-[0.97] focus-visible:outline-2 focus-visible:outline-[var(--brand-primary)] focus-visible:outline-offset-2"
           >
             {cancelLabel}
           </button>
           <button
             ref={confirmRef}
             onClick={onConfirm}
-            className={`px-4 py-2 rounded-xl text-[13px] font-bold transition-all duration-150 active:scale-[0.97] focus-visible:outline-2 focus-visible:outline-offset-2 ${cfg.confirmCls}`}
+            className={`px-4 py-2 rounded-lg text-[13px] font-bold transition-all duration-150 active:scale-[0.97] focus-visible:outline-2 focus-visible:outline-offset-2 ${cfg.confirmCls}`}
           >
             {confirmLabel}
           </button>

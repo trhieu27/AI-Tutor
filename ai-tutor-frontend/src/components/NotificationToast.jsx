@@ -1,17 +1,18 @@
 /**
- * NotificationToast — JolyUI-inspired animated toast
+ * NotificationToast - JolyUI-inspired animated toast
  *
  * Thiết kế:
- *  - Spring slide-in từ phải + scale (CSS keyframes)
- *  - Border-left accent màu theo type (giống JolyUI border-l-4)
+ *  - Ease-out slide-in from right plus scale (CSS keyframes)
+ *  - Full-border accent tint by type
  *  - Progress bar countdown mượt mà
  *  - Stagger entrance khi stack nhiều toast
  *  - Exit animation slide phải + fade
- *  - Không dùng Tailwind — 100% CSS variables + inline styles
+ *  - No Tailwind dependency, 100% CSS variables plus inline styles
  */
 
 // @refresh reset
 import { useEffect, useState, useCallback, createContext, useContext, useRef } from "react";
+import { NOTIFICATION_TOAST_TEXTS } from "@/constants/texts";
 
 // ── Context ───────────────────────────────────────────────────────────────────
 
@@ -33,7 +34,7 @@ const TYPE_CONFIG = {
   },
   document_failed: {
     icon: "error",
-    accent: "hsl(343 85% 58%)",
+    accent: "hsl(4 72% 52%)",
     iconBg: "hsl(343 85% 58% / 0.12)",
   },
   info: {
@@ -48,8 +49,8 @@ const TYPE_CONFIG = {
   },
   system: {
     icon: "notifications",
-    accent: "var(--border-emphasis, hsl(239 68% 58%))",
-    iconBg: "hsl(239 68% 58% / 0.10)",
+    accent: "var(--brand-primary, hsl(166 61% 35%))",
+    iconBg: "hsl(166 61% 35% / 0.10)",
   },
 };
 
@@ -72,7 +73,7 @@ function ensureStyles() {
       100% { opacity: 0; transform: translateX(36px) scale(0.90); }
     }
     ._nt_item {
-      animation: _nt_in 0.42s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+      animation: _nt_in 0.28s cubic-bezier(0.16, 1, 0.3, 1) both;
     }
     ._nt_item._nt_exiting {
       animation: _nt_out 0.24s cubic-bezier(0.55, 0, 1, 0.45) both;
@@ -126,9 +127,8 @@ function ToastItem({ toast, onDismiss, stackIndex }) {
         width: 356,
         borderRadius: 16,
         overflow: "hidden",
-        background: "var(--card-bg)",
-        border: "1px solid var(--border-color)",
-        borderLeft: `4px solid ${cfg.accent}`,
+        border: `1px solid ${cfg.accent}`,
+        background: `linear-gradient(90deg, ${cfg.iconBg}, transparent 42%), var(--card-bg)`,
         boxShadow:
           "0 4px 12px -2px hsl(228 25% 5% / 0.18), 0 12px 36px -4px hsl(228 25% 5% / 0.28)",
         pointerEvents: "auto",
@@ -212,7 +212,7 @@ function ToastItem({ toast, onDismiss, stackIndex }) {
             transition: "background 0.15s, color 0.15s",
             marginTop: -1,
           }}
-          aria-label="Đóng"
+          aria-label={NOTIFICATION_TOAST_TEXTS.close}
         >
           <span className="material-symbols-outlined icon-thin" style={{ fontSize: 15 }}>
             close
@@ -280,7 +280,7 @@ export function NotificationToastProvider({ children }) {
           pointerEvents: "none",
         }}
         aria-live="polite"
-        aria-label="Thông báo"
+        aria-label={NOTIFICATION_TOAST_TEXTS.notifications}
       >
         {toasts.map((toast, index) => (
           <ToastItem

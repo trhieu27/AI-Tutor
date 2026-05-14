@@ -3,12 +3,12 @@ import { INTERACTIVE_MINDMAP_TEXTS } from '@/constants/texts';
 
 // ── Palette ──────────────────────────────────────────────────────────────────
 const NODE_COLORS = [
-  { name: 'Indigo', value: 'hsl(239 68% 58%)' },
-  { name: 'Rose', value: 'hsl(343 85% 58%)' },
+  { name: 'Verdant', value: 'hsl(166 61% 35%)' },
+  { name: 'Rose', value: 'hsl(4 72% 52%)' },
   { name: 'Sky', value: 'hsl(199 89% 48%)' },
   { name: 'Emerald', value: 'hsl(158 64% 44%)' },
   { name: 'Amber', value: 'hsl(38 92% 50%)' },
-  { name: 'Violet', value: 'hsl(263 70% 62%)' },
+  { name: 'Cobalt', value: 'hsl(218 82% 55%)' },
   { name: 'Pink', value: 'hsl(328 81% 58%)' },
   { name: 'Teal', value: 'hsl(173 58% 42%)' },
   { name: 'Red', value: 'hsl(4 86% 58%)' },
@@ -100,7 +100,7 @@ function parseMermaid(code) {
         }
       }
     }
-    txt = txt.replace(/^[\(\[\{]+/, '').replace(/[\)\]\}]+$/, '').trim() || (stack.length === 0 ? 'Chủ đề chính' : 'Nhánh mới');
+    txt = txt.replace(/^[\(\[\{]+/, '').replace(/[\)\]\}]+$/, '').trim() || (stack.length === 0 ? INTERACTIVE_MINDMAP_TEXTS.rootNode : INTERACTIVE_MINDMAP_TEXTS.newNode);
 
     // unique id
     const slug = txt.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/đ/g, 'd').replace(/[^a-z0-9]/g, '-').replace(/-+/g, '-').slice(0, 12);
@@ -132,7 +132,7 @@ function toMermaid(root) {
   let out = 'mindmap\n';
   const w = (n, d) => {
     if (!n) return;
-    const t = n.text || (d === 1 ? 'Chủ đề chính' : 'Nhánh mới');
+    const t = n.text || (d === 1 ? INTERACTIVE_MINDMAP_TEXTS.rootNode : INTERACTIVE_MINDMAP_TEXTS.newNode);
     const shape = d === 1 ? `((${t}))` : `(${t})`;
     let meta = '';
     if (n.color) meta += `:::color-${n.color.startsWith('hsl') ? n.color : n.color.replace('#', '')}`;
@@ -154,7 +154,7 @@ function updateNode(root, id, upd) {
 function addChild(root, pid) {
   if (root.id === pid) {
     const id = `u-${Math.random().toString(36).slice(2, 9)}`;
-    return { ...root, children: [...ch(root), { id, text: 'Nhánh mới', children: [], color: root.color }] };
+    return { ...root, children: [...ch(root), { id, text: INTERACTIVE_MINDMAP_TEXTS.newNode, children: [], color: root.color }] };
   }
   return { ...root, children: ch(root).map(c => addChild(c, pid)) };
 }
@@ -530,7 +530,7 @@ const InteractiveMindmap = forwardRef(({ chart, onCodeChange, documentId, zoom =
     const newId = `u-${Math.random().toString(36).slice(2, 9)}`;
     const addChildWithId = (root, pid) => {
       if (root.id === pid) {
-        return { ...root, children: [...(root.children || []), { id: newId, text: 'Nhánh mới', children: [], color: root.color }] };
+        return { ...root, children: [...(root.children || []), { id: newId, text: INTERACTIVE_MINDMAP_TEXTS.newNode, children: [], color: root.color }] };
       }
       return { ...root, children: (root.children || []).map(c => addChildWithId(c, pid)) };
     };
@@ -562,10 +562,10 @@ const InteractiveMindmap = forwardRef(({ chart, onCodeChange, documentId, zoom =
       <div className="flex items-center justify-center p-20">
         <div className="flex flex-col items-center gap-4">
           <div className="relative w-14 h-14">
-            <div className="absolute inset-0 border-[1.5px] border-[hsl(239_68%_58%/0.15)] rounded-full" />
-            <div className="absolute inset-0 border-[1.5px] border-t-[hsl(239_68%_58%)] rounded-full animate-spin" />
+            <div className="absolute inset-0 border-[1.5px] border-[hsl(166_61%_35%/0.15)] rounded-full" />
+            <div className="absolute inset-0 border-[1.5px] border-t-[var(--brand-primary)] rounded-full animate-spin" />
           </div>
-          <p className="text-[10px] font-bold uppercase tracking-[0.25em] text-[var(--muted-light)]">{INTERACTIVE_MINDMAP_TEXTS.building}</p>
+          <p className="text-[10px] font-bold font-mono text-[var(--muted-light)]">{INTERACTIVE_MINDMAP_TEXTS.building}</p>
         </div>
       </div>
     );
@@ -598,8 +598,8 @@ const InteractiveMindmap = forwardRef(({ chart, onCodeChange, documentId, zoom =
             </linearGradient>);
           })}
           <filter id="ns"><feDropShadow dx="0" dy="2" stdDeviation="4" floodColor="hsl(222 47% 4%)" floodOpacity="0.1" /></filter>
-          <filter id="ng" x="-30%" y="-30%" width="160%" height="160%"><feDropShadow dx="0" dy="0" stdDeviation="10" floodColor="hsl(239 68% 58%)" floodOpacity="0.5" /></filter>
-          <filter id="nr" x="-30%" y="-30%" width="160%" height="160%"><feDropShadow dx="0" dy="0" stdDeviation="18" floodColor="hsl(239 62% 50%)" floodOpacity="0.3" /></filter>
+          <filter id="ng" x="-30%" y="-30%" width="160%" height="160%"><feDropShadow dx="0" dy="0" stdDeviation="10" floodColor="hsl(166 61% 35%)" floodOpacity="0.5" /></filter>
+          <filter id="nr" x="-30%" y="-30%" width="160%" height="160%"><feDropShadow dx="0" dy="0" stdDeviation="18" floodColor="hsl(218 82% 35%)" floodOpacity="0.3" /></filter>
         </defs>
 
         {conns.map(c => {
@@ -625,10 +625,10 @@ const InteractiveMindmap = forwardRef(({ chart, onCodeChange, documentId, zoom =
               onTouchStart={e => startDrag(e, n.id)}
               onClick={e => e.stopPropagation()}
               style={{ cursor: 'grab' }}>
-              {isSel && <rect x={p.x - p.w / 2 - 6} y={p.y - p.h / 2 - 6} width={p.w + 12} height={p.h + 12} rx={rx + 4} fill="none" stroke="hsl(239 68% 68%)" strokeWidth={1.5} strokeDasharray="5 4" className="animate-pulse" />}
+              {isSel && <rect x={p.x - p.w / 2 - 6} y={p.y - p.h / 2 - 6} width={p.w + 12} height={p.h + 12} rx={rx + 4} fill="none" stroke="hsl(166 61% 48%)" strokeWidth={1.5} strokeDasharray="5 4" className="animate-pulse" />}
               <rect x={p.x - p.w / 2} y={p.y - p.h / 2} width={p.w} height={p.h} rx={rx} fill={n.color || '#4338ca'} filter={flt} />
               <rect x={p.x - p.w / 2 + 1} y={p.y - p.h / 2 + 1} width={p.w - 2} height={Math.min(p.h * .45, 28)} rx={rx - 1} fill="white" opacity={isRoot ? .12 : .09} className="pointer-events-none" />
-              <text x={p.x} y={p.y} textAnchor="middle" dominantBaseline="central" fill="white" fontSize={fs} fontWeight={isRoot ? '700' : '600'} fontFamily="'Inter',system-ui,sans-serif" className="pointer-events-none select-none">
+              <text x={p.x} y={p.y} textAnchor="middle" dominantBaseline="central" fill="oklch(97% 0.006 205)" fontSize={fs} fontWeight={isRoot ? '700' : '600'} fontFamily="'Inter',system-ui,sans-serif" className="pointer-events-none select-none">
                 {lines.map((l, i) => <tspan key={i} x={p.x} dy={i === 0 ? fy : lh}>{l}</tspan>)}
               </text>
               {isSel && [['nw',-1,-1,'nw-resize'],['ne',1,-1,'ne-resize'],['sw',-1,1,'sw-resize'],['se',1,1,'se-resize']].map(([corner,sx,sy,cur])=>{
@@ -641,8 +641,8 @@ const InteractiveMindmap = forwardRef(({ chart, onCodeChange, documentId, zoom =
                   <rect x={hx-s/2} y={hy-s/2} width={s} height={s} rx={2} fill="hsl(222 47% 10%)" opacity={0.5} transform="translate(1,1)" className="pointer-events-none"/>
                   {/* white fill */}
                   <rect x={hx-s/2} y={hy-s/2} width={s} height={s} rx={2} fill="white" className="pointer-events-none"/>
-                  {/* indigo border */}
-                  <rect x={hx-s/2} y={hy-s/2} width={s} height={s} rx={2} fill="none" stroke="hsl(239 68% 62%)" strokeWidth={1.5} className="pointer-events-none"/>
+                  {/* selection border */}
+                  <rect x={hx-s/2} y={hy-s/2} width={s} height={s} rx={2} fill="none" stroke="hsl(166 61% 48%)" strokeWidth={1.5} className="pointer-events-none"/>
                 </g>);
               })}
             </g>
@@ -657,14 +657,14 @@ const InteractiveMindmap = forwardRef(({ chart, onCodeChange, documentId, zoom =
         if (menuMode === 'edit') return (
           <div className="absolute z-[999]" style={ms} onClick={e => e.stopPropagation()}>
             <div className="flex flex-col items-center">
-              <div className="w-[280px] rounded-2xl shadow-xl border border-[var(--border-color)] bg-[var(--card-bg)] p-4">
-                <p className="text-[10px] font-bold text-[var(--muted-light)] uppercase tracking-widest mb-3">{INTERACTIVE_MINDMAP_TEXTS.nodeEditor.title}</p>
+              <div className="w-[280px] rounded-lg shadow-xl border border-[var(--border-color)] bg-[var(--card-bg)] p-4">
+                <p className="text-[10px] font-bold text-[var(--muted-light)] font-mono mb-3">{INTERACTIVE_MINDMAP_TEXTS.nodeEditor.title}</p>
                 <input autoFocus value={editText} onChange={e => setEditText(e.target.value)}
                   onKeyDown={e => { if (e.key === 'Enter') doSave(); if (e.key === 'Escape') { setMenuMode(null); setSelId(null); } e.stopPropagation(); }}
-                  className="w-full px-3 py-2 rounded-xl bg-[var(--surface)] border border-[var(--border-color)] text-[13px] text-[var(--foreground)] outline-none focus:ring-2 focus:ring-[hsl(239_68%_58%/0.35)]"
+                  className="w-full px-3 py-2 rounded-xl bg-[var(--surface)] border border-[var(--border-color)] text-[13px] text-[var(--foreground)] outline-none focus:ring-2 focus:ring-[hsl(166_61%_35%/0.35)]"
                   placeholder={INTERACTIVE_MINDMAP_TEXTS.nodeEditor.placeholder} />
                 <div className="flex gap-2 mt-3">
-                  <button onClick={doSave} className="flex-1 py-2 bg-[hsl(239_68%_58%)] hover:bg-[hsl(239_62%_50%)] text-white rounded-xl text-[11px] font-bold transition-all">{INTERACTIVE_MINDMAP_TEXTS.nodeEditor.save}</button>
+                  <button onClick={doSave} className="flex-1 py-2 bg-[var(--brand-primary)] hover:bg-[var(--brand-primary-strong)] text-white rounded-xl text-[11px] font-bold transition-all">{INTERACTIVE_MINDMAP_TEXTS.nodeEditor.save}</button>
                   <button onClick={() => setMenuMode('main')} className="px-3 py-2 bg-[var(--surface)] text-[var(--muted)] rounded-xl text-[11px] font-bold transition-all">{INTERACTIVE_MINDMAP_TEXTS.nodeEditor.cancel}</button>
                 </div>
               </div>{arrow}
@@ -674,8 +674,8 @@ const InteractiveMindmap = forwardRef(({ chart, onCodeChange, documentId, zoom =
         if (menuMode === 'color') return (
           <div className="absolute z-[999]" style={ms} onClick={e => e.stopPropagation()}>
             <div className="flex flex-col items-center">
-              <div className="rounded-2xl shadow-xl border border-[var(--border-color)] bg-[var(--card-bg)] p-4">
-                <p className="text-[10px] font-bold text-[var(--muted-light)] uppercase tracking-widest mb-3">{INTERACTIVE_MINDMAP_TEXTS.colorPicker.title}</p>
+              <div className="rounded-lg shadow-xl border border-[var(--border-color)] bg-[var(--card-bg)] p-4">
+                <p className="text-[10px] font-bold text-[var(--muted-light)] font-mono mb-3">{INTERACTIVE_MINDMAP_TEXTS.colorPicker.title}</p>
                 <div className="grid grid-cols-6 gap-2">
                   {NODE_COLORS.map(c => <button key={c.value} onClick={e => { e.stopPropagation(); doColor(c.value); }} title={c.name}
                     className="w-7 h-7 rounded-lg hover:scale-110 transition-all"
@@ -689,19 +689,19 @@ const InteractiveMindmap = forwardRef(({ chart, onCodeChange, documentId, zoom =
         return (
           <div className="absolute z-[999]" style={ms} onClick={e => e.stopPropagation()}>
             <div className="flex flex-col items-center">
-              <div className="rounded-2xl shadow-xl border border-[var(--border-color)] bg-[var(--card-bg)] p-1.5 flex items-center gap-0.5">
-                <button onClick={e => { e.stopPropagation(); doEdit(); }} className="w-9 h-9 flex items-center justify-center rounded-xl text-[var(--muted)] hover:text-[hsl(239_68%_58%)] hover:bg-[hsl(239_68%_58%/0.08)] transition-all" title={INTERACTIVE_MINDMAP_TEXTS.contextMenu.editContent}>
+              <div className="rounded-lg shadow-xl border border-[var(--border-color)] bg-[var(--card-bg)] p-1.5 flex items-center gap-0.5">
+                <button onClick={e => { e.stopPropagation(); doEdit(); }} className="w-9 h-9 flex items-center justify-center rounded-xl text-[var(--muted)] hover:text-[var(--brand-primary)] hover:bg-[hsl(166_61%_35%/0.08)] transition-all" title={INTERACTIVE_MINDMAP_TEXTS.contextMenu.editContent}>
                   <span className="material-symbols-outlined text-[18px]">edit</span>
                 </button>
-                <button onClick={e => { e.stopPropagation(); doAdd(); }} className="w-9 h-9 flex items-center justify-center rounded-xl text-[var(--muted)] hover:text-[hsl(158_64%_44%)] hover:bg-[hsl(158_64%_44%/0.08)] transition-all" title="Thêm nhánh con">
+                <button onClick={e => { e.stopPropagation(); doAdd(); }} className="w-9 h-9 flex items-center justify-center rounded-xl text-[var(--muted)] hover:text-[hsl(158_64%_44%)] hover:bg-[hsl(158_64%_44%/0.08)] transition-all" title={INTERACTIVE_MINDMAP_TEXTS.contextMenu.addChild}>
                   <span className="material-symbols-outlined text-[18px]">add_circle</span>
                 </button>
                 <div className="w-px h-5 bg-[var(--border-color)] mx-0.5" />
-                <button onClick={e => { e.stopPropagation(); setMenuMode('color'); }} className="w-9 h-9 flex items-center justify-center rounded-xl hover:bg-[hsl(263_70%_62%/0.08)] transition-all" title={INTERACTIVE_MINDMAP_TEXTS.contextMenu.changeColor}>
+                <button onClick={e => { e.stopPropagation(); setMenuMode('color'); }} className="w-9 h-9 flex items-center justify-center rounded-xl hover:bg-[hsl(218_82%_55%/0.08)] transition-all" title={INTERACTIVE_MINDMAP_TEXTS.contextMenu.changeColor}>
                   <span className="material-symbols-outlined text-[18px]" style={{ color: selNode.color }}>palette</span>
                 </button>
                 {!isRoot && <><div className="w-px h-5 bg-[var(--border-color)] mx-0.5" />
-                  <button onClick={e => { e.stopPropagation(); doDel(); }} className="w-9 h-9 flex items-center justify-center rounded-xl text-[var(--muted)] hover:text-[hsl(343_85%_58%)] hover:bg-[hsl(343_85%_58%/0.08)] transition-all" title="Xóa nhánh">
+                  <button onClick={e => { e.stopPropagation(); doDel(); }} className="w-9 h-9 flex items-center justify-center rounded-xl text-[var(--muted)] hover:text-[hsl(4_72%_52%)] hover:bg-[hsl(343_85%_58%/0.08)] transition-all" title={INTERACTIVE_MINDMAP_TEXTS.contextMenu.deleteBranch}>
                     <span className="material-symbols-outlined text-[18px]">delete</span>
                   </button></>}
               </div>{arrow}

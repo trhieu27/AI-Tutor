@@ -2,8 +2,8 @@ import { createContext, useContext, useState, useEffect } from "react";
 
 // ── Colors must match CSS --background tokens exactly ─────────────────────────
 const PALETTE = {
-  light: { bg: "#f8fafc", scheme: "light" },
-  dark:  { bg: "#0a0a0a", scheme: "dark"  },
+  light: { bg: "#f3f6f8", scheme: "light" },
+  dark:  { bg: "#0f1218", scheme: "dark"  },
 };
 
 // ── Inject <style> rule for color-scheme (CSS path, different from inline) ────
@@ -56,13 +56,13 @@ function applyTheme(theme) {
   // The sticky header reads var(--glass-bg) which would take 1 frame to update
   // via CSS cascade. Setting it inline is synchronous → Safari sees final color.
   if (theme === "light") {
-    root.style.setProperty("--header-bg",    "hsl(0 0% 100% / 0.82)");
-    root.style.setProperty("--glass-bg",     "hsl(0 0% 100% / 0.88)");
-    root.style.setProperty("--glass-border", "hsl(214 32% 91% / 0.9)");
+    root.style.setProperty("--header-bg",    "oklch(98% 0.010 210 / 0.84)");
+    root.style.setProperty("--glass-bg",     "oklch(99% 0.006 205 / 0.76)");
+    root.style.setProperty("--glass-border", "oklch(82% 0.020 218 / 0.75)");
   } else {
-    root.style.setProperty("--header-bg",    "hsl(0 0% 4% / 0.90)");
-    root.style.setProperty("--glass-bg",     "hsl(0 0% 9% / 0.92)");
-    root.style.setProperty("--glass-border", "hsl(0 0% 20% / 0.8)");
+    root.style.setProperty("--header-bg",    "oklch(15% 0.018 238 / 0.84)");
+    root.style.setProperty("--glass-bg",     "oklch(19% 0.020 238 / 0.72)");
+    root.style.setProperty("--glass-border", "oklch(35% 0.022 238 / 0.72)");
   }
 
   // ── 4. CSS rule for color-scheme ──────────────────────────────────────────

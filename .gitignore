@@ -26,6 +26,8 @@ Thumbs.db
 .anthropic/
 .claude/
 *.agents
+!ai-tutor-frontend/.agents/
+!ai-tutor-frontend/.agents/**
 **/AGENTS.md
 **/CLAUDE.md
 
@@ -78,3 +80,15 @@ nginx/ssl/
 # ── OS ────────────────────────────────────────────────────────────────────────
 .DS_Store
 Desktop.ini
+
+# ── Skill & local design context ─────────────────────────────────────────────
+**/.agents/
+**/.agent/
+.impeccable/
+PRODUCT.md
+DESIGN.md
+**/PRODUCT.md
+**/DESIGN.md
+COMMIT_CONVENTION.md
+**/.codex-vite.log
+

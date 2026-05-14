@@ -13,16 +13,12 @@ export default function AuthLayout({
   const navigate = useNavigate();
   const [ready, setReady] = useState(false);
 
-  // Áp dụng nền trắng NGAY lập tức trước khi bất kỳ effect nào chạy
-  // tránh flash đen do dark theme của body/html
+  // Keep auth routes on the same themed surface as the rest of the app.
   if (typeof document !== "undefined") {
-    document.documentElement.style.backgroundColor = "#ffffff";
-    document.body.style.backgroundColor = "#ffffff";
+    document.documentElement.style.backgroundColor = "";
+    document.body.style.backgroundColor = "";
   }
   useEffect(() => {
-    // Force white on mount và cleanup khi rời trang auth
-    document.documentElement.style.backgroundColor = "#ffffff";
-    document.body.style.backgroundColor = "#ffffff";
     return () => {
       document.documentElement.style.backgroundColor = "";
       document.body.style.backgroundColor = "";
@@ -45,7 +41,7 @@ export default function AuthLayout({
     return /*#__PURE__*/_jsx("div", {
       style: {
         minHeight: "100dvh",
-        backgroundColor: "#ffffff"
+        backgroundColor: "var(--background)"
       },
       "aria-hidden": "true"
     });

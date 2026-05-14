@@ -3,13 +3,13 @@ import { useParams, useNavigate } from "react-router-dom";
 import { fetchDocument, fetchDocumentMindmapStream, QuotaError } from "@/services/api.service";
 import InteractiveMindmap from "@/components/InteractiveMindmap";
 import ConfirmDialog from "@/components/ConfirmDialog";
-import { MINDMAP_PAGE_TEXTS, QUOTA_TEXTS } from "@/constants/texts";
+import { MINDMAP_PAGE_TEXTS, MINDMAP_WORKSPACE_TEXTS, QUOTA_TEXTS } from "@/constants/texts";
+import LiquidGlassButton from "@/components/ui/LiquidGlassButton";
 import { jsx as _jsx, jsxs as _jsxs, Fragment as _Fragment } from "react/jsx-runtime";
 export default function InteractiveMindmapPage() {
   const params = useParams();
   const navigate = useNavigate();
-  const documentId = params.documentId;
-  if (!documentId) return null;
+  const documentId = params.documentId || "";
   const [docData, setDocData] = useState(null);
   const [mindmapCode, setMindmapCode] = useState("");
   const mindmapCodeRef = useRef("");
@@ -175,7 +175,7 @@ export default function InteractiveMindmapPage() {
       }
       console.error("Error loading mindmap:", error);
       // Always show a generic message — never expose raw API errors to the user
-      setErrorMessage('Không thể tạo sơ đồ tư duy. Vui lòng thử lại.');
+      setErrorMessage(MINDMAP_WORKSPACE_TEXTS.canvas.errorMessage);
     } finally {
       if (isActive()) {
         setIsLoading(false);
@@ -331,25 +331,25 @@ export default function InteractiveMindmapPage() {
   };
   return /*#__PURE__*/_jsxs(_Fragment, {
     children: [/*#__PURE__*/_jsxs("div", {
-      className: "flex flex-col h-full bg-[var(--background)] overflow-hidden relative font-sans selection:bg-[hsl(239_68%_58%/0.25)] transition-colors duration-500",
+      className: "flex flex-col h-full bg-[var(--background)] overflow-hidden relative font-sans selection:bg-[hsl(166_61%_35%/0.22)] transition-colors duration-500",
       children: [/*#__PURE__*/_jsxs("div", {
         className: "absolute inset-0 z-0 pointer-events-none overflow-hidden",
         children: [/*#__PURE__*/_jsx("div", {
-          className: "absolute -top-[20%] -left-[10%] w-[45%] h-[45%] rounded-full opacity-[0.06] dark:opacity-[0.12]",
+          className: "hidden",
           style: {
-            background: 'radial-gradient(circle, hsl(239 68% 58%) 0%, transparent 70%)',
+            background: 'radial-gradient(circle, hsl(166 61% 35%) 0%, transparent 70%)',
             filter: 'blur(80px)'
           }
         }), /*#__PURE__*/_jsx("div", {
-          className: "absolute -bottom-[15%] -right-[10%] w-[35%] h-[35%] rounded-full opacity-[0.05] dark:opacity-[0.10]",
+          className: "hidden",
           style: {
-            background: 'radial-gradient(circle, hsl(263 70% 62%) 0%, transparent 70%)',
+            background: 'radial-gradient(circle, hsl(218 82% 55%) 0%, transparent 70%)',
             filter: 'blur(80px)'
           }
         }), /*#__PURE__*/_jsx("div", {
           className: "absolute inset-0 opacity-[0.015] dark:opacity-[0.04]",
           style: {
-            backgroundImage: 'radial-gradient(circle, hsl(239 68% 58%) 1px, transparent 1px)',
+            backgroundImage: 'radial-gradient(circle, hsl(166 61% 35%) 1px, transparent 1px)',
             backgroundSize: '32px 32px'
           }
         })]
@@ -367,7 +367,7 @@ export default function InteractiveMindmapPage() {
                 children: "west"
               })
             }), /*#__PURE__*/_jsx("h1", {
-              className: "font-semibold text-[var(--foreground)] text-[13px] truncate min-w-0 max-w-[140px] md:max-w-[280px] lg:max-w-[420px] tracking-[-0.01em]",
+              className: "hidden sm:block font-semibold text-[var(--foreground)] text-[13px] truncate min-w-0 max-w-[140px] md:max-w-[280px] lg:max-w-[420px]",
               children: docData?.file_name
             })]
           }), /*#__PURE__*/_jsxs("div", {
@@ -403,7 +403,7 @@ export default function InteractiveMindmapPage() {
                   children: "remove"
                 })
               }), /*#__PURE__*/_jsxs("span", {
-                className: "px-2 text-[10px] font-bold text-[var(--muted)] font-mono w-10 text-center tracking-wider",
+                className: "px-2 text-[10px] font-bold text-[var(--muted)] font-mono w-10 text-center",
                 children: [Math.round(zoom * 100), "%"]
               }), /*#__PURE__*/_jsx("button", {
                 onClick: () => setZoom(prev => Math.min(3, prev + 0.1)),
@@ -415,9 +415,18 @@ export default function InteractiveMindmapPage() {
               })]
             }), /*#__PURE__*/_jsx("div", {
               className: "w-px h-5 bg-[var(--border-color)] mx-0.5"
+            }), /*#__PURE__*/_jsx("span", {
+              className: "hidden sm:inline-flex",
+              children: /*#__PURE__*/_jsx(LiquidGlassButton, {
+                variant: "subtle",
+                size: "sm",
+                icon: "restart_alt",
+                onClick: () => setShowResetConfirm(true),
+                children: MINDMAP_WORKSPACE_TEXTS.canvas.regenerate
+              })
             }), /*#__PURE__*/_jsx("button", {
               onClick: () => setShowResetConfirm(true),
-              className: "w-8 h-8 flex items-center justify-center rounded-xl text-[var(--muted)] hover:text-[hsl(343_85%_58%)] hover:bg-[hsl(343_85%_58%/0.06)] transition-all active:scale-90",
+              className: "w-8 h-8 flex sm:hidden items-center justify-center rounded-xl text-[var(--muted)] hover:text-[hsl(343_85%_58%)] hover:bg-[hsl(343_85%_58%/0.06)] transition-all active:scale-90",
               title: MINDMAP_PAGE_TEXTS.CONTROLS.RESET_DIAGRAM,
               children: /*#__PURE__*/_jsx("span", {
                 className: "material-symbols-outlined icon-thin text-[17px]",
@@ -425,7 +434,7 @@ export default function InteractiveMindmapPage() {
               })
             }), /*#__PURE__*/_jsx("button", {
               onClick: () => mindmapRef.current?.downloadImage(),
-              className: "w-8 h-8 flex items-center justify-center rounded-xl bg-[hsl(239_68%_58%)] hover:bg-[hsl(239_62%_50%)] text-white shadow-[0_2px_8px_hsl(239_68%_58%/0.35)] transition-all active:scale-90",
+              className: "w-8 h-8 flex items-center justify-center rounded-xl bg-[var(--brand-primary)] hover:bg-[var(--brand-primary-strong)] text-white shadow-[0_2px_8px_hsl(166_61%_35%/0.35)] transition-all active:scale-90",
               title: MINDMAP_PAGE_TEXTS.CONTROLS.DOWNLOAD,
               children: /*#__PURE__*/_jsx("span", {
                 className: "material-symbols-outlined icon-thin text-[17px]",
@@ -450,7 +459,7 @@ export default function InteractiveMindmapPage() {
           children: quotaExceeded ? /*#__PURE__*/_jsxs("div", {
             className: "flex flex-col items-center gap-6 bg-[var(--surface-overlay)] backdrop-blur-xl px-14 py-10 rounded-[28px] border border-[var(--border-color)] shadow-[0_8px_32px_hsl(222_47%_4%/0.08)] pointer-events-auto",
             children: [/*#__PURE__*/_jsx("div", {
-              className: "w-14 h-14 rounded-2xl bg-gradient-to-br from-amber-400/20 to-orange-400/20 flex items-center justify-center border border-amber-400/20",
+              className: "w-14 h-14 rounded-xl bg-gradient-to-br from-amber-400/20 to-orange-400/20 flex items-center justify-center border border-amber-400/20",
               children: /*#__PURE__*/_jsx("span", {
                 className: "material-symbols-outlined text-[28px] text-amber-500",
                 children: "bolt"
@@ -471,7 +480,7 @@ export default function InteractiveMindmapPage() {
               className: "flex gap-3",
               children: [/*#__PURE__*/_jsx("button", {
                 onClick: () => navigate("/settings"),
-                className: "px-5 py-2 rounded-xl bg-gradient-to-r from-[hsl(239_68%_58%)] to-[hsl(263_70%_62%)] text-white text-[12px] font-bold hover:opacity-90 transition-all active:scale-95 shadow-[0_4px_16px_hsl(239_68%_58%/0.3)]",
+                className: "px-5 py-2 rounded-xl bg-gradient-to-r from-[var(--brand-primary)] to-[var(--brand-secondary)] text-white text-[12px] font-bold hover:opacity-90 transition-all active:scale-95 shadow-[0_4px_16px_hsl(166_61%_35%/0.28)]",
                 children: QUOTA_TEXTS.exceeded.upgradeBtn
               }), /*#__PURE__*/_jsx("button", {
                 onClick: () => navigate(-1),
@@ -482,7 +491,7 @@ export default function InteractiveMindmapPage() {
           }) : errorMessage ? /*#__PURE__*/_jsxs("div", {
             className: "flex flex-col items-center gap-6 bg-[var(--surface-overlay)] backdrop-blur-xl px-14 py-10 rounded-[28px] border border-[hsl(343_85%_58%/0.25)] shadow-[0_8px_32px_hsl(222_47%_4%/0.08)] pointer-events-auto max-w-md",
             children: [/*#__PURE__*/_jsx("div", {
-              className: "w-14 h-14 rounded-2xl bg-gradient-to-br from-red-400/20 to-rose-400/20 flex items-center justify-center border border-red-400/20",
+              className: "w-14 h-14 rounded-xl bg-gradient-to-br from-red-400/20 to-rose-400/20 flex items-center justify-center border border-red-400/20",
               children: /*#__PURE__*/_jsx("span", {
                 className: "material-symbols-outlined text-[28px] text-red-500",
                 children: "error_outline"
@@ -491,7 +500,7 @@ export default function InteractiveMindmapPage() {
               className: "text-center space-y-1.5",
               children: [/*#__PURE__*/_jsx("p", {
                 className: "text-[13px] font-bold text-[var(--foreground)]",
-                children: "Không thể tải sơ đồ tư duy"
+                children: MINDMAP_WORKSPACE_TEXTS.canvas.errorTitle
               }), /*#__PURE__*/_jsx("p", {
                 className: "text-[11px] text-[var(--muted)] font-medium",
                 children: errorMessage
@@ -500,12 +509,12 @@ export default function InteractiveMindmapPage() {
               className: "flex gap-3",
               children: [/*#__PURE__*/_jsxs("button", {
                 onClick: () => loadData(false),
-                className: "px-5 py-2 rounded-xl bg-gradient-to-r from-[hsl(239_68%_58%)] to-[hsl(263_70%_62%)] text-white text-[12px] font-bold hover:opacity-90 transition-all active:scale-95 shadow-[0_4px_16px_hsl(239_68%_58%/0.3)] flex items-center gap-2",
-                children: [/*#__PURE__*/_jsx("span", { className: "material-symbols-outlined icon-thin text-[14px]", children: "refresh" }), "Thử lại"]
+                className: "px-5 py-2 rounded-xl bg-gradient-to-r from-[var(--brand-primary)] to-[var(--brand-secondary)] text-white text-[12px] font-bold hover:opacity-90 transition-all active:scale-95 shadow-[0_4px_16px_hsl(166_61%_35%/0.28)] flex items-center gap-2",
+                children: [/*#__PURE__*/_jsx("span", { className: "material-symbols-outlined icon-thin text-[14px]", children: "refresh" }), MINDMAP_WORKSPACE_TEXTS.canvas.retry]
               }), /*#__PURE__*/_jsx("button", {
                 onClick: () => navigate(-1),
                 className: "px-5 py-2 rounded-xl bg-[var(--surface)] border border-[var(--border-color)] text-[var(--muted)] text-[12px] font-bold hover:bg-[var(--card-bg)] transition-all active:scale-95",
-                children: "Quay lại"
+                children: MINDMAP_WORKSPACE_TEXTS.canvas.back
               })]
             })]
           }) : isLoading ? /*#__PURE__*/_jsxs("div", {
@@ -513,12 +522,12 @@ export default function InteractiveMindmapPage() {
             children: [/*#__PURE__*/_jsxs("div", {
               className: "relative",
               children: [/*#__PURE__*/_jsx("div", {
-                className: "absolute inset-0 rounded-2xl blur-xl opacity-40",
+                className: "absolute inset-0 rounded-xl blur-xl opacity-40",
                 style: {
-                  background: "radial-gradient(circle, hsl(239 68% 58%) 0%, hsl(263 70% 62%) 100%)"
+                  background: "radial-gradient(circle, hsl(166 61% 35%) 0%, hsl(218 82% 55%) 100%)"
                 }
               }), /*#__PURE__*/_jsx("div", {
-                className: "relative w-14 h-14 rounded-2xl bg-gradient-to-br from-[hsl(239_68%_58%)] to-[hsl(263_70%_62%)] flex items-center justify-center shadow-[0_4px_16px_hsl(239_68%_58%/0.30)]",
+                className: "relative w-14 h-14 rounded-xl bg-gradient-to-br from-[var(--brand-primary)] to-[var(--brand-secondary)] flex items-center justify-center shadow-[0_4px_16px_hsl(166_61%_35%/0.28)]",
                 children: /*#__PURE__*/_jsx("span", {
                   className: "material-symbols-outlined icon-thin text-white text-[26px]",
                   children: "account_tree"
@@ -536,7 +545,7 @@ export default function InteractiveMindmapPage() {
             }), /*#__PURE__*/_jsx("div", {
               className: "flex items-center gap-1.5",
               children: [0, 1, 2].map(i => /*#__PURE__*/_jsx("div", {
-                className: "w-1.5 h-1.5 rounded-full bg-[hsl(239_68%_58%)] animate-jumping-dot",
+                className: "w-1.5 h-1.5 rounded-full bg-[var(--brand-primary)] animate-jumping-dot",
                 style: {
                   animationDelay: `${i * 0.16}s`
                 }
@@ -556,16 +565,16 @@ export default function InteractiveMindmapPage() {
         }), /*#__PURE__*/_jsx("div", {
           className: `absolute bottom-8 left-8 transition-all duration-700 hidden md:block ${!hasInteracted && isUIVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-6 pointer-events-none'}`,
           children: /*#__PURE__*/_jsxs("div", {
-            className: "bg-[var(--surface-overlay)] backdrop-blur-xl border border-[var(--border-color)] rounded-2xl shadow-[0_8px_24px_hsl(222_47%_4%/0.08)] p-3 flex items-center gap-3 w-[320px]",
+            className: "bg-[var(--surface-overlay)] backdrop-blur-xl border border-[var(--border-color)] rounded-lg shadow-[0_8px_24px_hsl(222_47%_4%/0.08)] p-3 flex items-center gap-3 w-[320px]",
             children: [/*#__PURE__*/_jsx("div", {
-              className: "w-8 h-8 rounded-xl bg-[hsl(239_68%_58%/0.08)] border border-[hsl(239_68%_58%/0.15)] flex items-center justify-center text-[hsl(239_68%_58%)] shrink-0",
+              className: "w-8 h-8 rounded-xl bg-[hsl(166_61%_35%/0.08)] border border-[hsl(166_61%_35%/0.15)] flex items-center justify-center text-[var(--brand-primary)] shrink-0",
               children: /*#__PURE__*/_jsx("span", {
                 className: "material-symbols-outlined icon-thin text-[16px]",
                 children: "mouse"
               })
             }), /*#__PURE__*/_jsxs("div", {
               children: [/*#__PURE__*/_jsx("p", {
-                className: "text-[9px] font-bold uppercase tracking-[0.15em] text-[var(--muted-light)] mb-0.5",
+                className: "text-[9px] font-bold font-mono text-[var(--muted-light)] mb-0.5",
                 children: MINDMAP_PAGE_TEXTS.GUIDE.TITLE
               }), /*#__PURE__*/_jsx("p", {
                 className: "text-[11px] text-[var(--foreground)] font-medium leading-snug opacity-80",
@@ -576,17 +585,17 @@ export default function InteractiveMindmapPage() {
         }), /*#__PURE__*/_jsx("div", {
           className: `absolute bottom-8 left-4 right-4 transition-all duration-700 md:hidden ${!hasInteracted && isUIVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-6 pointer-events-none'}`,
           children: /*#__PURE__*/_jsxs("div", {
-            className: "bg-[var(--surface-overlay)] backdrop-blur-xl border border-[var(--border-color)] rounded-2xl shadow-[0_8px_24px_hsl(222_47%_4%/0.08)] p-3 flex items-center gap-3",
+            className: "bg-[var(--surface-overlay)] backdrop-blur-xl border border-[var(--border-color)] rounded-lg shadow-[0_8px_24px_hsl(222_47%_4%/0.08)] p-3 flex items-center gap-3",
             children: [/*#__PURE__*/_jsx("div", {
-              className: "w-8 h-8 rounded-xl bg-[hsl(239_68%_58%/0.08)] border border-[hsl(239_68%_58%/0.15)] flex items-center justify-center text-[hsl(239_68%_58%)] shrink-0",
+              className: "w-8 h-8 rounded-xl bg-[hsl(166_61%_35%/0.08)] border border-[hsl(166_61%_35%/0.15)] flex items-center justify-center text-[var(--brand-primary)] shrink-0",
               children: /*#__PURE__*/_jsx("span", {
                 className: "material-symbols-outlined icon-thin text-[16px]",
                 children: "touch_app"
               })
             }), /*#__PURE__*/_jsxs("div", {
               children: [/*#__PURE__*/_jsx("p", {
-                className: "text-[9px] font-bold uppercase tracking-[0.15em] text-[var(--muted-light)] mb-0.5",
-                children: "Thao t\xE1c"
+                className: "text-[9px] font-bold font-mono text-[var(--muted-light)] mb-0.5",
+                children: MINDMAP_WORKSPACE_TEXTS.canvas.guideTitle
               }), /*#__PURE__*/_jsx("p", {
                 className: "text-[11px] text-[var(--foreground)] font-medium leading-snug opacity-80",
                 children: MINDMAP_PAGE_TEXTS.GUIDE.MOBILE_DESC
@@ -602,7 +611,7 @@ export default function InteractiveMindmapPage() {
           });
           setZoom(0.8);
         },
-        className: "absolute bottom-6 right-6 z-50 w-9 h-9 bg-[var(--surface-overlay)] border border-[var(--border-color)] backdrop-blur-xl rounded-xl flex items-center justify-center text-[var(--muted)] hover:text-[hsl(239_68%_58%)] hover:border-[hsl(239_68%_58%/0.30)] shadow-[0_4px_16px_hsl(222_47%_4%/0.08)] transition-all active:scale-90",
+        className: "absolute bottom-6 right-6 z-50 w-9 h-9 bg-[var(--surface-overlay)] border border-[var(--border-color)] backdrop-blur-xl rounded-xl flex items-center justify-center text-[var(--muted)] hover:text-[var(--brand-primary)] hover:border-[hsl(166_61%_35%/0.30)] shadow-[0_4px_16px_hsl(222_47%_4%/0.08)] transition-all active:scale-90",
         title: MINDMAP_PAGE_TEXTS.CONTROLS.RESET_VIEW,
         children: /*#__PURE__*/_jsx("span", {
           className: "material-symbols-outlined icon-thin text-[18px]",
@@ -611,14 +620,14 @@ export default function InteractiveMindmapPage() {
       }), /*#__PURE__*/_jsx("aside", {
         className: "fixed top-24 right-6 bottom-6 z-40 overflow-hidden",
         style: {
-          width: isSidebarOpen ? '400px' : '0px',
+          width: '400px',
           opacity: isSidebarOpen ? 1 : 0,
-          transform: isSidebarOpen ? 'translateX(0)' : 'translateX(16px)',
-          transition: 'width 0.45s cubic-bezier(0.23, 1, 0.32, 1), opacity 0.3s ease, transform 0.45s cubic-bezier(0.23, 1, 0.32, 1)',
+          transform: isSidebarOpen ? 'translateX(0)' : 'translateX(24px)',
+          transition: 'opacity 0.3s ease, transform 0.45s cubic-bezier(0.23, 1, 0.32, 1)',
           pointerEvents: isSidebarOpen ? 'auto' : 'none'
         },
         children: /*#__PURE__*/_jsx("div", {
-          className: "h-full bg-[var(--surface-overlay)] backdrop-blur-3xl border border-[var(--border-color)] rounded-3xl flex flex-col shadow-[0_32px_64px_hsl(222_47%_4%/0.12),0_8px_24px_hsl(222_47%_4%/0.06)] min-w-[400px]",
+          className: "h-full bg-[var(--surface-overlay)] backdrop-blur-3xl border border-[var(--border-color)] rounded-lg flex flex-col shadow-[0_32px_64px_hsl(222_47%_4%/0.12),0_8px_24px_hsl(222_47%_4%/0.06)] min-w-[400px]",
           children: /*#__PURE__*/_jsxs("div", {
             className: "p-6 flex flex-col h-full",
             children: [/*#__PURE__*/_jsxs("div", {
@@ -626,14 +635,14 @@ export default function InteractiveMindmapPage() {
               children: [/*#__PURE__*/_jsxs("div", {
                 className: "flex items-center gap-3",
                 children: [/*#__PURE__*/_jsx("div", {
-                  className: "w-8 h-8 rounded-xl bg-[hsl(239_68%_58%)] flex items-center justify-center shadow-[0_4px_12px_hsl(239_68%_58%/0.35)]",
+                  className: "w-8 h-8 rounded-xl bg-[var(--brand-primary)] flex items-center justify-center shadow-[0_4px_12px_hsl(166_61%_35%/0.35)]",
                   children: /*#__PURE__*/_jsx("span", {
                     className: "material-symbols-outlined icon-thin text-white text-[16px]",
                     children: "code"
                   })
                 }), /*#__PURE__*/_jsxs("div", {
                   children: [/*#__PURE__*/_jsx("h3", {
-                    className: "font-semibold text-[var(--foreground)] text-[13px] tracking-[-0.01em]",
+                    className: "font-semibold text-[var(--foreground)] text-[13px]",
                     children: MINDMAP_PAGE_TEXTS.EDITOR.TITLE
                   }), /*#__PURE__*/_jsx("p", {
                     className: "text-[10px] text-[var(--muted-light)] font-medium",
@@ -651,23 +660,23 @@ export default function InteractiveMindmapPage() {
             }), /*#__PURE__*/_jsxs("div", {
               className: "flex-1 space-y-4 overflow-y-auto custom-scrollbar pr-1 pb-4",
               children: [/*#__PURE__*/_jsx("p", {
-                className: "text-[10px] font-bold text-[hsl(239_68%_58%)] uppercase tracking-[0.15em] px-1",
+                className: "text-[10px] font-bold text-[var(--brand-primary)] font-mono px-1",
                 children: MINDMAP_PAGE_TEXTS.EDITOR.LABEL
               }), /*#__PURE__*/_jsxs("div", {
                 className: "relative group",
                 children: [/*#__PURE__*/_jsx("div", {
-                  className: "absolute -inset-px bg-gradient-to-br from-[hsl(239_68%_58%/0.20)] to-[hsl(263_70%_62%/0.15)] rounded-2xl opacity-50 group-focus-within:opacity-100 transition-opacity duration-300"
+                  className: "absolute -inset-px bg-gradient-to-br from-[hsl(166_61%_35%/0.20)] to-[hsl(218_82%_55%/0.15)] rounded-xl opacity-50 group-focus-within:opacity-100 transition-opacity duration-300"
                 }), /*#__PURE__*/_jsx("textarea", {
                   value: editableCode,
                   onChange: e => setEditableCode(e.target.value),
-                  className: "relative w-full h-[360px] p-5 bg-[var(--surface)] border border-[var(--border-color)] rounded-2xl text-[12px] text-[var(--foreground)] font-mono leading-relaxed focus:outline-none focus:ring-2 focus:ring-[hsl(239_68%_58%/0.30)] focus:border-[hsl(239_68%_58%/0.40)] custom-scrollbar transition-all resize-none",
+                  className: "relative w-full h-[360px] p-5 bg-[var(--surface)] border border-[var(--border-color)] rounded-lg text-[12px] text-[var(--foreground)] font-mono leading-relaxed focus:outline-none focus:ring-2 focus:ring-[hsl(166_61%_35%/0.30)] focus:border-[hsl(166_61%_35%/0.40)] custom-scrollbar transition-all resize-none",
                   placeholder: MINDMAP_PAGE_TEXTS.EDITOR.PLACEHOLDER
                 })]
               }), /*#__PURE__*/_jsxs("div", {
                 className: "grid grid-cols-4 gap-2",
                 children: [/*#__PURE__*/_jsxs("button", {
                   onClick: handleApplyEdit,
-                  className: "col-span-3 py-3 bg-[hsl(239_68%_58%)] hover:bg-[hsl(239_62%_50%)] text-white rounded-xl font-semibold text-[12px] shadow-[0_4px_12px_hsl(239_68%_58%/0.30)] transition-all active:scale-95 flex items-center justify-center gap-2",
+                  className: "col-span-3 py-3 bg-[var(--brand-primary)] hover:bg-[var(--brand-primary-strong)] text-white rounded-xl font-semibold text-[12px] shadow-[0_4px_12px_hsl(166_61%_35%/0.30)] transition-all active:scale-95 flex items-center justify-center gap-2",
                   children: [/*#__PURE__*/_jsx("span", {
                     className: "material-symbols-outlined icon-thin text-[15px]",
                     children: "check_circle"
@@ -682,23 +691,23 @@ export default function InteractiveMindmapPage() {
                   })
                 })]
               }), /*#__PURE__*/_jsxs("div", {
-                className: "p-4 bg-[var(--surface)] rounded-2xl border border-[var(--border-subtle)] space-y-2",
+                className: "p-4 bg-[var(--surface)] rounded-lg border border-[var(--border-subtle)] space-y-2",
                 children: [/*#__PURE__*/_jsxs("h4", {
                   className: "font-semibold text-[var(--foreground)] text-[12px] flex items-center gap-2",
                   children: [/*#__PURE__*/_jsx("span", {
-                    className: "material-symbols-outlined icon-thin text-[hsl(239_68%_58%)] text-[14px]",
+                    className: "material-symbols-outlined icon-thin text-[var(--brand-primary)] text-[14px]",
                     children: "info"
-                  }), "Ghi ch\xFA"]
+                  }), MINDMAP_WORKSPACE_TEXTS.canvas.noteTitle]
                 }), /*#__PURE__*/_jsxs("p", {
                   className: "text-[11px] text-[var(--muted)] leading-relaxed",
-                  children: ["Ch\u1EC9nh s\u1EEDa m\xE3 v\xE0 nh\u1EA5n ", /*#__PURE__*/_jsx("strong", {
+                  children: [MINDMAP_WORKSPACE_TEXTS.canvas.noteBodyPrefix, /*#__PURE__*/_jsx("strong", {
                     className: "text-[var(--foreground)]",
                     children: "\u201CC\u1EADp nh\u1EADt\u201D"
-                  }), " \u0111\u1EC3 \xE1p d\u1EE5ng. Kh\xF4ng th\u1EC3 ho\xE0n t\xE1c sau khi \xE1p d\u1EE5ng m\xE3 th\u1EE7 c\xF4ng."]
+                  }), MINDMAP_WORKSPACE_TEXTS.canvas.noteBodySuffix]
                 }), /*#__PURE__*/_jsx("div", {
                   className: "flex flex-wrap gap-1.5 pt-1",
                   children: ['#Mindmap', '#Mermaid', '#AI_Tutor'].map(tag => /*#__PURE__*/_jsx("span", {
-                    className: "px-2 py-0.5 bg-[hsl(239_68%_58%/0.08)] border border-[hsl(239_68%_58%/0.15)] rounded-full text-[9px] text-[hsl(239_68%_58%)] font-bold tracking-wide",
+                    className: "px-2 py-0.5 bg-[hsl(166_61%_35%/0.08)] border border-[hsl(166_61%_35%/0.15)] rounded-full text-[9px] text-[var(--brand-primary)] font-bold tracking-wide",
                     children: tag
                   }, tag))
                 })]
