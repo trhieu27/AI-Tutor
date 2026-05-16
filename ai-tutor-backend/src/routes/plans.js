@@ -111,9 +111,7 @@ router.post('/subscribe', authMiddleware, async (req, res) => {
       });
     }
 
-    // Nếu là gói có trả phí thì set is_pro = true trên User
-    const isPro = plan.id !== 'free';
-    await User.updateOne({ id: req.userId }, { $set: { is_pro: isPro, updated_at: now } });
+    // Pro status is now derived from subscription — no need to set is_pro on User
 
     const updatedSub = await UserSubscription.findOne({ user_id: req.userId }).lean();
     const { _id, ...cleanSub } = updatedSub;
@@ -132,7 +130,7 @@ router.delete('/cancel', authMiddleware, async (req, res) => {
       { user_id: req.userId },
       { $set: { status: 'cancelled', cancelled_at: now, updated_at: now } }
     );
-    await User.updateOne({ id: req.userId }, { $set: { is_pro: false, updated_at: now } });
+    // Pro status is now derived from subscription — no need to set is_pro on User
     res.json({ message: 'Đã hủy gói thành công. Bạn đã quay lại gói Miễn phí.' });
   } catch (err) {
     res.status(500).json({ detail: 'Lỗi server' });

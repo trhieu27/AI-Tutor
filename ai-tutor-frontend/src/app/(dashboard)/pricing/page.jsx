@@ -56,6 +56,7 @@ function PaymentModal({ plan, onClose, onSuccess }) {
     try {
       const res = await authFetch(`${API}/plans/subscribe`, {
         method: "POST",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ plan_id: plan.id, payment_method: method }),
       });
       if (!res.ok) throw new Error((await res.json()).detail);
@@ -128,15 +129,25 @@ function PaymentModal({ plan, onClose, onSuccess }) {
                         type="button"
                         onClick={() => setMethod(paymentMethod.id)}
                         className={cx(
-                          "flex h-12 w-full items-center gap-3 rounded-[var(--radius-control)] border px-3 text-left transition",
+                          "flex h-14 w-full items-center gap-3.5 rounded-[var(--radius-control)] border px-4 text-left transition",
                           selected
-                            ? `${paymentMethod.className} shadow-[var(--premium-shadow-sm)]`
+                            ? "border-[var(--brand-primary)] bg-[hsl(166_61%_35%/0.06)] shadow-[var(--premium-shadow-sm)]"
                             : "border-[var(--border-color)] bg-[var(--card-bg)] text-[var(--foreground)] hover:border-[var(--border-emphasis)] hover:bg-[var(--card-bg-hover)]"
                         )}
                       >
-                        <span className="material-symbols-outlined text-[20px]" aria-hidden="true">{paymentMethod.icon}</span>
-                        <span className="min-w-0 flex-1 truncate text-[13px] font-bold">{paymentMethod.label}</span>
-                        {selected && <span className="material-symbols-outlined text-[17px]" aria-hidden="true">check_circle</span>}
+                        <span className={cx(
+                          "flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border",
+                          paymentMethod.className
+                        )}>
+                          <span className="material-symbols-outlined text-[18px]" aria-hidden="true">{paymentMethod.icon}</span>
+                        </span>
+                        <span className={cx("min-w-0 flex-1 truncate text-[13px] font-bold", selected ? "text-[var(--foreground)]" : "text-[var(--foreground)]")}>{paymentMethod.label}</span>
+                        <span className={cx(
+                          "material-symbols-outlined shrink-0 text-[20px] transition",
+                          selected ? "text-[var(--brand-primary)]" : "text-[var(--border-color)]"
+                        )} aria-hidden="true">
+                          {selected ? "check_circle" : "radio_button_unchecked"}
+                        </span>
                       </button>
                     );
                   })}
@@ -155,7 +166,6 @@ function PaymentModal({ plan, onClose, onSuccess }) {
                     )}
                   </Button>
                 </div>
-                <p className="mt-3 text-[11px] font-medium leading-5 text-[var(--muted)]">{P.secureNote}</p>
               </section>
             </div>
           </>
@@ -325,7 +335,7 @@ export default function PricingPage() {
   );
 
   const handleSuccess = () => {
-    updateUser({ is_pro: true, isPro: true });
+    updateUser({});
     load();
   };
 
@@ -333,8 +343,7 @@ export default function PricingPage() {
     <PageFrame className="min-h-[calc(100svh-72px)] space-y-5 py-6 lg:py-7">
       <div className="flex items-center justify-between gap-4">
         <div className="min-w-0">
-          <p className="text-[11px] font-bold text-[var(--muted)]">{T.hero.badge}</p>
-          <h1 className="mt-2 text-[30px] font-semibold leading-tight text-[var(--foreground)] sm:text-[34px]">
+          <h1 className="text-[30px] font-semibold leading-tight text-[var(--foreground)] sm:text-[34px]">
             {T.hero.title}
           </h1>
           <p className="mt-2 max-w-2xl text-[13px] font-medium leading-6 text-[var(--muted)] sm:text-[14px]">

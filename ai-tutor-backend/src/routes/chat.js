@@ -3,7 +3,7 @@ const router = express.Router();
 const { v4: uuidv4 } = require('uuid');
 const { Document, ChatSession, User } = require('../db/models');
 const { authMiddleware } = require('../middleware/auth');
-const { requireChatQuota, recordChatUsage, checkAndRecordAiQuota } = require('../utils/quota');
+const { requireChatQuota, recordChatUsage, checkAndRecordAiQuota, isUserPro } = require('../utils/quota');
 const config = require('../config');
 const rag = require('../rag/pipeline');
 
@@ -133,8 +133,7 @@ router.post('/:documentId/ask', authMiddleware, requireChatQuota(), async (req, 
     }
 
     // Build context window by tier
-    const user = await User.findOne({ id: req.userId });
-    const isPro = Boolean(user?.is_pro);
+    const isPro = await isUserPro(req.userId);
 
     const historyMsgs = sessionData.messages || [];
     let contextMsgs, maxCharPerMsg;

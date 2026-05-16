@@ -14,7 +14,7 @@ const userSchema = new mongoose.Schema({
   email: { type: String, required: true, unique: true, index: true },
   hashed_password: { type: String, default: '' },
   bio: { type: String, default: null },
-  is_pro: { type: Boolean, default: false },
+  // is_pro removed — Pro status is derived from user_subscriptions collection
   provider: { type: String, default: 'local' },
   preferences: { type: userPreferencesSchema, default: () => ({}) },
   created_at: { type: Date, default: Date.now },

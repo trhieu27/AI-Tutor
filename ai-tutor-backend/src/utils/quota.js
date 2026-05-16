@@ -1,4 +1,4 @@
-const { UsageLog, User } = require('../db/models');
+const { UsageLog, User, UserSubscription } = require('../db/models');
 const config = require('../config');
 
 function todayUTC() {
@@ -13,6 +13,13 @@ async function getUser(userId) {
     throw err;
   }
   return user;
+}
+
+async function isUserPro(userId) {
+  const sub = await UserSubscription.findOne({ user_id: userId, status: 'active' }).lean();
+  if (!sub || sub.plan_id === 'free') return false;
+  if (sub.expires_at && new Date(sub.expires_at) < new Date()) return false;
+  return true;
 }
 
 async function usageToday(userId, feature) {
@@ -30,7 +37,7 @@ function requireDocQuota() {
     try {
       const userId = req.userId;
       const user = await getUser(userId);
-      if (user.is_pro) return next();
+      if (await isUserPro(userId)) return next();
 
       const { Document } = require('../db/models');
       const total = await Document.countDocuments({ owner_id: userId });
@@ -53,7 +60,7 @@ function requireChatQuota() {
     try {
       const userId = req.userId;
       const user = await getUser(userId);
-      if (user.is_pro) return next();
+      if (await isUserPro(userId)) return next();
 
       const used = await usageToday(userId, 'chat_messages');
       const limit = config.freeLimits.chatMessages;
@@ -71,14 +78,12 @@ function requireChatQuota() {
 }
 
 async function recordChatUsage(userId) {
-  const user = await getUser(userId);
-  if (user.is_pro) return;
+  if (await isUserPro(userId)) return;
   await recordUsage(userId, 'chat_messages');
 }
 
 async function checkAndRecordAiQuota(userId) {
-  const user = await getUser(userId);
-  if (user.is_pro) return;
+  if (await isUserPro(userId)) return;
 
   const used = await usageToday(userId, 'ai_features');
   const limit = config.freeLimits.aiFeatures;
@@ -99,4 +104,5 @@ module.exports = {
   checkAndRecordAiQuota,
   usageToday,
   getUser,
+  isUserPro,
 };

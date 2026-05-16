@@ -2,14 +2,14 @@ const express = require('express');
 const router = express.Router();
 const { Document, UsageLog } = require('../db/models');
 const { authMiddleware } = require('../middleware/auth');
-const { getUser, usageToday } = require('../utils/quota');
+const { getUser, usageToday, isUserPro } = require('../utils/quota');
 const config = require('../config');
 
 // GET /api/v1/quota/me
 router.get('/me', authMiddleware, async (req, res) => {
   try {
     const user = await getUser(req.userId);
-    const isPro = Boolean(user.is_pro);
+    const isPro = await isUserPro(req.userId);
 
     if (isPro) {
       return res.json({ is_pro: true, limits: null, usage: null });

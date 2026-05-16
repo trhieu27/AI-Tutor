@@ -94,7 +94,7 @@ router.post('/login', async (req, res) => {
 
     return res.json({
       access_token, refresh_token, token_type: 'bearer',
-      user: { id: user.id, full_name: user.full_name, email: user.email, student_id: user.student_id, is_pro: user.is_pro || false },
+      user: { id: user.id, full_name: user.full_name, email: user.email, student_id: user.student_id },
     });
   } catch (err) {
     if (err.statusCode) return res.status(err.statusCode).json({ detail: err.message });

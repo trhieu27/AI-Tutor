@@ -4,15 +4,16 @@ const bcrypt = require('bcryptjs');
 const { User, UserSession } = require('../db/models');
 const { authMiddleware } = require('../middleware/auth');
 const { sendSupportEmail } = require('../utils/email');
+const { isUserPro } = require('../utils/quota');
 
-function serializeUser(user) {
+async function serializeUser(user) {
   return {
     id: user.id,
     student_id: user.student_id || '',
     full_name: user.full_name || '',
     email: user.email || '',
     bio: user.bio || null,
-    is_pro: user.is_pro || false,
+    is_pro: await isUserPro(user.id),
     preferences: user.preferences || { email_notifications: true, ai_response_detail: 'balanced' },
     created_at: user.created_at ? String(user.created_at) : '',
   };
@@ -23,7 +24,7 @@ router.get('/me', authMiddleware, async (req, res) => {
   try {
     const user = await User.findOne({ id: req.userId });
     if (!user) return res.status(404).json({ detail: 'Người dùng không tồn tại' });
-    res.json(serializeUser(user));
+    res.json(await serializeUser(user));
   } catch (err) {
     res.status(500).json({ detail: 'Lỗi server' });
   }
@@ -42,7 +43,7 @@ router.put('/profile', authMiddleware, async (req, res) => {
 
     await User.updateOne({ id: req.userId }, { $set: updates });
     const user = await User.findOne({ id: req.userId });
-    res.json(serializeUser(user));
+    res.json(await serializeUser(user));
   } catch (err) {
     res.status(500).json({ detail: 'Lỗi server' });
   }
@@ -68,16 +69,7 @@ router.put('/password', authMiddleware, async (req, res) => {
   }
 });
 
-// PUT /api/v1/users/upgrade-pro
-router.put('/upgrade-pro', authMiddleware, async (req, res) => {
-  try {
-    await User.updateOne({ id: req.userId }, { $set: { is_pro: true, updated_at: new Date() } });
-    const user = await User.findOne({ id: req.userId });
-    res.json(serializeUser(user));
-  } catch (err) {
-    res.status(500).json({ detail: 'Lỗi server' });
-  }
-});
+// (upgrade-pro endpoint removed — Pro status is determined by subscription)
 
 // PUT /api/v1/users/preferences
 router.put('/preferences', authMiddleware, async (req, res) => {
@@ -95,7 +87,7 @@ router.put('/preferences', authMiddleware, async (req, res) => {
       await User.updateOne({ id: req.userId }, { $set: updates });
     }
     const user = await User.findOne({ id: req.userId });
-    res.json(serializeUser(user));
+    res.json(await serializeUser(user));
   } catch (err) {
     res.status(500).json({ detail: 'Lỗi server' });
   }
