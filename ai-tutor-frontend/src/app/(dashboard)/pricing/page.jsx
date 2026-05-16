@@ -1,9 +1,16 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext";
 import { authFetch } from "@/services/api.service";
 import { PRICING_PAGE_TEXTS as T } from "@/constants/texts";
 import { Button, IconButton, PageFrame, SegmentedControl, Skeleton, cx } from "@/components/ui/Premium";
+import Lottie from "lottie-react";
+import successAnimData from "@/components/icons/payment_successfully.json";
+
+function SuccessAnimation() {
+  return <Lottie animationData={successAnimData} loop={false} className="mx-auto h-40 w-40 -mb-4" />;
+}
+
 
 const API = import.meta.env.VITE_API_URL || "http://localhost:8081/api/v1";
 
@@ -24,62 +31,62 @@ function visibleFeatures(plan) {
 
 function PaymentModal({ plan, onClose, onSuccess }) {
   const P = T.payment;
-  const [method, setMethod] = useState(null);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [err, setErr] = useState("");
   const [done, setDone] = useState(false);
+  const [paymentInfo, setPaymentInfo] = useState(null);
   const price = plan.discounted_price_vnd;
 
-  const methods = [
-    {
-      id: "momo",
-      label: P.method.momo,
-      icon: "account_balance_wallet",
-      className: "border-[var(--danger-border)] bg-[var(--danger-soft)] text-[var(--brand-rose)]",
-    },
-    {
-      id: "vnpay",
-      label: P.method.vnpay,
-      icon: "qr_code_2",
-      className: "border-[var(--info-border)] bg-[var(--info-soft)] text-[var(--brand-secondary)]",
-    },
-  ];
+  // Tạo đơn thanh toán khi mở modal
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await authFetch(`${API}/plans/subscribe`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ plan_id: plan.id }),
+        });
+        if (!res.ok) throw new Error((await res.json()).detail);
+        const data = await res.json();
+        if (!cancelled) setPaymentInfo(data);
+      } catch (error) {
+        if (!cancelled) setErr(error.message);
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [plan.id]);
 
-  const handlePay = async () => {
-    setErr("");
-    if (!method) {
-      setErr(P.errors.selectMethod);
-      return;
-    }
-
-    setLoading(true);
-    try {
-      const res = await authFetch(`${API}/plans/subscribe`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ plan_id: plan.id, payment_method: method }),
-      });
-      if (!res.ok) throw new Error((await res.json()).detail);
-      setDone(true);
-    } catch (error) {
-      setErr(error.message);
-    } finally {
-      setLoading(false);
-    }
-  };
+  // Poll kiểm tra thanh toán mỗi 5 giây
+  useEffect(() => {
+    if (!paymentInfo?.order_code || done) return;
+    const interval = setInterval(async () => {
+      try {
+        const res = await authFetch(`${API}/plans/check-payment/${paymentInfo.order_code}`);
+        if (res.ok) {
+          const data = await res.json();
+          if (data.paid) {
+            setDone(true);
+            clearInterval(interval);
+          }
+        }
+      } catch { /* ignore */ }
+    }, 5000);
+    return () => clearInterval(interval);
+  }, [paymentInfo?.order_code, done]);
 
   return (
     <div
       className="fixed inset-0 z-[70] flex items-center justify-center bg-[hsl(222_29%_8%/0.54)] p-4 backdrop-blur-sm"
       onClick={(event) => event.target === event.currentTarget && onClose()}
     >
-      <div className="premium-card w-full max-w-2xl overflow-hidden p-0 animate-dialog-enter">
+      <div className="premium-card w-full max-w-xl overflow-hidden p-0 animate-dialog-enter">
         {done ? (
           <div className="px-6 py-8 text-center sm:px-8">
-            <span className="mx-auto flex h-14 w-14 items-center justify-center rounded-[var(--radius-panel)] border border-[var(--success-border)] bg-[var(--success-soft)] text-[var(--brand-success)]">
-              <span className="material-symbols-outlined text-[30px]" aria-hidden="true">verified</span>
-            </span>
-            <h2 className="mt-5 text-[21px] font-bold text-[var(--foreground)]">{P.successTitle}</h2>
+            <SuccessAnimation />
+            <h2 className="mt-2 text-[21px] font-bold text-[var(--foreground)]">{P.successTitle}</h2>
             <p className="mx-auto mt-2 max-w-sm text-[13px] font-medium leading-6 text-[var(--muted)]">
               {P.successMsg(plan.display_name)}
             </p>
@@ -97,76 +104,84 @@ function PaymentModal({ plan, onClose, onSuccess }) {
               <IconButton icon="close" label={P.close} onClick={onClose} />
             </div>
 
-            <div className="grid gap-4 p-5 md:grid-cols-[0.95fr_1.05fr]">
+            <div className="p-5">
+              {/* Order summary */}
               <section className="rounded-[var(--radius-panel)] border border-[var(--border-subtle)] bg-[var(--surface)] p-4">
-                <p className="text-[11px] font-bold text-[var(--muted)]">{P.orderSummary}</p>
-                <div className="mt-4 space-y-3 text-[13px]">
-                  <div className="flex justify-between gap-4">
-                    <span className="text-[var(--muted)]">{P.plan}</span>
-                    <span className="text-right font-bold text-[var(--foreground)]">{plan.display_name}</span>
+                <div className="grid grid-cols-3 gap-2 text-[13px]">
+                  <div>
+                    <span className="text-[11px] font-bold text-[var(--muted)]">{P.plan}</span>
+                    <p className="mt-1 font-bold text-[var(--foreground)]">{plan.display_name}</p>
                   </div>
-                  <div className="flex justify-between gap-4">
-                    <span className="text-[var(--muted)]">{P.billingCycle}</span>
-                    <span className="font-semibold text-[var(--foreground)]">{billingLabel(plan)}</span>
+                  <div className="text-center">
+                    <span className="text-[11px] font-bold text-[var(--muted)]">{P.billingCycle}</span>
+                    <p className="mt-1 font-semibold text-[var(--foreground)]">{billingLabel(plan)}</p>
                   </div>
-                  <div className="border-t border-[var(--border-subtle)] pt-3">
-                    <div className="flex items-end justify-between gap-4">
-                      <span className="pb-1 text-[var(--muted)]">{P.total}</span>
-                      <span className="text-[24px] font-[820] leading-none text-[var(--foreground)]">{fmt(price)}</span>
-                    </div>
+                  <div className="text-right">
+                    <span className="text-[11px] font-bold text-[var(--muted)]">{P.total}</span>
+                    <p className="mt-1 text-[20px] font-[820] leading-none text-[var(--brand-primary)]">{fmt(price)}</p>
                   </div>
                 </div>
               </section>
 
-              <section>
-                <p className="text-[11px] font-bold text-[var(--muted)]">{P.method.title}</p>
-                <div className="mt-3 grid gap-2">
-                  {methods.map((paymentMethod) => {
-                    const selected = method === paymentMethod.id;
-                    return (
-                      <button
-                        key={paymentMethod.id}
-                        type="button"
-                        onClick={() => setMethod(paymentMethod.id)}
-                        className={cx(
-                          "flex h-14 w-full items-center gap-3.5 rounded-[var(--radius-control)] border px-4 text-left transition",
-                          selected
-                            ? "border-[var(--brand-primary)] bg-[hsl(166_61%_35%/0.06)] shadow-[var(--premium-shadow-sm)]"
-                            : "border-[var(--border-color)] bg-[var(--card-bg)] text-[var(--foreground)] hover:border-[var(--border-emphasis)] hover:bg-[var(--card-bg-hover)]"
-                        )}
+              {/* QR Section */}
+              <div className="mt-5 flex flex-col items-center text-center">
+                {loading ? (
+                  <div className="flex flex-col items-center gap-3 py-6">
+                    <div className="h-[220px] w-[220px] animate-pulse rounded-2xl bg-[var(--surface-raised)]" />
+                    <p className="text-[13px] font-medium text-[var(--muted)]">Đang tạo mã thanh toán...</p>
+                  </div>
+                ) : err ? (
+                  <div className="py-6">
+                    <span className="material-symbols-outlined text-[40px] text-[var(--brand-rose)]" aria-hidden="true">error</span>
+                    <p className="mt-2 text-[13px] font-semibold text-[var(--brand-rose)]">{err}</p>
+                    <Button variant="secondary" onClick={onClose} className="mt-4">Đóng</Button>
+                  </div>
+                ) : paymentInfo ? (
+                  <>
+                    {/* QR from payOS */}
+                    <div className="rounded-2xl border-2 border-[var(--border-emphasis)] bg-white p-2 shadow-[var(--premium-shadow-sm)]">
+                      <img
+                        src={paymentInfo.qr_code}
+                        alt="QR thanh toán"
+                        className="h-[220px] w-[220px] object-contain"
+                      />
+                    </div>
+
+                    <p className="mt-4 text-[13px] font-bold text-[var(--foreground)]">
+                      Quét mã QR để thanh toán
+                    </p>
+                    <p className="mt-1 max-w-xs text-[12px] font-medium leading-5 text-[var(--muted)]">
+                      Mở ứng dụng ngân hàng, quét mã QR phía trên để hoàn tất thanh toán
+                    </p>
+
+                    {/* Checkout link */}
+                    {paymentInfo.checkout_url && (
+                      <a
+                        href={paymentInfo.checkout_url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="mt-3 inline-flex items-center gap-1.5 text-[12px] font-bold text-[var(--brand-primary)] hover:underline"
                       >
-                        <span className={cx(
-                          "flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border",
-                          paymentMethod.className
-                        )}>
-                          <span className="material-symbols-outlined text-[18px]" aria-hidden="true">{paymentMethod.icon}</span>
-                        </span>
-                        <span className={cx("min-w-0 flex-1 truncate text-[13px] font-bold", selected ? "text-[var(--foreground)]" : "text-[var(--foreground)]")}>{paymentMethod.label}</span>
-                        <span className={cx(
-                          "material-symbols-outlined shrink-0 text-[20px] transition",
-                          selected ? "text-[var(--brand-primary)]" : "text-[var(--border-color)]"
-                        )} aria-hidden="true">
-                          {selected ? "check_circle" : "radio_button_unchecked"}
-                        </span>
-                      </button>
-                    );
-                  })}
-                </div>
-                {err && <p className="mt-3 text-[12px] font-semibold text-[var(--brand-rose)]">{err}</p>}
-                <div className="mt-4 grid grid-cols-[0.8fr_1.2fr] gap-2">
-                  <Button variant="secondary" onClick={onClose} disabled={loading}>{P.cancelBtn}</Button>
-                  <Button onClick={handlePay} disabled={loading}>
-                    {loading ? (
-                      <span className="flex items-center justify-center gap-2">
-                        <span className="h-4 w-4 animate-spin rounded-full border-2 border-current/30 border-t-current" aria-hidden="true" />
-                        {P.submitting}
-                      </span>
-                    ) : (
-                      P.submitBtn
+                        <span className="material-symbols-outlined text-[16px]" aria-hidden="true">open_in_new</span>
+                        Hoặc mở trang thanh toán
+                      </a>
                     )}
-                  </Button>
+
+                    {/* Polling indicator */}
+                    <div className="mt-3 inline-flex items-center gap-2 text-[11px] font-medium text-[var(--muted)]">
+                      <span className="h-2 w-2 animate-pulse rounded-full bg-[var(--brand-primary)]" />
+                      Đang chờ xác nhận thanh toán...
+                    </div>
+                  </>
+                ) : null}
+              </div>
+
+              {/* Cancel */}
+              {!loading && !err && (
+                <div className="mt-5 flex justify-center">
+                  <Button variant="secondary" onClick={onClose} className="w-full sm:w-auto">{P.cancelBtn}</Button>
                 </div>
-              </section>
+              )}
             </div>
           </>
         )}
@@ -309,6 +324,7 @@ export default function PricingPage() {
   const [billingAnnual, setBillingAnnual] = useState(false);
   const [selectedPlan, setSelectedPlan] = useState(null);
 
+
   const load = useCallback(async () => {
     try {
       const [plansRes, myRes] = await Promise.all([
@@ -329,6 +345,8 @@ export default function PricingPage() {
     load();
   }, [load]);
 
+
+
   const visiblePlans = useMemo(
     () => plans.filter((plan) => plan.name === "free" || (billingAnnual ? plan.billing_cycle === "annual" : plan.billing_cycle === "monthly")),
     [billingAnnual, plans]
@@ -341,6 +359,7 @@ export default function PricingPage() {
 
   return (
     <PageFrame className="min-h-[calc(100svh-72px)] space-y-5 py-6 lg:py-7">
+
       <div className="flex items-center justify-between gap-4">
         <div className="min-w-0">
           <h1 className="text-[30px] font-semibold leading-tight text-[var(--foreground)] sm:text-[34px]">
