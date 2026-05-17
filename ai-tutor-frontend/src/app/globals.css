@@ -1622,8 +1622,6 @@ select:focus-visible {
 .doc-library-scroll {
   max-height: 420px;
   overflow: auto;
-  overscroll-behavior: contain;
-  contain: paint;
 }
 
 @media (min-width: 640px) {

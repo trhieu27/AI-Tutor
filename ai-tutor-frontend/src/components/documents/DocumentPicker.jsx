@@ -135,93 +135,93 @@ export default function DocumentPicker({
         />
       ) : (
         <div>
-          <div className="max-h-[456px] space-y-3 overflow-y-auto overscroll-contain p-3 custom-scrollbar md:max-h-[480px] md:space-y-0 md:divide-y md:divide-[var(--border-subtle)] md:p-0">
-          {paginatedDocuments.map((doc) => {
-            const isSelected = String(activeId) === String(doc.id);
-            const actionTarget = actionForDocument?.(doc);
-            const rowClassName = cx(
-              "group grid gap-4 rounded-[var(--radius-panel)] border border-[var(--border-subtle)] bg-[var(--surface)] px-3.5 py-4 text-left transition-[background,border-color,box-shadow] duration-150 sm:px-5 sm:py-4 md:min-h-[96px] md:grid-cols-[minmax(0,1fr)_auto] md:items-center md:rounded-none md:border-0 md:bg-transparent md:px-5 md:shadow-none",
-              isSelected
-                ? "bg-[hsl(166_61%_35%/0.06)]"
-                : "hover:bg-[var(--surface)]"
-            );
-            const actionControlClassName = cx(
-              "inline-flex h-11 w-full shrink-0 items-center justify-center gap-2 rounded-[var(--radius-control)] border px-4 text-[13px] font-semibold leading-snug transition-[background,border-color,color,box-shadow,transform] duration-150 group-hover:-translate-y-0.5 md:ml-auto md:h-10 md:w-auto",
-              liquidAction
-                ? "border-transparent bg-[linear-gradient(135deg,var(--brand-primary),var(--brand-secondary))] text-[var(--on-primary)] shadow-[0_12px_26px_var(--shadow-primary)]"
-                : isSelected
-                  ? "border-transparent bg-[var(--brand-primary)] text-[var(--on-primary)] shadow-[0_10px_24px_var(--shadow-primary)]"
-                  : "border-[var(--border-color)] bg-[var(--surface-raised)] text-[var(--foreground)] shadow-[var(--premium-shadow-sm)] group-hover:border-[var(--border-emphasis)] group-hover:bg-[var(--card-bg-hover)]"
-            );
-            const actionControl = (
-              <span className={actionControlClassName}>
-                <span className="material-symbols-outlined text-[17px]" aria-hidden="true">
-                  {actionTarget ? actionIcon : isSelected ? "task_alt" : "radio_button_unchecked"}
-                </span>
-                <span className="truncate">
-                  {actionTarget ? actionLabel : isSelected ? DOCUMENT_PICKER_TEXTS.selected : DOCUMENT_PICKER_TEXTS.chooseSource}
-                </span>
-              </span>
-            );
-            const content = (
-              <article
-                className={rowClassName}
-              >
-                <div className="flex min-w-0 items-center gap-3.5">
-                  <span
-                    className={cx(
-                      "flex h-12 w-12 shrink-0 items-center justify-center rounded-lg border bg-[var(--surface-raised)] text-[var(--brand-primary)] shadow-[inset_0_1px_0_hsl(0_0%_100%/0.55)] md:h-11 md:w-11",
-                      isSelected ? "border-[var(--brand-primary)]" : "border-[var(--border-color)]"
-                    )}
-                  >
-                    <span className="material-symbols-outlined icon-thin text-[20px]">{getDocumentIcon(doc)}</span>
+          <div className="max-h-[456px] space-y-3 overflow-y-auto p-3 custom-scrollbar md:max-h-[480px] md:space-y-0 md:divide-y md:divide-[var(--border-subtle)] md:p-0">
+            {paginatedDocuments.map((doc) => {
+              const isSelected = String(activeId) === String(doc.id);
+              const actionTarget = actionForDocument?.(doc);
+              const rowClassName = cx(
+                "group grid gap-4 rounded-[var(--radius-panel)] border border-[var(--border-subtle)] bg-[var(--surface)] px-3.5 py-4 text-left transition-[background,border-color,box-shadow] duration-150 sm:px-5 sm:py-4 md:min-h-[96px] md:grid-cols-[minmax(0,1fr)_auto] md:items-center md:rounded-none md:border-0 md:bg-transparent md:px-5 md:shadow-none",
+                isSelected
+                  ? "bg-[hsl(166_61%_35%/0.06)]"
+                  : "hover:bg-[var(--surface)]"
+              );
+              const actionControlClassName = cx(
+                "inline-flex h-11 w-full shrink-0 items-center justify-center gap-2 rounded-[var(--radius-control)] border px-4 text-[13px] font-semibold leading-snug transition-[background,border-color,color,box-shadow,transform] duration-150 group-hover:-translate-y-0.5 md:ml-auto md:h-10 md:w-auto",
+                liquidAction
+                  ? "border-transparent bg-[linear-gradient(135deg,var(--brand-primary),var(--brand-secondary))] text-[var(--on-primary)] shadow-[0_12px_26px_var(--shadow-primary)]"
+                  : isSelected
+                    ? "border-transparent bg-[var(--brand-primary)] text-[var(--on-primary)] shadow-[0_10px_24px_var(--shadow-primary)]"
+                    : "border-[var(--border-color)] bg-[var(--surface-raised)] text-[var(--foreground)] shadow-[var(--premium-shadow-sm)] group-hover:border-[var(--border-emphasis)] group-hover:bg-[var(--card-bg-hover)]"
+              );
+              const actionControl = (
+                <span className={actionControlClassName}>
+                  <span className="material-symbols-outlined text-[17px]" aria-hidden="true">
+                    {actionTarget ? actionIcon : isSelected ? "task_alt" : "radio_button_unchecked"}
                   </span>
-                  <div className="min-w-0 flex-1">
-                    <h3 className="truncate text-[13px] font-semibold leading-5 text-[var(--foreground)] md:line-clamp-2 md:whitespace-normal">
-                      {getDocumentName(doc)}
-                    </h3>
-                    <p className="mt-1 truncate text-[11px] font-semibold leading-5 text-[var(--muted)] md:line-clamp-2 md:whitespace-normal">
-                      {getDocumentExt(doc)} · {getDocumentSize(doc)} · {getDocumentDate(doc)} · {getDocumentPages(doc)}
-                    </p>
+                  <span className="truncate">
+                    {actionTarget ? actionLabel : isSelected ? DOCUMENT_PICKER_TEXTS.selected : DOCUMENT_PICKER_TEXTS.chooseSource}
+                  </span>
+                </span>
+              );
+              const content = (
+                <article
+                  className={rowClassName}
+                >
+                  <div className="flex min-w-0 items-center gap-3.5">
+                    <span
+                      className={cx(
+                        "flex h-12 w-12 shrink-0 items-center justify-center rounded-lg border bg-[var(--surface-raised)] text-[var(--brand-primary)] shadow-[inset_0_1px_0_hsl(0_0%_100%/0.55)] md:h-11 md:w-11",
+                        isSelected ? "border-[var(--brand-primary)]" : "border-[var(--border-color)]"
+                      )}
+                    >
+                      <span className="material-symbols-outlined icon-thin text-[20px]">{getDocumentIcon(doc)}</span>
+                    </span>
+                    <div className="min-w-0 flex-1">
+                      <h3 className="truncate text-[13px] font-semibold leading-5 text-[var(--foreground)] md:line-clamp-2 md:whitespace-normal">
+                        {getDocumentName(doc)}
+                      </h3>
+                      <p className="mt-1 truncate text-[11px] font-semibold leading-5 text-[var(--muted)] md:line-clamp-2 md:whitespace-normal">
+                        {getDocumentExt(doc)} · {getDocumentSize(doc)} · {getDocumentDate(doc)} · {getDocumentPages(doc)}
+                      </p>
+                    </div>
+                    <span className="hidden shrink-0 md:block">
+                      <StatusBadge status={normalizeDocumentStatus(doc.status)} />
+                    </span>
                   </div>
-                  <span className="hidden shrink-0 md:block">
-                    <StatusBadge status={normalizeDocumentStatus(doc.status)} />
-                  </span>
-                </div>
 
-                <div className="flex items-center gap-2 md:justify-end">
-                  {actionControl}
-                </div>
-              </article>
-            );
+                  <div className="flex items-center gap-2 md:justify-end">
+                    {actionControl}
+                  </div>
+                </article>
+              );
 
-            if (actionTarget) {
+              if (actionTarget) {
+                return (
+                  <Link
+                    key={doc.id}
+                    to={actionTarget}
+                    className="block focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--focus-ring)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--background)]"
+                    aria-label={`${actionLabel}: ${getDocumentName(doc)}`}
+                  >
+                    {content}
+                  </Link>
+                );
+              }
+
               return (
-                <Link
+                <button
                   key={doc.id}
-                  to={actionTarget}
-                  className="block focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--focus-ring)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--background)]"
-                  aria-label={`${actionLabel}: ${getDocumentName(doc)}`}
+                  type="button"
+                  className="block w-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--focus-ring)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--background)]"
+                  onClick={() => {
+                    setLocalSelectedId(doc.id);
+                    onSelect?.(doc);
+                  }}
                 >
                   {content}
-                </Link>
+                </button>
               );
-            }
-
-            return (
-              <button
-                key={doc.id}
-                type="button"
-                className="block w-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--focus-ring)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--background)]"
-                onClick={() => {
-                  setLocalSelectedId(doc.id);
-                  onSelect?.(doc);
-                }}
-              >
-                {content}
-              </button>
-            );
-          })}
+            })}
           </div>
           <div className="pagination-bar">
             <div className="flex items-center justify-between gap-2">
