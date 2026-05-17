@@ -383,7 +383,7 @@ export default function Dashboard() {
           </div>
           {recentSessions.length > 0 ? (
             <div className="space-y-2">
-              {recentSessions.map((session) => (
+              {recentSessions.slice(0, 3).map((session) => (
                 <SessionRow
                   key={session.id || `${session.documentId}-${session.updatedAt}`}
                   session={session}
