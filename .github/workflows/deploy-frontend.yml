@@ -70,6 +70,11 @@ jobs:
               echo "Docker Compose: $(sudo docker compose version)"
             fi
 
+            echo "🧹 Stopping all containers and freeing disk..."
+            sudo docker stop $(sudo docker ps -aq) 2>/dev/null || true
+            sudo docker rm -f $(sudo docker ps -aq) 2>/dev/null || true
+            sudo docker system prune -af --volumes 2>/dev/null || true
+
             echo "🔨 Building and restarting frontend..."
             sudo docker compose -f docker-compose.prod.yml build --no-cache frontend
             sudo docker compose -f docker-compose.prod.yml up -d --force-recreate frontend nginx
