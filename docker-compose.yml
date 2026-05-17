@@ -1,0 +1,81 @@
+# ============================================================
+# docker-compose.yml — Local Development
+# Chạy toàn bộ (ChromaDB + Backend + Frontend) bằng 1 lệnh:
+#   docker compose up -d
+# Dừng tất cả:
+#   docker compose down
+# ============================================================
+
+services:
+  # -------------------------------------------------------
+  # ChromaDB — Vector Database cho RAG
+  # -------------------------------------------------------
+  chromadb:
+    image: chromadb/chroma:latest
+    container_name: ai_tutor_chromadb
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    volumes:
+      - chroma_data:/chroma/chroma
+    networks:
+      - ai_tutor_network
+
+  # -------------------------------------------------------
+  # Backend Node.js (dev mode với nodemon auto-reload)
+  # -------------------------------------------------------
+  backend:
+    build:
+      context: ./ai-tutor-backend
+      dockerfile: Dockerfile.dev
+    container_name: ai_tutor_backend
+    restart: unless-stopped
+    ports:
+      - "8081:8081"
+    volumes:
+      # Mount source code để nodemon auto-reload khi thay đổi
+      - ./ai-tutor-backend/src:/app/src
+      - ./ai-tutor-backend/storage:/app/storage
+    env_file:
+      - ./ai-tutor-backend/.env
+    environment:
+      # Override CHROMA_URL để dùng Docker internal network
+      - CHROMA_URL=http://chromadb:8000
+      - NODE_ENV=development
+    depends_on:
+      - chromadb
+    networks:
+      - ai_tutor_network
+
+  # -------------------------------------------------------
+  # Frontend Vite (dev mode với HMR hot-reload)
+  # -------------------------------------------------------
+  frontend:
+    build:
+      context: ./ai-tutor-frontend
+      dockerfile: Dockerfile.dev
+    container_name: ai_tutor_frontend
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    volumes:
+      # Mount source code để HMR hot-reload khi thay đổi
+      - ./ai-tutor-frontend/src:/app/src
+      - ./ai-tutor-frontend/public:/app/public
+      - ./ai-tutor-frontend/index.html:/app/index.html
+    environment:
+      - VITE_API_URL=http://localhost:8081/api/v1
+      - VITE_GOOGLE_CLIENT_ID=801791613238-tqiu8qenj6uqitun0qv3emr7lda965eo.apps.googleusercontent.com
+      - VITE_WS_URL=ws://localhost:8081
+    depends_on:
+      - backend
+    networks:
+      - ai_tutor_network
+
+networks:
+  ai_tutor_network:
+    driver: bridge
+
+volumes:
+  chroma_data:
+

@@ -1,0 +1,16 @@
+# Dockerfile.dev — Backend dev mode (nodemon auto-reload)
+FROM node:20-alpine
+
+WORKDIR /app
+
+COPY package*.json ./
+RUN npm install
+
+COPY . .
+
+RUN mkdir -p ./storage/uploads
+
+EXPOSE 8081
+
+# Dùng nodemon để auto-reload khi code thay đổi
+CMD ["npx", "nodemon", "src/server.js"]
