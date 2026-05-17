@@ -1,7 +1,10 @@
 /**
- * RAG Pipeline — Node.js implementation
+ * RAG Pipeline — Node.js implementation (Production-grade)
  *
- * Replaces the Python FastAPI RAG service.
+ * Full retrieval pipeline:
+ *   Query Rewriting → Retrieval Strategy Router → Hybrid Search / CAG / Hierarchy
+ *   → Re-ranking → Context Selection → Grounded Answer Generation → Citations
+ *
  * Provides: ingest, ask, summarize, quiz, mindmap, studyQuestions, deleteCollection
  */
 
@@ -10,6 +13,13 @@ const { extractText } = require('./extractor');
 const { chunkText } = require('./chunker');
 const { embedTexts, embedQuery, generateText, generateStream } = require('./gemini');
 const vectorstore = require('./vectorstore');
+const { rewriteQuery } = require('./query-rewriter');
+const { hybridSearch } = require('./hybrid-search');
+const { rerankResults } = require('./reranker');
+const { selectContext } = require('./context-selector');
+const { chooseRetrievalStrategy, describeStrategy } = require('./retrieval-router');
+const { classifyKnowledgeType, getCachedStaticContext, setCachedStaticContext, invalidateKnowledgeCache } = require('./knowledge-cache');
+const { getDocumentHierarchy, retrieveByHierarchy, formatHierarchicalSources, invalidateHierarchy } = require('./hierarchy-builder');
 
 function throwIfAborted(signal) {
   if (!signal?.aborted) return;
@@ -55,30 +65,166 @@ async function ingest(filePath, documentId) {
 
   await vectorstore.addDocuments(collectionName, ids, embeddings, chunks, chunkRecords.map(record => record.metadata));
 
+  // Invalidate any cached hierarchy/knowledge for this collection
+  invalidateKnowledgeCache(collectionName);
+  invalidateHierarchy(collectionName);
+
   return { collection_name: collectionName, page_count: pageCount };
 }
 
-// ── Ask ───────────────────────────────────────────────────────────────────────
+// ── Ask (Production-grade pipeline) ───────────────────────────────────────────
 
 /**
- * RAG-based Q&A.
+ * Production-grade RAG-based Q&A pipeline.
+ *
+ * Flow: Query Rewriting → Strategy Router → Search → Re-rank → Context Selection → Answer
  *
  * @param {string} collectionName
  * @param {string} question
  * @param {Array<{role:'human'|'ai', content:string}>} chatHistory
- * @returns {{ answer: string, sources: string[] }}
+ * @param {object} [options] - { signal, documentMetadata, debug }
+ * @returns {{ answer, sources, pipeline }}
  */
 async function ask(collectionName, question, chatHistory = [], options = {}) {
-  const { signal } = options;
-  throwIfAborted(signal);
-  // Retrieve relevant context
-  const queryVec = await embedQuery(question, signal ? { signal } : undefined);
-  throwIfAborted(signal);
-  const sourceChunks = await vectorstore.queryCollectionWithMetadata(collectionName, queryVec, 6);
-  const chunks = sourceChunks.map(source => source.text);
+  const { signal, documentMetadata = {}, debug = false } = options;
+  const pipelineLog = {
+    originalQuery: question,
+    rewrittenQuery: null,
+    strategy: null,
+    strategyReasons: [],
+    cacheHit: false,
+    searchResultCount: 0,
+    rerankedCount: 0,
+    selectedCount: 0,
+    tokenEstimate: 0,
+    timings: {},
+  };
+  const startTime = Date.now();
+
   throwIfAborted(signal);
 
-  const context = chunks.join('\n\n---\n\n');
+  // ── Early check: verify collection has data ──
+  // Catches the case where ChromaDB data was lost (e.g. Docker volume reset)
+  // while MongoDB still shows the document as READY
+  const allDocs = await vectorstore.getAllDocuments(collectionName);
+  if (!allDocs || allDocs.length === 0) {
+    return {
+      answer: 'Tài liệu này cần được xử lý lại. Dữ liệu tìm kiếm không còn trong hệ thống — có thể do cơ sở dữ liệu vector đã được khởi tạo lại.\n\nVui lòng nhấn nút **Xử lý lại** (⟳) trong thư viện tài liệu để tạo lại dữ liệu.',
+      sources: [],
+      pipeline: {
+        strategy: 'none',
+        strategyDescription: 'Không có dữ liệu',
+        cacheHit: false,
+        searchResultCount: 0,
+        selectedCount: 0,
+        totalTimeMs: Date.now() - startTime,
+        error: 'empty_collection',
+      },
+    };
+  }
+
+  // ── Step 1: Query Rewriting ──
+  const rewriteStart = Date.now();
+  const rewrittenQuery = await rewriteQuery(question, chatHistory, { signal });
+  pipelineLog.rewrittenQuery = rewrittenQuery;
+  pipelineLog.timings.rewrite = Date.now() - rewriteStart;
+  throwIfAborted(signal);
+
+  // ── Step 2: Retrieval Strategy Router ──
+  const docMeta = { ...documentMetadata, collectionName };
+  const { strategy, reasons, cacheHit } = chooseRetrievalStrategy(rewrittenQuery, docMeta, chatHistory);
+  pipelineLog.strategy = strategy;
+  pipelineLog.strategyReasons = reasons;
+
+  let retrievedChunks = [];
+
+  // ── Step 3: Execute retrieval based on strategy ──
+  const searchStart = Date.now();
+
+  if (strategy === 'cag_cached' && cacheHit?.hit) {
+    // CAG: Use cached context
+    pipelineLog.cacheHit = true;
+    const cachedContext = cacheHit.context;
+    retrievedChunks = cachedContext.selectedChunks || [];
+    pipelineLog.searchResultCount = retrievedChunks.length;
+
+  } else if (strategy === 'combined') {
+    // Combined: Hybrid search + Hierarchical retrieval
+    const [hybridResults, hierarchyResults] = await Promise.all([
+      hybridSearch(collectionName, rewrittenQuery, { nResults: 8, signal }),
+      (async () => {
+        const hierarchy = await getDocumentHierarchy(collectionName);
+        if (!hierarchy) return [];
+        return retrieveByHierarchy(rewrittenQuery, hierarchy, { maxChunks: 4 });
+      })(),
+    ]);
+    throwIfAborted(signal);
+
+    // Merge results, prioritizing hybrid but adding hierarchy context
+    const seen = new Set();
+    for (const chunk of [...hybridResults, ...hierarchyResults]) {
+      const key = (chunk.text || '').slice(0, 200);
+      if (!seen.has(key)) {
+        seen.add(key);
+        retrievedChunks.push(chunk);
+      }
+    }
+    pipelineLog.searchResultCount = retrievedChunks.length;
+
+  } else if (strategy === 'hierarchical') {
+    // Pure hierarchical retrieval
+    const hierarchy = await getDocumentHierarchy(collectionName);
+    if (hierarchy) {
+      retrievedChunks = await retrieveByHierarchy(rewrittenQuery, hierarchy, { maxChunks: 6 });
+    }
+    // Fallback to hybrid if hierarchy fails
+    if (retrievedChunks.length === 0) {
+      retrievedChunks = await hybridSearch(collectionName, rewrittenQuery, { nResults: 8, signal });
+    }
+    pipelineLog.searchResultCount = retrievedChunks.length;
+
+  } else {
+    // hybrid_rag or standard_rag: Hybrid search
+    retrievedChunks = await hybridSearch(collectionName, rewrittenQuery, { nResults: 10, signal });
+    pipelineLog.searchResultCount = retrievedChunks.length;
+  }
+
+  pipelineLog.timings.search = Date.now() - searchStart;
+  throwIfAborted(signal);
+
+  // ── Step 4: Re-ranking ──
+  const rerankStart = Date.now();
+  let rerankedChunks;
+  if (strategy === 'cag_cached' && pipelineLog.cacheHit) {
+    // Skip re-ranking for cached results
+    rerankedChunks = retrievedChunks.map(c => ({ ...c, rerankScore: c.score }));
+  } else {
+    rerankedChunks = await rerankResults(rewrittenQuery, retrievedChunks, { maxChunks: 8, signal });
+  }
+  pipelineLog.rerankedCount = rerankedChunks.length;
+  pipelineLog.timings.rerank = Date.now() - rerankStart;
+  throwIfAborted(signal);
+
+  // ── Step 5: Context Selection ──
+  const selectStart = Date.now();
+  const { selectedChunks, contextText, tokenEstimate } = selectContext(rerankedChunks, {
+    maxTokens: 6000,
+    minScore: 0.15,
+    maxChunks: 5,
+  });
+  pipelineLog.selectedCount = selectedChunks.length;
+  pipelineLog.tokenEstimate = tokenEstimate;
+  pipelineLog.timings.select = Date.now() - selectStart;
+  throwIfAborted(signal);
+
+  // Cache context for future reuse (if static knowledge)
+  if (!pipelineLog.cacheHit && selectedChunks.length > 0) {
+    const knowledgeType = classifyKnowledgeType(question, docMeta);
+    setCachedStaticContext(collectionName, rewrittenQuery, { selectedChunks, contextText, tokenEstimate }, { knowledgeType });
+  }
+
+  // ── Step 6: Grounded Answer Generation ──
+  const generateStart = Date.now();
 
   // Format chat history
   const historyText = chatHistory
@@ -87,26 +233,60 @@ async function ask(collectionName, question, chatHistory = [], options = {}) {
 
   const prompt = `Bạn là trợ lý AI hỗ trợ học tập thông minh. Dựa trên nội dung tài liệu được cung cấp, hãy trả lời câu hỏi một cách chính xác, rõ ràng và có cấu trúc.
 
+QUY TẮC QUAN TRỌNG:
+- CHỈ trả lời dựa trên nội dung tài liệu được cung cấp bên dưới
+- Nếu thông tin KHÔNG có trong tài liệu, hãy nói rõ: "Tài liệu không chứa đủ thông tin để trả lời câu hỏi này"
+- KHÔNG bịa đặt hoặc thêm thông tin không có trong tài liệu
+- Khi trích dẫn, ghi rõ trang nguồn, ví dụ: "(Trang 6)" hoặc "(Trang 1, Trang 8)". CHỈ dùng số trang có trong phần NỘI DUNG TÀI LIỆU bên dưới
+- KHÔNG ĐƯỢC viết "Theo Nguồn 1", "Nguồn 5" hay bất kỳ số nguồn nào — chỉ dùng số trang
+- Trả lời bằng tiếng Việt, rõ ràng và có cấu trúc
+
 NỘI DUNG TÀI LIỆU:
-${context}
+${contextText || '(Không tìm thấy nội dung liên quan trong tài liệu)'}
 
-${historyText ? `LỊCH SỬ CUỘC TRÒ CHUYỆN:\n${historyText}\n` : ''}
-CÂU HỎI: ${question}
+${historyText ? `LỊCH SỬ CUỘC TRÒ CHUYỆN:\n${historyText}\n` : ''}CÂU HỎI GỐC: ${question}${rewrittenQuery !== question ? `\nCÂU HỎI ĐÃ PHÂN TÍCH: ${rewrittenQuery}` : ''}
 
-Hãy trả lời dựa trên nội dung tài liệu. Nếu câu hỏi không liên quan đến tài liệu hoặc thông tin không có trong tài liệu, hãy nói rõ điều đó một cách lịch sự.`;
+Hãy trả lời:`;
 
   const answer = await generateText(prompt, { temperature: 0.2, signal });
+  pipelineLog.timings.generate = Date.now() - generateStart;
+  pipelineLog.timings.total = Date.now() - startTime;
   throwIfAborted(signal);
 
-  return {
+  // ── Step 7: Format sources ──
+  const sources = selectedChunks.map((chunk, index) => {
+    const page = chunk.metadata?.page_number;
+    const title = page ? `Trang ${page}` : chunk.metadata?.section || `Đoạn ${index + 1}`;
+    return {
+      title,
+      text: chunk.text.slice(0, 320) + (chunk.text.length > 320 ? '...' : ''),
+      page_number: page,
+      document_id: chunk.metadata?.document_id,
+      section: chunk.metadata?.section || null,
+    };
+  });
+
+  const result = {
     answer,
-    sources: sourceChunks.slice(0, 3).map((source, index) => ({
-      title: `Trích dẫn ${index + 1}`,
-      text: source.text.slice(0, 320) + (source.text.length > 320 ? '...' : ''),
-      page_number: source.metadata?.page_number,
-      document_id: source.metadata?.document_id,
-    })),
+    sources,
   };
+
+  // Include pipeline metadata for debug/advanced mode
+  if (debug) {
+    result.pipeline = {
+      ...pipelineLog,
+      strategyDescription: describeStrategy(strategy),
+    };
+  } else {
+    // Minimal pipeline info: just strategy label + time for the chat badge
+    result.pipeline = {
+      strategy,
+      strategyDescription: describeStrategy(strategy),
+      totalTimeMs: pipelineLog.timings.total,
+    };
+  }
+
+  return result;
 }
 
 // ── Summarize ─────────────────────────────────────────────────────────────────
@@ -117,6 +297,10 @@ Hãy trả lời dựa trên nội dung tài liệu. Nếu câu hỏi không li�
  */
 async function* summarize(collectionName) {
   const chunks = await vectorstore.getAllDocuments(collectionName);
+  if (!chunks || chunks.length === 0) {
+    yield 'Tài liệu này cần được xử lý lại. Dữ liệu không còn trong hệ thống — vui lòng nhấn nút **Xử lý lại** (⟳) trong thư viện tài liệu.';
+    return;
+  }
   // Use first 30 chunks to stay within token limits
   const context = chunks.slice(0, 30).join('\n\n');
 
@@ -142,6 +326,10 @@ ${context}`;
  */
 async function* quiz(collectionName) {
   const chunks = await vectorstore.getAllDocuments(collectionName);
+  if (!chunks || chunks.length === 0) {
+    yield '[{"question":"Tài liệu cần được xử lý lại. Vui lòng nhấn Xử lý lại trong thư viện.","options":["—","—","—","—"],"correct_index":0,"explanation":"Dữ liệu vector đã bị mất."}]';
+    return;
+  }
   const context = chunks.slice(0, 40).join('\n\n');
   const chunkCount = chunks.length;
   const questionRange =
@@ -190,6 +378,10 @@ ${context}`;
  */
 async function* mindmap(collectionName) {
   const chunks = await vectorstore.getAllDocuments(collectionName);
+  if (!chunks || chunks.length === 0) {
+    yield 'mindmap\n  root((Cần xử lý lại tài liệu))\n    Dữ liệu vector đã bị mất\n      Nhấn Xử lý lại trong thư viện';
+    return;
+  }
   const context = chunks.slice(0, 25).join('\n\n');
 
   const prompt = `Bạn là chuyên gia tổ chức kiến thức. Dựa vào nội dung tài liệu học tập bên dưới, hãy tạo sơ đồ tư duy (mindmap) bằng cú pháp Mermaid.
@@ -247,6 +439,10 @@ ${context}`;
  */
 async function* studyQuestions(collectionName) {
   const chunks = await vectorstore.getAllDocuments(collectionName);
+  if (!chunks || chunks.length === 0) {
+    yield '1. Tài liệu cần được xử lý lại — dữ liệu vector đã bị mất. Vui lòng nhấn nút Xử lý lại (⟳) trong thư viện tài liệu.';
+    return;
+  }
   const context = chunks.slice(0, 20).join('\n\n');
 
   const prompt = `Bạn là giáo viên có kinh nghiệm. Dựa vào nội dung tài liệu học tập bên dưới, hãy tạo 10 câu hỏi ôn tập tự luận giúp học sinh hiểu sâu kiến thức.
@@ -269,6 +465,8 @@ ${context}`;
 
 async function deleteDocumentCollection(collectionName) {
   await vectorstore.deleteCollection(collectionName);
+  invalidateKnowledgeCache(collectionName);
+  invalidateHierarchy(collectionName);
 }
 
 module.exports = { ingest, ask, summarize, quiz, mindmap, studyQuestions, deleteDocumentCollection };

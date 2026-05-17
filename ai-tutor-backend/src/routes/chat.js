@@ -166,9 +166,20 @@ router.post('/:documentId/ask', authMiddleware, requireChatQuota(), async (req, 
 
     if (isClientClosed()) return;
 
-    // Call Node.js RAG pipeline
-    const { answer, sources } = await rag.ask(doc.chroma_collection_id, questionText, chatHistory, {
+    // Build document metadata for retrieval router
+    const debug = req.headers['x-debug'] === 'true';
+    const documentMetadata = {
+      pageCount: doc.page_count || 0,
+      status: doc.status,
+      updatedAt: doc.updated_at,
+      uploadedAt: doc.uploaded_at,
+    };
+
+    // Call production-grade RAG pipeline
+    const { answer, sources, pipeline } = await rag.ask(doc.chroma_collection_id, questionText, chatHistory, {
       signal: requestController.signal,
+      documentMetadata,
+      debug,
     });
 
     if (isClientClosed()) return;
@@ -195,7 +206,7 @@ router.post('/:documentId/ask', authMiddleware, requireChatQuota(), async (req, 
 
     if (isClientClosed()) return;
 
-    res.json({ session_id: sessionId, message: aiMsg });
+    res.json({ session_id: sessionId, message: aiMsg, pipeline });
   } catch (err) {
     if (isClientClosed()) return;
     if (err?.name === 'AbortError' || requestController.signal.aborted) {

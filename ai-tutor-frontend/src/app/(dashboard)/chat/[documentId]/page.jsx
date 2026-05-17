@@ -706,6 +706,18 @@ function ChatWorkspaceSkeleton() {
   );
 }
 
+function PipelineLoadingIndicator() {
+  return (
+    <div className="flex items-center gap-3 rounded-[var(--radius-panel)] border border-[var(--border-subtle)] bg-[var(--surface)] px-3.5 py-2.5" aria-live="polite">
+      <span className="relative flex h-2.5 w-2.5 shrink-0">
+        <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-[var(--brand-primary)] opacity-35" />
+        <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-[var(--brand-primary)]" />
+      </span>
+      <span className="text-[12px] font-semibold text-[var(--muted)]">Đang tìm câu trả lời...</span>
+    </div>
+  );
+}
+
 export default function ChatPage() {
   const { documentId } = useParams();
   const navigate = useNavigate();
@@ -908,6 +920,12 @@ export default function ChatPage() {
     return lastAssistant?.sources || [];
   }, [messages]);
 
+  const lastPipeline = useMemo(() => {
+    const lastAssistant = [...messages].reverse().find((message) => (message.role === "assistant" || message.isAssistant) && message.pipeline);
+    return lastAssistant?.pipeline || null;
+  }, [messages]);
+
+
   const handleSend = async () => {
     const question = input.trim();
     if (!question || isSending) return;
@@ -946,7 +964,10 @@ export default function ChatPage() {
 
       const nextSessionId = response.session_id || currentSessionId;
       if (nextSessionId && !currentSessionId) setCurrentSessionId(nextSessionId);
-      setMessages((prev) => [...prev, response.message]);
+      // Attach pipeline metadata to the message for display
+      const aiMsg = { ...response.message };
+      if (response.pipeline) aiMsg.pipeline = response.pipeline;
+      setMessages((prev) => [...prev, aiMsg]);
       await refreshSessions();
       fetchQuota().then(setQuota).catch(() => {});
     } catch (err) {
@@ -1112,22 +1133,7 @@ export default function ChatPage() {
                   />
                 ))}
                 {isSending && (
-                  <div className="flex items-center gap-2 text-[12px] font-semibold text-[var(--muted)]" aria-live="polite">
-                    <span className="relative flex h-2.5 w-2.5 shrink-0">
-                      <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-[var(--brand-primary)] opacity-35" />
-                      <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-[var(--brand-primary)]" />
-                    </span>
-                    <span>{T.page.assistantTyping}</span>
-                    <span className="inline-flex items-end gap-0.5" aria-hidden="true">
-                      {[0, 120, 240].map((delay) => (
-                        <span
-                          key={delay}
-                          className="h-1.5 w-1.5 animate-bounce rounded-full bg-[var(--brand-primary)] opacity-80 [animation-duration:900ms]"
-                          style={{ animationDelay: `${delay}ms` }}
-                        />
-                      ))}
-                    </span>
-                  </div>
+                  <PipelineLoadingIndicator />
                 )}
                 <div ref={messagesEndRef} />
               </div>
@@ -1151,7 +1157,7 @@ export default function ChatPage() {
 
         {contextOpen && (
           <div className="hidden min-h-0 lg:block">
-            <DocumentContextPanel document={docData} sources={lastSources} quota={quota} onQuickAction={handleQuickAction} />
+            <DocumentContextPanel document={docData} sources={lastSources} quota={quota} onQuickAction={handleQuickAction} lastPipeline={lastPipeline} />
           </div>
         )}
       </div>
@@ -1191,7 +1197,7 @@ export default function ChatPage() {
               aria-label={T.page.closeContext}
             />
             <div className="absolute inset-y-0 right-0 w-[min(88vw,360px)] bg-[var(--card-bg)] shadow-2xl">
-              <DocumentContextPanel document={docData} sources={lastSources} quota={quota} onQuickAction={handleQuickAction} />
+              <DocumentContextPanel document={docData} sources={lastSources} quota={quota} onQuickAction={handleQuickAction} lastPipeline={lastPipeline} />
             </div>
           </div>,
           document.body

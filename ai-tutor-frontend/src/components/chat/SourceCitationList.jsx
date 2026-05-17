@@ -14,19 +14,25 @@ function normalizeSource(source, index) {
   const page =
     source.page_number ?? source.pageNumber ?? source.page ?? source.metadata?.page_number ?? source.metadata?.page;
   const documentId = source.document_id ?? source.documentId ?? source.metadata?.document_id ?? source.metadata?.documentId;
-  const labelParts = [source.title || source.file_name || source.document_name || T.fallback(index)];
-  if (page !== undefined && page !== null && page !== "") labelParts.push(T.page(page));
+  const title = source.title || source.file_name || source.document_name || T.fallback(index);
+  const labelParts = [title];
+  // Only append page if title doesn't already contain it (e.g. "Trang 7")
+  if (page !== undefined && page !== null && page !== "" && !title.startsWith("Trang ")) labelParts.push(T.page(page));
 
   return {
     label: labelParts.join(" · "),
     page,
     documentId,
     text: source.chunk_text || source.text || source.content || source.snippet || source.page_content || "",
+    section: source.section || null,
   };
 }
 
 export default function SourceCitationList({ sources = [], compact = false, inline = false, className = "", onOpenSource }) {
-  const normalized = sources.map(normalizeSource).filter((source) => source.text || source.label);
+  const normalized = sources
+    .map(normalizeSource)
+    .filter((source) => source.text || source.label)
+    .sort((a, b) => (a.page ?? Infinity) - (b.page ?? Infinity));
   if (normalized.length === 0) return null;
 
   return (
@@ -40,7 +46,7 @@ export default function SourceCitationList({ sources = [], compact = false, inli
           className={cx(
             "group rounded-[var(--radius-panel)] border border-[var(--border-subtle)] bg-[var(--surface)] open:bg-[var(--card-bg)]",
             inline
-              ? "min-w-[150px] max-w-[220px] flex-[0_1_180px] px-3 py-2 open:max-w-none open:basis-full"
+              ? "flex-[0_1_auto] px-3 py-2 open:basis-full"
               : compact
                 ? "w-full px-3 py-2"
                 : "p-3"
@@ -51,6 +57,7 @@ export default function SourceCitationList({ sources = [], compact = false, inli
             <span className="inline-flex w-full min-w-0 items-center gap-2">
               <span className="material-symbols-outlined icon-thin shrink-0 text-[15px] text-[var(--brand-primary)]">article</span>
               <span className="min-w-0 truncate" title={source.label}>{source.label}</span>
+
               {onOpenSource && (
                 <button
                   type="button"
@@ -70,16 +77,30 @@ export default function SourceCitationList({ sources = [], compact = false, inli
               )}
             </span>
           </summary>
-          {source.text && (
-            <p
-              className={cx(
-                "mt-2 line-clamp-5 text-[12px] font-medium leading-6 text-[var(--muted)]",
-                compact && "w-full border-t border-[var(--border-subtle)] pt-2"
-              )}
-            >
-              {source.text}
-            </p>
-          )}
+
+          <div className="mt-2 space-y-1.5">
+            {/* Section label */}
+            {source.section && (
+              <div className="flex flex-wrap items-center gap-1.5 text-[10px] font-semibold text-[var(--muted)]">
+                <span className="inline-flex items-center gap-1">
+                  <span className="material-symbols-outlined icon-thin text-[12px]">segment</span>
+                  {source.section}
+                </span>
+              </div>
+            )}
+
+            {/* Content preview */}
+            {source.text && (
+              <p
+                className={cx(
+                  "line-clamp-5 text-[12px] font-medium leading-6 text-[var(--muted)]",
+                  (compact || source.section) && "w-full border-t border-[var(--border-subtle)] pt-2"
+                )}
+              >
+                {source.text}
+              </p>
+            )}
+          </div>
         </details>
       ))}
     </div>

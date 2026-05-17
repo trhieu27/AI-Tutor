@@ -11,6 +11,7 @@ export default function ChatMessage({ message, onRetry, onOpenSource }) {
   const isUser = message.role === "user" || message.isUser;
   const content = typeof message.content === "string" ? message.content : String(message.content || "");
 
+
   return (
     <article className={cx("flex", isUser && "justify-end")}>
       <div className={cx("min-w-0 max-w-[min(760px,100%)]", isUser ? "flex flex-col items-end" : "w-full")}>
