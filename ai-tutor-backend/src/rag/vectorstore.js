@@ -26,7 +26,10 @@ async function chromaFetch(method, path, body) {
   }
   // 204 No Content — nothing to parse
   if (res.status === 204) return null;
-  return res.json();
+  // Safely parse JSON to avoid "Unexpected end of JSON input" on empty body
+  const text = await res.text();
+  if (!text || !text.trim()) return null;
+  return JSON.parse(text);
 }
 
 // ── Collection helpers ────────────────────────────────────────────────────────
@@ -115,6 +118,80 @@ async function queryCollectionWithMetadata(collectionName, queryEmbedding, nResu
 }
 
 /**
+ * Query top-k chunks with metadata AND distance/relevance scores.
+ * Returns { text, metadata, score, id }[].
+ */
+async function queryCollectionWithScores(collectionName, queryEmbedding, nResults = 5) {
+  try {
+    const id  = await getOrCreateCollectionId(collectionName);
+    const res = await chromaFetch('POST', `/collections/${id}/query`, {
+      query_embeddings: [queryEmbedding],
+      n_results: nResults,
+      include: ['documents', 'metadatas', 'distances'],
+    });
+    const documents = res.documents?.[0] || [];
+    const metadatas = res.metadatas?.[0] || [];
+    const distances = res.distances?.[0] || [];
+    const ids = res.ids?.[0] || [];
+    return documents.map((text, index) => ({
+      text,
+      metadata: metadatas[index] || {},
+      // ChromaDB cosine distance: 0 = identical, 2 = opposite
+      // Convert to similarity score: 1 - (distance/2)
+      score: distances[index] !== undefined ? Math.max(0, 1 - distances[index] / 2) : 0.5,
+      id: ids[index] || null,
+    }));
+  } catch (e) {
+    console.error('queryCollectionWithScores error:', e.message);
+    return [];
+  }
+}
+
+/**
+ * Keyword-based search using ChromaDB's document $contains filter.
+ * Returns { text, metadata, score, id }[].
+ */
+async function searchByKeywords(collectionName, keywords, nResults = 5) {
+  if (!keywords || keywords.length === 0) return [];
+  try {
+    const id = await getOrCreateCollectionId(collectionName);
+    // ChromaDB supports $contains for document-level text search
+    // Use the first keyword for primary filtering (ChromaDB has limited support)
+    const primaryKeyword = keywords[0];
+    const res = await chromaFetch('POST', `/collections/${id}/get`, {
+      where_document: { '$contains': primaryKeyword },
+      include: ['documents', 'metadatas'],
+      limit: nResults * 2, // Fetch extra to allow for post-filtering
+    });
+
+    const documents = res.documents || [];
+    const metadatas = res.metadatas || [];
+    const ids = res.ids || [];
+
+    // Score by keyword match count
+    const results = documents.map((text, index) => {
+      const lowerText = (text || '').toLowerCase();
+      const matchCount = keywords.filter(kw => lowerText.includes(kw)).length;
+      return {
+        text,
+        metadata: metadatas[index] || {},
+        score: matchCount / keywords.length,
+        id: ids[index] || null,
+      };
+    });
+
+    // Sort by match score and return top results
+    return results
+      .filter(r => r.score > 0)
+      .sort((a, b) => b.score - a.score)
+      .slice(0, nResults);
+  } catch (e) {
+    console.warn('searchByKeywords error:', e.message);
+    return [];
+  }
+}
+
+/**
  * Get all document chunks in a collection (for summarize / quiz / mindmap).
  * Returns string[].
  */
@@ -127,6 +204,28 @@ async function getAllDocuments(collectionName) {
     return res.documents || [];
   } catch (e) {
     console.error('getAllDocuments error:', e.message);
+    return [];
+  }
+}
+
+/**
+ * Get all document chunks with metadata (for hierarchy building).
+ * Returns { text, metadata }[].
+ */
+async function getAllDocumentsWithMetadata(collectionName) {
+  try {
+    const id  = await getOrCreateCollectionId(collectionName);
+    const res = await chromaFetch('POST', `/collections/${id}/get`, {
+      include: ['documents', 'metadatas'],
+    });
+    const documents = res.documents || [];
+    const metadatas = res.metadatas || [];
+    return documents.map((text, index) => ({
+      text,
+      metadata: metadatas[index] || {},
+    }));
+  } catch (e) {
+    console.error('getAllDocumentsWithMetadata error:', e.message);
     return [];
   }
 }
@@ -145,4 +244,13 @@ async function deleteCollection(collectionName) {
   }
 }
 
-module.exports = { addDocuments, queryCollection, queryCollectionWithMetadata, getAllDocuments, deleteCollection };
+module.exports = {
+  addDocuments,
+  queryCollection,
+  queryCollectionWithMetadata,
+  queryCollectionWithScores,
+  searchByKeywords,
+  getAllDocuments,
+  getAllDocumentsWithMetadata,
+  deleteCollection,
+};

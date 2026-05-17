@@ -63,7 +63,9 @@ services:
       - ./ai-tutor-frontend/src:/app/src
       - ./ai-tutor-frontend/public:/app/public
       - ./ai-tutor-frontend/index.html:/app/index.html
+      - ./ai-tutor-frontend/vite.config.js:/app/vite.config.js
     environment:
+      - VITE_PROXY_TARGET=http://backend:8081
       - VITE_API_URL=http://localhost:8081/api/v1
       - VITE_GOOGLE_CLIENT_ID=801791613238-tqiu8qenj6uqitun0qv3emr7lda965eo.apps.googleusercontent.com
       - VITE_WS_URL=ws://localhost:8081

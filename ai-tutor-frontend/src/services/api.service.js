@@ -21,6 +21,19 @@ const getAuthHeaders = () => {
   };
   return {};
 };
+/**
+ * Safely parse response body as JSON.
+ * Prevents "Unexpected end of JSON input" when proxy returns empty/non-JSON body.
+ */
+async function safeJson(res, fallback = null) {
+  try {
+    const text = await res.text();
+    if (!text || !text.trim()) return fallback;
+    return JSON.parse(text);
+  } catch {
+    return fallback;
+  }
+}
 export async function authFetch(url, options = {}) {
   const headers = {
     ...options.headers,
@@ -82,18 +95,22 @@ export async function uploadDocument(file) {
     } catch { }
     throw new Error(errorDetail);
   }
-  return res.json();
+  const data = await safeJson(res);
+  if (!data) throw new Error('Không nhận được phản hồi từ máy chủ');
+  return data;
 }
 export async function fetchDocuments() {
   const res = await authFetch(`${API_BASE}/documents`);
   if (!res.ok) throw new Error('Không thể tải danh sách tài liệu');
-  const data = await res.json();
+  const data = await safeJson(res, []);
   return data.map(d => Document.fromJSON(d));
 }
 export async function fetchDocument(documentId) {
   const res = await authFetch(`${API_BASE}/documents/${documentId}`);
   if (!res.ok) throw new Error('Không tìm thấy tài liệu');
-  return Document.fromJSON(await res.json());
+  const data = await safeJson(res);
+  if (!data) throw new Error('Không nhận được dữ liệu tài liệu');
+  return Document.fromJSON(data);
 }
 export async function fetchDocumentFileBlob(documentId) {
   const res = await authFetch(`${API_BASE}/documents/${documentId}/file`);
@@ -109,7 +126,7 @@ export async function locateDocumentCitation(documentId, text) {
     body: JSON.stringify({ text })
   });
   if (!res.ok) throw new Error('Không thể tìm trang trích dẫn');
-  return res.json();
+  return safeJson(res, {});
 }
 export async function deleteDocument(documentId) {
   const res = await authFetch(`${API_BASE}/documents/${documentId}`, {
@@ -122,28 +139,29 @@ export async function retryDocument(documentId) {
     method: 'POST'
   });
   if (!res.ok) throw new Error('Yêu cầu xử lý lại thất bại');
-  return res.json();
+  return safeJson(res, {});
 }
 export async function askQuestion(documentId, request, signal) {
+  const headers = { 'Content-Type': 'application/json' };
+  // Pass debug header for advanced mode
+  if (request.debug) headers['X-Debug'] = 'true';
+
   const res = await authFetch(`${API_BASE}/chat/${documentId}/ask`, {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json'
-    },
+    headers,
     body: JSON.stringify(request),
     signal
   });
   if (!res.ok) {
     if (res.status === 429) {
-      const err = await res.json().catch(() => ({}));
+      const err = await safeJson(res, {});
       throw new QuotaError(err.detail || 'Quota exceeded');
     }
-    const error = await res.json().catch(() => ({
-      detail: 'Hỏi thất bại'
-    }));
+    const error = await safeJson(res, { detail: 'Hỏi thất bại' });
     throw new Error(error.detail || 'Hỏi thất bại');
   }
-  const data = await res.json();
+  const data = await safeJson(res);
+  if (!data || !data.message) throw new Error('Không nhận được phản hồi từ máy chủ');
   const msgContent = data.message.content;
   if (Array.isArray(msgContent)) data.message.content = msgContent.map(p => p.text || '').join(''); else if (typeof msgContent === 'object' && msgContent !== null) data.message.content = msgContent.text || JSON.stringify(msgContent);
   return data;
@@ -151,22 +169,22 @@ export async function askQuestion(documentId, request, signal) {
 export async function fetchChatSessions(documentId) {
   const res = await authFetch(`${API_BASE}/chat/${documentId}/sessions`);
   if (!res.ok) throw new Error('Không thể tải lịch sử chat');
-  const data = await res.json();
+  const data = await safeJson(res, []);
   return data.map(s => ChatSession.fromJSON(s));
 }
 export async function fetchRecentChatSessions(limit = 5) {
   const res = await authFetch(`${API_BASE}/chat/sessions/recent?limit=${encodeURIComponent(limit)}`);
   if (!res.ok) throw new Error('Không thể tải lịch sử chat gần đây');
-  const data = await res.json();
+  const data = await safeJson(res, []);
   return data.map(s => ChatSession.fromJSON(s));
 }
 export async function fetchSessionDetail(sessionId) {
   const res = await authFetch(`${API_BASE}/chat/sessions/${sessionId}`);
   if (!res.ok) {
-    const e = await res.json().catch(() => ({}));
+    const e = await safeJson(res, {});
     throw new Error(`[${res.status}] ${e.detail || 'Không tìm thấy phiên chat'}`);
   }
-  return res.json();
+  return safeJson(res, {});
 }
 export async function deleteChatSession(sessionId) {
   const res = await authFetch(`${API_BASE}/chat/sessions/${sessionId}`, {
@@ -202,7 +220,7 @@ export async function fetchDocumentSummaryStream(documentId, onChunk, signal) {
   });
   if (!res.ok) {
     if (res.status === 429) {
-      const e = await res.json().catch(() => ({}));
+      const e = await safeJson(res, {});
       throw new QuotaError(e.detail || 'Quota exceeded');
     }
     throw new Error('Không thể tạo bản tóm tắt');
@@ -222,7 +240,7 @@ export async function fetchDocumentQuizStream(documentId, onChunk, force = false
   });
   if (!res.ok) {
     if (res.status === 429) {
-      const e = await res.json().catch(() => ({}));
+      const e = await safeJson(res, {});
       throw new QuotaError(e.detail || 'Quota exceeded');
     }
     throw new Error('Không thể tạo bài kiểm tra');
@@ -245,7 +263,7 @@ export async function fetchDocumentMindmapStream(documentId, onChunk, signal, fo
   });
   if (!res.ok) {
     if (res.status === 429) {
-      const e = await res.json().catch(() => ({}));
+      const e = await safeJson(res, {});
       throw new QuotaError(e.detail || 'Quota exceeded');
     }
     throw new Error('Không thể tạo sơ đồ tư duy');
@@ -270,7 +288,7 @@ export async function updateDocumentMindmap(documentId, mindmapCode) {
     })
   });
   if (!res.ok) {
-    const e = await res.json().catch(() => ({}));
+    const e = await safeJson(res, {});
     throw new Error(e.detail || 'Không thể cập nhật sơ đồ tư duy');
   }
 }
@@ -280,7 +298,7 @@ export async function fetchDocumentStudyQuestionsStream(documentId, onChunk, sig
   });
   if (!res.ok) {
     if (res.status === 429) {
-      const e = await res.json().catch(() => ({}));
+      const e = await safeJson(res, {});
       throw new QuotaError(e.detail || 'Quota exceeded');
     }
     throw new Error('Không thể tạo câu hỏi ôn tập');
@@ -297,12 +315,14 @@ export async function fetchDocumentStudyQuestions(documentId, signal) {
 export async function fetchQuota() {
   const res = await authFetch(`${API_BASE}/quota/me`);
   if (!res.ok) throw new Error('Không thể tải thông tin quota');
-  return Quota.fromJSON(await res.json());
+  const data = await safeJson(res);
+  if (!data) throw new Error('Không nhận được dữ liệu quota');
+  return Quota.fromJSON(data);
 }
 export async function fetchNotifications(limit = 30) {
   const res = await authFetch(`${API_BASE}/notifications?limit=${limit}`);
   if (!res.ok) return [];
-  const data = await res.json();
+  const data = await safeJson(res, []);
   return data.map(n => Notification.fromJSON(n));
 }
 export async function markNotificationRead(notifId) {
