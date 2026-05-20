@@ -12,6 +12,8 @@ const userSchema = new mongoose.Schema({
   student_id: { type: String, required: true },
   full_name: { type: String, required: true },
   email: { type: String, required: true, unique: true, index: true },
+  role: { type: String, enum: ['STUDENT', 'ADMIN'], default: 'STUDENT', index: true },
+  status: { type: String, enum: ['active', 'blocked', 'deleted'], default: 'active', index: true },
   hashed_password: { type: String, default: '' },
   bio: { type: String, default: null },
   // is_pro removed — Pro status is derived from user_subscriptions collection
@@ -178,6 +180,38 @@ const notificationSchema = new mongoose.Schema({
   created_at: { type: String },
 });
 
+// ── Payment Transaction ──────────────────────────────────────────────────────
+
+const paymentTransactionSchema = new mongoose.Schema({
+  id: { type: String, required: true, unique: true, index: true },
+  user_id: { type: String, required: true, index: true },
+  plan_id: { type: String, required: true, index: true },
+  provider: { type: String, default: 'unknown' },
+  transaction_id: { type: String, default: null, index: true },
+  amount_vnd: { type: Number, default: 0 },
+  status: {
+    type: String,
+    enum: ['pending', 'paid', 'failed', 'refunded'],
+    default: 'paid',
+    index: true,
+  },
+  paid_at: { type: Date, default: null, index: true },
+  created_at: { type: Date, default: Date.now },
+});
+
+// ── Admin Audit Log ──────────────────────────────────────────────────────────
+
+const adminAuditLogSchema = new mongoose.Schema({
+  id: { type: String, required: true, unique: true, index: true },
+  admin_id: { type: String, required: true, index: true },
+  action: { type: String, required: true, index: true },
+  target_type: { type: String, required: true, index: true },
+  target_id: { type: String, default: null, index: true },
+  metadata: { type: mongoose.Schema.Types.Mixed, default: {} },
+  ip_address: { type: String, default: '' },
+  created_at: { type: Date, default: Date.now, index: true },
+});
+
 // ── Models ────────────────────────────────────────────────────────────────────
 
 const User = mongoose.model('User', userSchema, 'users');
@@ -190,6 +224,8 @@ const UsageLog = mongoose.model('UsageLog', usageLogSchema, 'usage_logs');
 const Notification = mongoose.model('Notification', notificationSchema, 'notifications');
 const SubscriptionPlan = mongoose.model('SubscriptionPlan', subscriptionPlanSchema, 'subscription_plans');
 const UserSubscription = mongoose.model('UserSubscription', userSubscriptionSchema, 'user_subscriptions');
+const PaymentTransaction = mongoose.model('PaymentTransaction', paymentTransactionSchema, 'payment_transactions');
+const AdminAuditLog = mongoose.model('AdminAuditLog', adminAuditLogSchema, 'admin_audit_logs');
 
 module.exports = {
   User,
@@ -202,4 +238,6 @@ module.exports = {
   Notification,
   SubscriptionPlan,
   UserSubscription,
+  PaymentTransaction,
+  AdminAuditLog,
 };

@@ -30,6 +30,7 @@ const chatRoutes = require('./routes/chat');
 const quotaRoutes = require('./routes/quota');
 const notificationsRoutes = require('./routes/notifications');
 const plansRoutes = require('./routes/plans');
+const adminRoutes = require('./routes/admin');
 
 const app = express();
 const server = http.createServer(app);
@@ -73,6 +74,7 @@ app.use('/api/v1/chat', chatRoutes);
 app.use('/api/v1/quota', quotaRoutes);
 app.use('/api/v1/notifications', notificationsRoutes);
 app.use('/api/v1/plans', plansRoutes);
+app.use('/api/v1/admin', adminRoutes);
 
 // ── Health check ─────────────────────────────────────────────────────────────
 app.get('/health', (req, res) => res.json({ status: 'healthy' }));

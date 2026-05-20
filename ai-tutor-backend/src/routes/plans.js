@@ -2,7 +2,7 @@ const express = require('express');
 const router = express.Router();
 const { v4: uuidv4 } = require('uuid');
 const { PayOS } = require('@payos/node');
-const { User, UserSubscription, SubscriptionPlan } = require('../db/models');
+const { User, UserSubscription, SubscriptionPlan, PaymentTransaction } = require('../db/models');
 const { authMiddleware } = require('../middleware/auth');
 
 // ── payOS config ────────────────────────────────────────────────────────────
@@ -87,6 +87,21 @@ async function activateSubscription(userId, plan, transactionId) {
       expires_at,
       cancelled_at: null,
     });
+  }
+  if (plan.discounted_price_vnd > 0 && transactionId) {
+    const existingTransaction = await PaymentTransaction.findOne({ transaction_id: transactionId });
+    if (!existingTransaction) {
+      await PaymentTransaction.create({
+        id: uuidv4(),
+        user_id: userId,
+        plan_id: plan.id,
+        provider: 'payos',
+        transaction_id: transactionId,
+        amount_vnd: plan.discounted_price_vnd,
+        status: 'paid',
+        paid_at: now,
+      });
+    }
   }
   console.log(`[payOS] ✅ Activated ${plan.id} for user ${userId}, txn: ${transactionId}`);
 }

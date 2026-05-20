@@ -12,6 +12,8 @@ async function serializeUser(user) {
     student_id: user.student_id || '',
     full_name: user.full_name || '',
     email: user.email || '',
+    role: user.role || 'STUDENT',
+    status: user.status || 'active',
     bio: user.bio || null,
     is_pro: await isUserPro(user.id),
     preferences: user.preferences || { email_notifications: true, ai_response_detail: 'balanced' },
