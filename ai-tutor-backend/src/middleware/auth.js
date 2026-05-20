@@ -1,6 +1,8 @@
 const jwt = require('jsonwebtoken');
 const config = require('../config');
-const { User, UserSession } = require('../db/models');
+const { UserSession } = require('../db/models');
+const { cacheAuthUser, findAuthUserById, isMongoUnavailableError } = require('../db/authDb');
+const { presenceOnlineUpdate } = require('../utils/presence');
 
 /**
  * Middleware to verify JWT access token and attach user_id to req.userId
@@ -16,7 +18,7 @@ async function authMiddleware(req, res, next) {
     if (payload.type && payload.type !== 'access') {
       return res.status(401).json({ detail: 'Invalid token type' });
     }
-    const user = await User.findOne({ id: payload.sub });
+    const user = await findAuthUserById(payload.sub, { fallbackToCache: true, preferCache: true });
     if (!user) return res.status(401).json({ detail: 'Người dùng không tồn tại' });
     if (user.status && user.status !== 'active') {
       return res.status(403).json({ detail: 'Tài khoản đã bị khóa hoặc không còn hoạt động' });
@@ -26,11 +28,13 @@ async function authMiddleware(req, res, next) {
     req.userEmail = payload.email;
     req.user = user;
     req.sessionId = payload.sid || null;
+    cacheAuthUser(user);
 
     if (payload.sid) {
+      const now = new Date();
       UserSession.updateOne(
         { id: payload.sid, user_id: payload.sub },
-        { $set: { last_active: new Date() } }
+        { $set: presenceOnlineUpdate(now) }
       ).catch(() => {});
     }
 
@@ -38,6 +42,9 @@ async function authMiddleware(req, res, next) {
   } catch (err) {
     if (err.name === 'TokenExpiredError') {
       return res.status(401).json({ detail: 'Token đã hết hạn' });
+    }
+    if (isMongoUnavailableError(err)) {
+      return res.status(503).json({ detail: 'Cơ sở dữ liệu đang phản hồi chậm. Vui lòng thử lại sau vài giây.' });
     }
     return res.status(401).json({ detail: 'Không thể xác thực danh tính' });
   }

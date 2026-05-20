@@ -1,7 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 const { Document, ChatSession } = require('../db/models');
-const { sendNotification } = require('./notifications');
+const { sendNotification, sendAdminRealtimeEvent } = require('./notifications');
 const config = require('../config');
 const rag = require('../rag/pipeline');
 
@@ -19,12 +19,14 @@ async function processDocumentBackground(documentId, filePath, ownerId) {
 
   try {
     await Document.updateOne({ id: documentId }, { $set: { status: 'PROCESSING', updated_at: new Date() } });
+    sendAdminRealtimeEvent('document_status_changed', { id: documentId, status: 'PROCESSING', file_name: doc.file_name }).catch(console.error);
     const { collection_name, page_count } = await rag.ingest(filePath, documentId);
 
     await Document.updateOne(
       { id: documentId },
       { $set: { status: 'READY', page_count, chroma_collection_id: collection_name, updated_at: new Date() } }
     );
+    sendAdminRealtimeEvent('document_status_changed', { id: documentId, status: 'READY', file_name: doc.file_name }).catch(console.error);
 
     try {
       await sendNotification(ownerId, 'document_ready', 'Xử lý thành công',
@@ -38,6 +40,7 @@ async function processDocumentBackground(documentId, filePath, ownerId) {
     console.error(`Document ${documentId} processing failed:`, err.message, err.cause ?? '');
     try {
       await Document.updateOne({ id: documentId }, { $set: { status: 'FAILED', updated_at: new Date() } });
+      sendAdminRealtimeEvent('document_status_changed', { id: documentId, status: 'FAILED', file_name: doc.file_name }).catch(console.error);
       await sendNotification(ownerId, 'document_failed', 'Xử lý thất bại',
         `Tài liệu "${doc.file_name}" gặp lỗi. Vui lòng thử lại.`,
         { document_id: documentId }
@@ -64,6 +67,7 @@ async function retryDocumentProcessing(documentId) {
   }
 
   await Document.updateOne({ id: documentId }, { $set: { status: 'PROCESSING', updated_at: new Date() } });
+  sendAdminRealtimeEvent('document_status_changed', { id: documentId, status: 'PROCESSING', file_name: doc.file_name }).catch(console.error);
   processDocumentBackground(documentId, storedFile.filePath, doc.owner_id).catch(console.error);
   return Document.findOne({ id: documentId }).lean();
 }
@@ -93,6 +97,7 @@ async function deleteDocumentResources(documentId) {
   }
 
   await Document.deleteOne({ id: documentId });
+  sendAdminRealtimeEvent('document_status_changed', { id: documentId, status: 'DELETED', file_name: doc.file_name }).catch(console.error);
   await ChatSession.deleteMany({ document_id: documentId });
   return doc.toObject();
 }

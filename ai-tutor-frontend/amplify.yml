@@ -7,15 +7,13 @@ frontend:
         - npm ci --prefer-offline
     build:
       commands:
-        - echo "Building Next.js app..."
+        - echo "Building Vite app..."
         - npm run build
         - echo "Build complete!"
   artifacts:
-    # Với Next.js standalone output
-    baseDirectory: .next
+    baseDirectory: dist
     files:
       - '**/*'
   cache:
     paths:
       - node_modules/**/*
-      - .next/cache/**/*

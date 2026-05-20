@@ -2,7 +2,7 @@
  * WebSocket Notification Manager — multi-tab support per user.
  * Converts Python's NotificationManager class to JS.
  */
-const { Notification } = require('../db/models');
+const { Notification, User } = require('../db/models');
 const { v4: uuidv4 } = require('uuid');
 
 class NotificationManager {
@@ -43,9 +43,27 @@ class NotificationManager {
     }
     dead.forEach(ws => sockets.delete(ws));
   }
+
+  async pushAdmins(payload) {
+    const admins = await User.find({
+      role: 'ADMIN',
+      status: { $ne: 'deleted' },
+    }).select('id').lean();
+
+    await Promise.all(admins.map((admin) => this.push(admin.id, payload)));
+  }
 }
 
 const notificationManager = new NotificationManager();
+
+async function sendAdminRealtimeEvent(event, metadata = {}) {
+  await notificationManager.pushAdmins({
+    type: 'admin_realtime',
+    event,
+    metadata,
+    created_at: new Date().toISOString(),
+  });
+}
 
 async function sendNotification(userId, notifType, title, message, metadata = {}) {
   const doc = {
@@ -72,4 +90,4 @@ async function sendNotification(userId, notifType, title, message, metadata = {}
   console.log(`[Notif] ${notifType} → ${userId}`);
 }
 
-module.exports = { notificationManager, sendNotification };
+module.exports = { notificationManager, sendNotification, sendAdminRealtimeEvent };

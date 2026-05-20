@@ -1,6 +1,8 @@
 const jwt = require('jsonwebtoken');
 const config = require('../config');
-const { User, UserSession } = require('../db/models');
+const { UserSession } = require('../db/models');
+const { cacheAuthUser, findAuthUserById, isMongoUnavailableError } = require('../db/authDb');
+const { presenceOnlineUpdate } = require('../utils/presence');
 
 async function adminMiddleware(req, res, next) {
   const authHeader = req.headers['authorization'];
@@ -15,7 +17,7 @@ async function adminMiddleware(req, res, next) {
       return res.status(401).json({ detail: 'Invalid token type' });
     }
 
-    const user = await User.findOne({ id: payload.sub });
+    const user = await findAuthUserById(payload.sub, { fallbackToCache: true, preferCache: true });
     if (!user) return res.status(401).json({ detail: 'Người dùng không tồn tại' });
     if ((user.status || 'active') !== 'active') {
       return res.status(403).json({ detail: 'Tài khoản admin không còn hoạt động' });
@@ -28,11 +30,13 @@ async function adminMiddleware(req, res, next) {
     req.userEmail = user.email;
     req.user = user;
     req.sessionId = payload.sid || null;
+    cacheAuthUser(user);
 
     if (payload.sid) {
+      const now = new Date();
       UserSession.updateOne(
         { id: payload.sid, user_id: user.id },
-        { $set: { last_active: new Date() } }
+        { $set: presenceOnlineUpdate(now) }
       ).catch(() => {});
     }
 
@@ -40,6 +44,9 @@ async function adminMiddleware(req, res, next) {
   } catch (err) {
     if (err.name === 'TokenExpiredError') {
       return res.status(401).json({ detail: 'Token đã hết hạn' });
+    }
+    if (isMongoUnavailableError(err)) {
+      return res.status(503).json({ detail: 'Cơ sở dữ liệu đang phản hồi chậm. Vui lòng thử lại sau vài giây.' });
     }
     return res.status(401).json({ detail: 'Không thể xác thực quyền admin' });
   }

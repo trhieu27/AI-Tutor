@@ -4,6 +4,7 @@ const { v4: uuidv4 } = require('uuid');
 const { Document, ChatSession, User } = require('../db/models');
 const { authMiddleware } = require('../middleware/auth');
 const { requireChatQuota, recordChatUsage, checkAndRecordAiQuota, isUserPro } = require('../utils/quota');
+const { sendAdminRealtimeEvent } = require('../utils/notifications');
 const config = require('../config');
 const rag = require('../rag/pipeline');
 
@@ -203,6 +204,11 @@ router.post('/:documentId/ask', authMiddleware, requireChatQuota(), async (req, 
     }
 
     await recordChatUsage(req.userId);
+    sendAdminRealtimeEvent('chat_message_created', {
+      user_id: req.userId,
+      document_id: documentId,
+      session_id: sessionId,
+    }).catch((eventErr) => console.warn('[AdminRealtime] chat_message_created failed:', eventErr.message));
 
     if (isClientClosed()) return;
 
@@ -219,6 +225,187 @@ router.post('/:documentId/ask', authMiddleware, requireChatQuota(), async (req, 
     }
     console.error('Chat Error:', err.message);
     res.status(500).json({ detail: 'Hệ thống đang bận hoặc gặp lỗi xử lý. Vui lòng thử lại sau nhé.' });
+  }
+});
+
+// POST /api/v1/chat/:documentId/ask-stream  — SSE STREAMING
+router.post('/:documentId/ask-stream', authMiddleware, requireChatQuota(), async (req, res) => {
+  const requestController = new AbortController();
+  let clientClosed = false;
+
+  const markClientClosed = () => {
+    clientClosed = true;
+    if (!requestController.signal.aborted) requestController.abort();
+  };
+  req.on('aborted', markClientClosed);
+  req.on('close', markClientClosed);
+
+  // Helper to safely write SSE (no-op after client disconnect)
+  function sseWrite(event, data) {
+    if (clientClosed) return;
+    try {
+      res.write('event: ' + event + '\ndata: ' + JSON.stringify(data) + '\n\n');
+    } catch (e) { /* ignore write-after-end */ }
+  }
+
+  try {
+    const documentId = req.params.documentId;
+    var body = req.body || {};
+    var question = body.question;
+    var session_id = body.session_id;
+
+    // SSE headers
+    res.setHeader('Content-Type', 'text/event-stream');
+    res.setHeader('Cache-Control', 'no-cache');
+    res.setHeader('Connection', 'keep-alive');
+    res.setHeader('X-Accel-Buffering', 'no');
+    res.flushHeaders();
+
+    const doc = await Document.findOne({ id: documentId });
+    if (!doc || !doc.chroma_collection_id) {
+      sseWrite('error', { detail: 'T\u00e0i li\u1ec7u kh\u00f4ng t\u1ed3n t\u1ea1i ho\u1eb7c ch\u01b0a \u0111\u01b0\u1ee3c x\u1eed l\u00fd' });
+      return res.end();
+    }
+
+    // Get existing session or prepare a new one
+    const requestedSessionId = session_id;
+    const sessionId = requestedSessionId || uuidv4();
+    let sessionData;
+    if (requestedSessionId) {
+      sessionData = await ChatSession.findOne({ id: sessionId, user_id: req.userId, document_id: documentId }).lean();
+      if (!sessionData) {
+        sseWrite('error', { detail: 'Phi\u00ean chat kh\u00f4ng t\u1ed3n t\u1ea1i' });
+        return res.end();
+      }
+    } else {
+      sessionData = { messages: [] };
+    }
+
+    // Build context window by tier
+    const isPro = await isUserPro(req.userId);
+    const historyMsgs = sessionData.messages || [];
+    let contextMsgs, maxCharPerMsg;
+    if (isPro) {
+      contextMsgs = historyMsgs;
+      maxCharPerMsg = 4000;
+    } else {
+      contextMsgs = historyMsgs.slice(-config.freeLimits.contextMessages);
+      maxCharPerMsg = config.freeLimits.msgChars;
+    }
+
+    const chatHistory = contextMsgs.map(function (m) {
+      return {
+        role: m.role === 'user' ? 'human' : 'ai',
+        content: m.content.slice(0, maxCharPerMsg),
+      };
+    });
+
+    // Sanitize question
+    let questionText;
+    try {
+      questionText = sanitizeQuestion(question || '');
+    } catch (err) {
+      sseWrite('error', { detail: err.message });
+      return res.end();
+    }
+
+    if (!isPro && questionText.length > config.freeLimits.questionChars) {
+      sseWrite('error', {
+        detail: 'T\u00e0i kho\u1ea3n mi\u1ec5n ph\u00ed gi\u1edbi h\u1ea1n c\u00e2u h\u1ecfi t\u1ed1i \u0111a ' + config.freeLimits.questionChars + ' k\u00fd t\u1ef1 (' + questionText.length + ' \u0111\u00e3 nh\u1eadp). N\u00e2ng c\u1ea5p Pro \u0111\u1ec3 h\u1ecfi kh\u00f4ng gi\u1edbi h\u1ea1n.'
+      });
+      return res.end();
+    }
+
+    if (clientClosed) return res.end();
+
+    // Build document metadata for retrieval router
+    const debug = req.headers['x-debug'] === 'true';
+    const documentMetadata = {
+      pageCount: doc.page_count || 0,
+      status: doc.status,
+      updatedAt: doc.updated_at,
+      uploadedAt: doc.uploaded_at,
+    };
+
+    // Stream from pipeline
+    let doneEvent = null;
+    for await (const event of rag.askStream(doc.chroma_collection_id, questionText, chatHistory, {
+      signal: requestController.signal,
+      documentMetadata: documentMetadata,
+      debug: debug,
+    })) {
+      if (clientClosed) break;
+
+      if (event.type === 'chunk') {
+        sseWrite('chunk', { text: event.text });
+      } else if (event.type === 'done') {
+        doneEvent = event;
+      }
+    }
+
+    if (clientClosed) return res.end();
+
+    if (!doneEvent) {
+      sseWrite('error', { detail: 'Kh\u00f4ng nh\u1eadn \u0111\u01b0\u1ee3c ph\u1ea3n h\u1ed3i t\u1eeb AI' });
+      return res.end();
+    }
+
+    // Save session to DB
+    const answer = doneEvent.answer;
+    const sources = doneEvent.sources;
+    const pipeline = doneEvent.pipeline;
+
+    const userMsg = { id: uuidv4(), session_id: sessionId, role: 'user', content: question, sources: [] };
+    const aiMsg = { id: uuidv4(), session_id: sessionId, role: 'assistant', content: answer, sources: sources };
+
+    if (requestedSessionId) {
+      await ChatSession.updateOne(
+        { id: sessionId, user_id: req.userId, document_id: documentId },
+        { $push: { messages: { $each: [userMsg, aiMsg] } }, $set: { updated_at: new Date() } }
+      );
+    } else {
+      await ChatSession.create({
+        id: sessionId,
+        user_id: req.userId,
+        document_id: documentId,
+        title: (questionText || '').slice(0, 50) + '...',
+        messages: [userMsg, aiMsg],
+      });
+    }
+
+    // Send final done event
+    sseWrite('done', {
+      session_id: sessionId,
+      message: aiMsg,
+      sources: sources,
+      pipeline: pipeline,
+    });
+
+    res.end();
+
+    // Post-response side effects (fire-and-forget)
+    recordChatUsage(req.userId).catch(function () {});
+    sendAdminRealtimeEvent('chat_message_created', {
+      user_id: req.userId,
+      document_id: documentId,
+      session_id: sessionId,
+    }).catch(function (eventErr) { console.warn('[AdminRealtime] chat_message_created failed:', eventErr.message); });
+
+  } catch (err) {
+    if (clientClosed) return;
+    var errName = err && err.name;
+    if (errName === 'AbortError' || requestController.signal.aborted) {
+      sseWrite('error', { detail: 'Y\u00eau c\u1ea7u \u0111\u00e3 \u0111\u01b0\u1ee3c h\u1ee7y.' });
+      return res.end();
+    }
+    var msg = String(err && err.message || '');
+    if (msg.includes('429') || msg.includes('RESOURCE_EXHAUSTED')) {
+      sseWrite('error', { detail: 'B\u1ed9 n\u00e3o AI hi\u1ec7n \u0111ang qu\u00e1 t\u1ea3i l\u01b0\u1ee3t d\u00f9ng. Vui l\u00f2ng th\u1eed l\u1ea1i sau gi\u00e2y l\u00e1t nh\u00e9.' });
+      return res.end();
+    }
+    console.error('Chat Stream Error:', msg);
+    sseWrite('error', { detail: 'H\u1ec7 th\u1ed1ng \u0111ang b\u1eadn ho\u1eb7c g\u1eb7p l\u1ed7i x\u1eed l\u00fd. Vui l\u00f2ng th\u1eed l\u1ea1i sau nh\u00e9.' });
+    res.end();
   }
 });
 

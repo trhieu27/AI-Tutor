@@ -1,4 +1,5 @@
 const mongoose = require('mongoose');
+const { presenceOnlineUntil } = require('../utils/presence');
 
 // ── User ──────────────────────────────────────────────────────────────────────
 
@@ -22,6 +23,8 @@ const userSchema = new mongoose.Schema({
   created_at: { type: Date, default: Date.now },
   updated_at: { type: Date, default: Date.now },
 });
+userSchema.index({ status: 1, created_at: -1 });
+userSchema.index({ role: 1, status: 1, created_at: -1 });
 
 // ── User Session ──────────────────────────────────────────────────────────────
 
@@ -32,7 +35,11 @@ const userSessionSchema = new mongoose.Schema({
   ip_address: { type: String, default: '' },
   created_at: { type: Date, default: Date.now },
   last_active: { type: Date, default: Date.now },
+  is_online: { type: Boolean, default: true, index: true },
+  online_until: { type: Date, default: () => presenceOnlineUntil(), index: true },
 });
+userSessionSchema.index({ is_online: 1, online_until: 1, user_id: 1 });
+userSessionSchema.index({ user_id: 1, last_active: -1 });
 
 // ── Document ──────────────────────────────────────────────────────────────────
 
@@ -51,6 +58,10 @@ const documentSchema = new mongoose.Schema({
   uploaded_at: { type: Date, default: Date.now },
   updated_at: { type: Date, default: Date.now },
 });
+documentSchema.index({ uploaded_at: -1 });
+documentSchema.index({ status: 1, uploaded_at: -1 });
+documentSchema.index({ owner_id: 1, uploaded_at: -1 });
+documentSchema.index({ owner_id: 1, status: 1, uploaded_at: -1 });
 
 // ── Chat Message ──────────────────────────────────────────────────────────────
 
@@ -60,6 +71,7 @@ const chatMessageSchema = new mongoose.Schema({
   role: { type: String, enum: ['user', 'assistant'], required: true },
   content: { type: String, required: true },
   sources: { type: mongoose.Schema.Types.Mixed, default: [] },
+  toolExecuted: { type: mongoose.Schema.Types.Mixed, default: null },
   created_at: { type: Date, default: Date.now },
 }, { _id: false });
 
@@ -74,6 +86,8 @@ const chatSessionSchema = new mongoose.Schema({
   updated_at: { type: Date, default: Date.now },
   messages: { type: [chatMessageSchema], default: [] },
 });
+chatSessionSchema.index({ user_id: 1, updated_at: -1 });
+chatSessionSchema.index({ document_id: 1, user_id: 1, updated_at: -1 });
 
 // ── OTP ──────────────────────────────────────────────────────────────────────
 
@@ -157,6 +171,8 @@ const userSubscriptionSchema = new mongoose.Schema({
   created_at: { type: Date, default: Date.now },
   updated_at: { type: Date, default: Date.now },
 });
+userSubscriptionSchema.index({ status: 1, plan_id: 1, expires_at: 1, user_id: 1 });
+userSubscriptionSchema.index({ started_at: -1 });
 
 // ── Usage Log ─────────────────────────────────────────────────────────────────
 
@@ -166,6 +182,9 @@ const usageLogSchema = new mongoose.Schema({
   date: { type: String, required: true },
   created_at: { type: Date, default: Date.now },
 });
+usageLogSchema.index({ user_id: 1, date: 1 });
+usageLogSchema.index({ user_id: 1, date: 1, feature: 1 });
+usageLogSchema.index({ date: 1, feature: 1 });
 
 // ── Notification ──────────────────────────────────────────────────────────────
 
@@ -179,6 +198,7 @@ const notificationSchema = new mongoose.Schema({
   metadata: { type: mongoose.Schema.Types.Mixed, default: {} },
   created_at: { type: String },
 });
+notificationSchema.index({ user_id: 1, created_at: -1 });
 
 // ── Payment Transaction ──────────────────────────────────────────────────────
 
@@ -198,6 +218,7 @@ const paymentTransactionSchema = new mongoose.Schema({
   paid_at: { type: Date, default: null, index: true },
   created_at: { type: Date, default: Date.now },
 });
+paymentTransactionSchema.index({ status: 1, paid_at: -1 });
 
 // ── Admin Audit Log ──────────────────────────────────────────────────────────
 

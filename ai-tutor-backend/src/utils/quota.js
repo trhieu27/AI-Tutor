@@ -1,5 +1,37 @@
-const { UsageLog, User, UserSubscription } = require('../db/models');
+const { UsageLog, User, UserSubscription, SubscriptionPlan } = require('../db/models');
 const config = require('../config');
+
+async function getUserQuotaLimit(userId, field, defaultValue) {
+  try {
+    const sub = await UserSubscription.findOne({ user_id: userId, status: 'active' }).lean();
+    let planId = 'free';
+    if (sub) {
+      const isExpired = sub.expires_at && new Date(sub.expires_at) < new Date();
+      if (!isExpired) {
+        planId = sub.plan_id;
+      }
+    }
+    const plan = await SubscriptionPlan.findOne({ id: planId }).lean();
+    if (plan && plan.quota && plan.quota[field] !== undefined) {
+      return plan.quota[field];
+    }
+  } catch (err) {
+    console.error(`Error fetching quota limit for user ${userId}, field ${field}:`, err.message);
+  }
+  return defaultValue;
+}
+
+async function getFreePlanLimit(field, defaultValue) {
+  try {
+    const freePlan = await SubscriptionPlan.findOne({ id: 'free' }).lean();
+    if (freePlan && freePlan.quota && freePlan.quota[field] !== undefined) {
+      return freePlan.quota[field];
+    }
+  } catch (err) {
+    console.error(`Error fetching free plan limit for ${field}:`, err.message);
+  }
+  return defaultValue;
+}
 
 function todayUTC() {
   return new Date().toISOString().slice(0, 10); // 'YYYY-MM-DD'
@@ -28,6 +60,10 @@ async function usageToday(userId, feature) {
 
 async function recordUsage(userId, feature) {
   await UsageLog.create({ user_id: userId, feature, date: todayUTC() });
+  try { require('../routes/admin').clearOverviewCache(); } catch {}
+  const { sendAdminRealtimeEvent } = require('./notifications');
+  sendAdminRealtimeEvent('usage_recorded', { user_id: userId, feature })
+    .catch((err) => console.warn('[AdminRealtime] usage_recorded failed:', err.message));
 }
 
 // ── Middleware Factories ───────────────────────────────────────────────────────
@@ -37,11 +73,12 @@ function requireDocQuota() {
     try {
       const userId = req.userId;
       const user = await getUser(userId);
-      if (await isUserPro(userId)) return next();
+      
+      const limit = await getUserQuotaLimit(userId, 'max_documents', 3);
+      if (limit === -1) return next();
 
       const { Document } = require('../db/models');
       const total = await Document.countDocuments({ owner_id: userId });
-      const limit = config.freeLimits.documents;
       if (total >= limit) {
         return res.status(402).json({
           detail: `Tài khoản miễn phí chỉ được tải lên tối đa ${limit} tài liệu. Nâng cấp Pro để không giới hạn.`
@@ -60,10 +97,11 @@ function requireChatQuota() {
     try {
       const userId = req.userId;
       const user = await getUser(userId);
-      if (await isUserPro(userId)) return next();
+
+      const limit = await getUserQuotaLimit(userId, 'chat_per_day', 30);
+      if (limit === -1) return next();
 
       const used = await usageToday(userId, 'chat_messages');
-      const limit = config.freeLimits.chatMessages;
       if (used >= limit) {
         return res.status(429).json({
           detail: `Bạn đã dùng hết ${limit} tin nhắn miễn phí hôm nay. Nâng cấp Pro hoặc quay lại vào ngày mai.`
@@ -78,15 +116,16 @@ function requireChatQuota() {
 }
 
 async function recordChatUsage(userId) {
-  if (await isUserPro(userId)) return;
+  const limit = await getUserQuotaLimit(userId, 'chat_per_day', 30);
+  if (limit === -1) return;
   await recordUsage(userId, 'chat_messages');
 }
 
 async function checkAndRecordAiQuota(userId) {
-  if (await isUserPro(userId)) return;
+  const limit = await getUserQuotaLimit(userId, 'ai_generations_per_day', 10);
+  if (limit === -1) return;
 
   const used = await usageToday(userId, 'ai_features');
-  const limit = config.freeLimits.aiFeatures;
   if (used >= limit) {
     const err = new Error(
       `Bạn đã dùng hết ${limit} lần tạo nội dung AI miễn phí hôm nay. Nâng cấp Pro hoặc quay lại vào ngày mai.`
@@ -105,4 +144,7 @@ module.exports = {
   usageToday,
   getUser,
   isUserPro,
+  getFreePlanLimit,
+  getUserQuotaLimit,
 };
+

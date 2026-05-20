@@ -1,23 +1,33 @@
 import { Navigate, Route, Routes } from "react-router-dom";
-import { AuthProvider, useAuth } from "@/context/AuthContext";
-import { ThemeProvider } from "@/components/ThemeProvider";
+import { AuthProvider, useAuth } from "@/features/auth/context/AuthContext";
+import { ThemeProvider } from "@/shared/ui/ThemeProvider";
 
-import LoginPage from "@/app/(auth)/login/page";
-import RegisterPage from "@/app/(auth)/register/page";
-import ForgotPasswordPage from "@/app/(auth)/forgot-password/page";
+import LoginPage from "@/features/auth/pages/LoginPage";
+import RegisterPage from "@/features/auth/pages/RegisterPage";
+import ForgotPasswordPage from "@/features/auth/pages/ForgotPasswordPage";
 
-import DashboardLayout from "@/app/(dashboard)/layout";
-import DashboardPage from "@/app/(dashboard)/page";
-import LearningPage from "@/app/(dashboard)/learning/page";
-import ChatStartPage from "@/app/(dashboard)/chat/page";
-import ChatPage from "@/app/(dashboard)/chat/[documentId]/page";
-import QuizPage from "@/app/(dashboard)/quiz/[documentId]/page";
-import MindmapPage from "@/app/(dashboard)/mindmap/[documentId]/page";
-import MindmapListPage from "@/app/(dashboard)/mindmap/page";
-import PracticePage from "@/app/(dashboard)/practice/page";
-import SettingsPage from "@/app/(dashboard)/settings/page";
-import HelpPage from "@/app/(dashboard)/help/page";
-import PricingPage from "@/app/(dashboard)/pricing/page";
+import DashboardLayout from "@/features/user/pages/UserLayout";
+import DashboardPage from "@/features/user/pages/DashboardPage";
+import LearningPage from "@/features/user/pages/LearningPage";
+import ChatStartPage from "@/features/user/pages/ChatStartPage";
+import ChatPage from "@/features/user/pages/ChatPage";
+import QuizPage from "@/features/user/pages/QuizPage";
+import MindmapPage from "@/features/user/pages/MindmapPage";
+import MindmapListPage from "@/features/user/pages/MindmapListPage";
+import PracticePage from "@/features/user/pages/PracticePage";
+import SettingsPage from "@/features/user/pages/SettingsPage";
+import HelpPage from "@/features/user/pages/HelpPage";
+import PricingPage from "@/features/user/pages/PricingPage";
+
+import AdminLayout from "@/features/admin/pages/AdminLayout";
+import AdminLoginPage from "@/features/admin/pages/LoginPage";
+import AdminDashboardPage from "@/features/admin/pages/DashboardPage";
+import AdminUsersPage from "@/features/admin/pages/UsersPage";
+import AdminDocumentsPage from "@/features/admin/pages/DocumentsPage";
+import AdminPlansPage from "@/features/admin/pages/PlansPage";
+import AdminRevenuePage from "@/features/admin/pages/RevenuePage";
+import AdminActivityPage from "@/features/admin/pages/ActivityPage";
+import AdminAuditPage from "@/features/admin/pages/AuditPage";
 
 function AppRouteShimmer() {
   return (
@@ -46,10 +56,22 @@ function PrivateRoute({ children }) {
   return isAuthenticated ? children : <Navigate to="/login" replace />;
 }
 
+function AdminRoute({ children }) {
+  const { user, isAuthenticated, isInitialLoading } = useAuth();
+
+  if (isInitialLoading) {
+    return <AppRouteShimmer />;
+  }
+
+  if (!isAuthenticated) return <Navigate to="/admin/login" replace />;
+  return user?.role === "ADMIN" ? children : <Navigate to="/" replace />;
+}
+
 function PublicRoute({ children }) {
-  const { isAuthenticated, isInitialLoading } = useAuth();
+  const { user, isAuthenticated, isInitialLoading } = useAuth();
   if (isInitialLoading) return <AppRouteShimmer />;
-  return isAuthenticated ? <Navigate to="/" replace /> : children;
+  if (!isAuthenticated) return children;
+  return <Navigate to={user?.role === "ADMIN" ? "/admin" : "/"} replace />;
 }
 
 export default function App() {
@@ -109,6 +131,31 @@ export default function App() {
                   </PrivateRoute>
                 }
               />
+              <Route
+                path="/admin/login"
+                element={
+                  <PublicRoute>
+                    <AdminLoginPage />
+                  </PublicRoute>
+                }
+              />
+              <Route
+                path="/admin"
+                element={
+                  <AdminRoute>
+                    <AdminLayout />
+                  </AdminRoute>
+                }
+              >
+                <Route index element={<AdminDashboardPage />} />
+                <Route path="users" element={<AdminUsersPage />} />
+                <Route path="documents" element={<AdminDocumentsPage />} />
+                <Route path="plans" element={<AdminPlansPage />} />
+                <Route path="revenue" element={<AdminRevenuePage />} />
+                <Route path="activity" element={<AdminActivityPage />} />
+                <Route path="audit" element={<AdminAuditPage />} />
+              </Route>
+
               <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </AuthProvider>

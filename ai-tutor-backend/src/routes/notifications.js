@@ -2,14 +2,19 @@ const express = require('express');
 const router = express.Router();
 const { Notification } = require('../db/models');
 const { authMiddleware } = require('../middleware/auth');
+const { buildPagination, parsePagination, sendPaginated } = require('../utils/pagination');
 
 // GET /api/v1/notifications
 router.get('/', authMiddleware, async (req, res) => {
   try {
-    const limit = parseInt(req.query.limit) || 30;
-    const notifications = await Notification.find({ user_id: req.userId })
-      .sort({ created_at: -1 }).limit(limit).lean();
-    res.json(notifications.map(n => ({ ...n, _id: undefined })));
+    const { page, limit, skip } = parsePagination(req.query, { defaultLimit: 30, maxLimit: 100 });
+    const query = { user_id: req.userId };
+    const [total, notifications] = await Promise.all([
+      Notification.countDocuments(query),
+      Notification.find(query).sort({ created_at: -1 }).skip(skip).limit(limit).lean(),
+    ]);
+    const items = notifications.map(n => ({ ...n, _id: undefined }));
+    sendPaginated(res, items, buildPagination({ page, limit, total }), req.query);
   } catch (err) {
     res.status(500).json({ detail: 'Lỗi server' });
   }

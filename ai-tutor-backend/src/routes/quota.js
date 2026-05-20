@@ -1,30 +1,44 @@
 const express = require('express');
 const router = express.Router();
-const { Document, UsageLog } = require('../db/models');
+const { Document, UsageLog, UserSubscription } = require('../db/models');
 const { authMiddleware } = require('../middleware/auth');
-const { getUser, usageToday, isUserPro } = require('../utils/quota');
+const { getUser, usageToday, isUserPro, getUserQuotaLimit } = require('../utils/quota');
 const config = require('../config');
 
 // GET /api/v1/quota/me
 router.get('/me', authMiddleware, async (req, res) => {
   try {
-    const user = await getUser(req.userId);
-    const isPro = await isUserPro(req.userId);
+    const userId = req.userId;
+    const user = await getUser(userId);
+    const isPro = await isUserPro(userId);
 
-    if (isPro) {
-      return res.json({ is_pro: true, limits: null, usage: null });
+    // Get active subscription info
+    const sub = await UserSubscription.findOne({ user_id: userId, status: 'active' }).lean();
+    let planId = 'free';
+    if (sub) {
+      const isExpired = sub.expires_at && new Date(sub.expires_at) < new Date();
+      if (!isExpired) {
+        planId = sub.plan_id;
+      }
     }
 
-    const docCount = await Document.countDocuments({ owner_id: req.userId });
-    const chatUsed = await usageToday(req.userId, 'chat_messages');
-    const aiUsed = await usageToday(req.userId, 'ai_features');
+    const docCount = await Document.countDocuments({ owner_id: userId });
+    const chatUsed = await usageToday(userId, 'chat_messages');
+    const aiUsed = await usageToday(userId, 'ai_features');
+
+    const limitDocs = await getUserQuotaLimit(userId, 'max_documents', 3);
+    const limitChat = await getUserQuotaLimit(userId, 'chat_per_day', 30);
+    const limitAi = await getUserQuotaLimit(userId, 'ai_generations_per_day', 10);
+    const limitFileSize = await getUserQuotaLimit(userId, 'max_file_size_mb', 50);
 
     res.json({
-      is_pro: false,
+      is_pro: isPro,
+      plan: planId,
       limits: {
-        documents:     config.freeLimits.documents,
-        chat_messages: config.freeLimits.chatMessages,
-        ai_features:   config.freeLimits.aiFeatures,
+        documents:        limitDocs,
+        chat_messages:    limitChat,
+        ai_features:      limitAi,
+        max_file_size_mb: limitFileSize,
       },
       usage: {
         documents:     docCount,
@@ -39,3 +53,4 @@ router.get('/me', authMiddleware, async (req, res) => {
 });
 
 module.exports = router;
+

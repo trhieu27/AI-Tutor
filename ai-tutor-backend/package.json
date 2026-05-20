@@ -5,7 +5,10 @@
   "main": "src/server.js",
   "scripts": {
     "start": "node src/server.js",
-    "dev": "nodemon src/server.js"
+    "dev": "nodemon src/server.js",
+    "test:load": "k6 run scripts/load/user-docs-scenario.js",
+    "test:load:admin": "k6 run scripts/load/admin-scenario.js",
+    "test:load:user": "k6 run scripts/load/user-docs-scenario.js"
   },
   "dependencies": {
     "@google/generative-ai": "^0.24.1",
@@ -23,6 +26,7 @@
     "multer": "^1.4.5-lts.1",
     "nodemailer": "^6.9.13",
     "pdfjs-dist": "^5.7.284",
+    "puppeteer-core": "^25.0.4",
     "uuid": "^9.0.1",
     "ws": "^8.17.0"
   },

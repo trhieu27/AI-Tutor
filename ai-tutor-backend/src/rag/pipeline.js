@@ -109,7 +109,7 @@ async function ask(collectionName, question, chatHistory = [], options = {}) {
   const allDocs = await vectorstore.getAllDocuments(collectionName);
   if (!allDocs || allDocs.length === 0) {
     return {
-      answer: 'Tài liệu này cần được xử lý lại. Dữ liệu tìm kiếm không còn trong hệ thống — có thể do cơ sở dữ liệu vector đã được khởi tạo lại.\n\nVui lòng nhấn nút **Xử lý lại** (⟳) trong thư viện tài liệu để tạo lại dữ liệu.',
+      answer: 'Tài liệu này cần được xử lý lại. Dữ liệu tìm kiếm không còn trong hệ thống.\n\nVui lòng **xóa** tài liệu này trong thư viện và **tải lại** để tạo lại dữ liệu.',
       sources: [],
       pipeline: {
         strategy: 'none',
@@ -248,7 +248,7 @@ ${historyText ? `LỊCH SỬ CUỘC TRÒ CHUYỆN:\n${historyText}\n` : ''}CÂU 
 
 Hãy trả lời:`;
 
-  const answer = await generateText(prompt, { temperature: 0.2, signal });
+  const { text: answer, toolExecuted } = await generateText(prompt, { temperature: 0.2, signal });
   pipelineLog.timings.generate = Date.now() - generateStart;
   pipelineLog.timings.total = Date.now() - startTime;
   throwIfAborted(signal);
@@ -269,6 +269,7 @@ Hãy trả lời:`;
   const result = {
     answer,
     sources,
+    toolExecuted,
   };
 
   // Include pipeline metadata for debug/advanced mode
@@ -298,7 +299,7 @@ Hãy trả lời:`;
 async function* summarize(collectionName) {
   const chunks = await vectorstore.getAllDocuments(collectionName);
   if (!chunks || chunks.length === 0) {
-    yield 'Tài liệu này cần được xử lý lại. Dữ liệu không còn trong hệ thống — vui lòng nhấn nút **Xử lý lại** (⟳) trong thư viện tài liệu.';
+    yield 'Tài liệu này cần được xử lý lại. Vui lòng **xóa** tài liệu trong thư viện và **tải lại** để tạo lại dữ liệu.';
     return;
   }
   // Use first 30 chunks to stay within token limits
@@ -327,7 +328,7 @@ ${context}`;
 async function* quiz(collectionName) {
   const chunks = await vectorstore.getAllDocuments(collectionName);
   if (!chunks || chunks.length === 0) {
-    yield '[{"question":"Tài liệu cần được xử lý lại. Vui lòng nhấn Xử lý lại trong thư viện.","options":["—","—","—","—"],"correct_index":0,"explanation":"Dữ liệu vector đã bị mất."}]';
+    yield '[{"question":"Tài liệu cần được xử lý lại. Vui lòng xóa và tải lại tài liệu.","options":["---","---","---","---"],"correct_index":0,"explanation":"Dữ liệu vector đã bị mất."}]';
     return;
   }
   const context = chunks.slice(0, 40).join('\n\n');
@@ -379,7 +380,7 @@ ${context}`;
 async function* mindmap(collectionName) {
   const chunks = await vectorstore.getAllDocuments(collectionName);
   if (!chunks || chunks.length === 0) {
-    yield 'mindmap\n  root((Cần xử lý lại tài liệu))\n    Dữ liệu vector đã bị mất\n      Nhấn Xử lý lại trong thư viện';
+    yield 'mindmap\n  root((Cần xử lý lại tài liệu))\n    Dữ liệu vector đã bị mất\n      Xóa và tải lại tài liệu';
     return;
   }
   const context = chunks.slice(0, 25).join('\n\n');
@@ -440,7 +441,7 @@ ${context}`;
 async function* studyQuestions(collectionName) {
   const chunks = await vectorstore.getAllDocuments(collectionName);
   if (!chunks || chunks.length === 0) {
-    yield '1. Tài liệu cần được xử lý lại — dữ liệu vector đã bị mất. Vui lòng nhấn nút Xử lý lại (⟳) trong thư viện tài liệu.';
+    yield '1. Tài liệu cần được xử lý lại. Vui lòng xóa tài liệu trong thư viện và tải lại để tạo lại dữ liệu.';
     return;
   }
   const context = chunks.slice(0, 20).join('\n\n');
@@ -461,6 +462,227 @@ ${context}`;
   yield* generateStream(prompt, { temperature: 0.4, maxTokens: 2048 });
 }
 
+// ── Ask Stream (SSE-friendly async generator) ────────────────────────────────
+
+/**
+ * Streaming version of ask(). Runs the same RAG pipeline (Steps 1–5)
+ * then yields text chunks via generateStream() instead of generateText().
+ *
+ * Yields:
+ *   { type: 'chunk', text: string }   – incremental text fragments
+ *   { type: 'done', answer, sources, pipeline } – final metadata
+ *
+ * NOTE: Does NOT support browser tool (function calling) since that
+ * requires non-streaming generateText.
+ *
+ * @param {string} collectionName
+ * @param {string} question
+ * @param {Array<{role:'human'|'ai', content:string}>} chatHistory
+ * @param {object} [options] - { signal, documentMetadata, debug }
+ */
+async function* askStream(collectionName, question, chatHistory, options) {
+  chatHistory = chatHistory || [];
+  options = options || {};
+  const signal = options.signal;
+  const documentMetadata = options.documentMetadata || {};
+  const debug = options.debug || false;
+
+  const pipelineLog = {
+    originalQuery: question,
+    rewrittenQuery: null,
+    strategy: null,
+    strategyReasons: [],
+    cacheHit: false,
+    searchResultCount: 0,
+    rerankedCount: 0,
+    selectedCount: 0,
+    tokenEstimate: 0,
+    timings: {},
+  };
+  const startTime = Date.now();
+
+  throwIfAborted(signal);
+
+  // ── Early check: verify collection has data ──
+  const allDocs = await vectorstore.getAllDocuments(collectionName);
+  if (!allDocs || allDocs.length === 0) {
+    yield {
+      type: 'done',
+      answer: 'T\u00e0i li\u1ec7u n\u00e0y c\u1ea7n \u0111\u01b0\u1ee3c x\u1eed l\u00fd l\u1ea1i. D\u1eef li\u1ec7u t\u00ecm ki\u1ebfm kh\u00f4ng c\u00f2n trong h\u1ec7 th\u1ed1ng.\n\nVui l\u00f2ng **x\u00f3a** t\u00e0i li\u1ec7u n\u00e0y trong th\u01b0 vi\u1ec7n v\u00e0 **t\u1ea3i l\u1ea1i** \u0111\u1ec3 t\u1ea1o l\u1ea1i d\u1eef li\u1ec7u.',
+      sources: [],
+      pipeline: {
+        strategy: 'none',
+        strategyDescription: 'Kh\u00f4ng c\u00f3 d\u1eef li\u1ec7u',
+        cacheHit: false,
+        searchResultCount: 0,
+        selectedCount: 0,
+        totalTimeMs: Date.now() - startTime,
+        error: 'empty_collection',
+      },
+    };
+    return;
+  }
+
+  // ── Step 1: Query Rewriting ──
+  const rewriteStart = Date.now();
+  const rewrittenQuery = await rewriteQuery(question, chatHistory, { signal });
+  pipelineLog.rewrittenQuery = rewrittenQuery;
+  pipelineLog.timings.rewrite = Date.now() - rewriteStart;
+  throwIfAborted(signal);
+
+  // ── Step 2: Retrieval Strategy Router ──
+  const docMeta = Object.assign({}, documentMetadata, { collectionName: collectionName });
+  const routerResult = chooseRetrievalStrategy(rewrittenQuery, docMeta, chatHistory);
+  const strategy = routerResult.strategy;
+  const reasons = routerResult.reasons;
+  const cacheHit = routerResult.cacheHit;
+  pipelineLog.strategy = strategy;
+  pipelineLog.strategyReasons = reasons;
+
+  let retrievedChunks = [];
+
+  // ── Step 3: Execute retrieval based on strategy ──
+  const searchStart = Date.now();
+
+  if (strategy === 'cag_cached' && cacheHit && cacheHit.hit) {
+    pipelineLog.cacheHit = true;
+    const cachedContext = cacheHit.context;
+    retrievedChunks = (cachedContext && cachedContext.selectedChunks) || [];
+    pipelineLog.searchResultCount = retrievedChunks.length;
+
+  } else if (strategy === 'combined') {
+    const [hybridResults, hierarchyResults] = await Promise.all([
+      hybridSearch(collectionName, rewrittenQuery, { nResults: 8, signal }),
+      (async () => {
+        const hierarchy = await getDocumentHierarchy(collectionName);
+        if (!hierarchy) return [];
+        return retrieveByHierarchy(rewrittenQuery, hierarchy, { maxChunks: 4 });
+      })(),
+    ]);
+    throwIfAborted(signal);
+
+    const seen = new Set();
+    for (const chunk of [].concat(hybridResults, hierarchyResults)) {
+      const key = ((chunk && chunk.text) || '').slice(0, 200);
+      if (!seen.has(key)) {
+        seen.add(key);
+        retrievedChunks.push(chunk);
+      }
+    }
+    pipelineLog.searchResultCount = retrievedChunks.length;
+
+  } else if (strategy === 'hierarchical') {
+    const hierarchy = await getDocumentHierarchy(collectionName);
+    if (hierarchy) {
+      retrievedChunks = await retrieveByHierarchy(rewrittenQuery, hierarchy, { maxChunks: 6 });
+    }
+    if (retrievedChunks.length === 0) {
+      retrievedChunks = await hybridSearch(collectionName, rewrittenQuery, { nResults: 8, signal });
+    }
+    pipelineLog.searchResultCount = retrievedChunks.length;
+
+  } else {
+    retrievedChunks = await hybridSearch(collectionName, rewrittenQuery, { nResults: 10, signal });
+    pipelineLog.searchResultCount = retrievedChunks.length;
+  }
+
+  pipelineLog.timings.search = Date.now() - searchStart;
+  throwIfAborted(signal);
+
+  // ── Step 4: Re-ranking ──
+  const rerankStart = Date.now();
+  let rerankedChunks;
+  if (strategy === 'cag_cached' && pipelineLog.cacheHit) {
+    rerankedChunks = retrievedChunks.map(function (c) { return Object.assign({}, c, { rerankScore: c.score }); });
+  } else {
+    rerankedChunks = await rerankResults(rewrittenQuery, retrievedChunks, { maxChunks: 8, signal });
+  }
+  pipelineLog.rerankedCount = rerankedChunks.length;
+  pipelineLog.timings.rerank = Date.now() - rerankStart;
+  throwIfAborted(signal);
+
+  // ── Step 5: Context Selection ──
+  const selectStart = Date.now();
+  const selResult = selectContext(rerankedChunks, {
+    maxTokens: 6000,
+    minScore: 0.15,
+    maxChunks: 5,
+  });
+  const selectedChunks = selResult.selectedChunks;
+  const contextText = selResult.contextText;
+  const tokenEstimate = selResult.tokenEstimate;
+  pipelineLog.selectedCount = selectedChunks.length;
+  pipelineLog.tokenEstimate = tokenEstimate;
+  pipelineLog.timings.select = Date.now() - selectStart;
+  throwIfAborted(signal);
+
+  // Cache context for future reuse (if static knowledge)
+  if (!pipelineLog.cacheHit && selectedChunks.length > 0) {
+    const knowledgeType = classifyKnowledgeType(question, docMeta);
+    setCachedStaticContext(collectionName, rewrittenQuery, { selectedChunks: selectedChunks, contextText: contextText, tokenEstimate: tokenEstimate }, { knowledgeType: knowledgeType });
+  }
+
+  // ── Step 6: Grounded Answer Generation (streaming) ──
+  const generateStart = Date.now();
+
+  const historyText = chatHistory
+    .map(function (m) { return (m.role === 'human' ? 'H\u1ecdc sinh' : 'Tr\u1ee3 l\u00fd') + ': ' + m.content; })
+    .join('\n');
+
+  var prompt = 'B\u1ea1n l\u00e0 tr\u1ee3 l\u00fd AI h\u1ed7 tr\u1ee3 h\u1ecdc t\u1eadp th\u00f4ng minh. D\u1ef1a tr\u00ean n\u1ed9i dung t\u00e0i li\u1ec7u \u0111\u01b0\u1ee3c cung c\u1ea5p, h\u00e3y tr\u1ea3 l\u1eddi c\u00e2u h\u1ecfi m\u1ed9t c\u00e1ch ch\u00ednh x\u00e1c, r\u00f5 r\u00e0ng v\u00e0 c\u00f3 c\u1ea5u tr\u00fac.\n\n'
+    + 'QUY T\u1eaeC QUAN TR\u1eccNG:\n'
+    + '- CH\u1ec8 tr\u1ea3 l\u1eddi d\u1ef1a tr\u00ean n\u1ed9i dung t\u00e0i li\u1ec7u \u0111\u01b0\u1ee3c cung c\u1ea5p b\u00ean d\u01b0\u1edbi\n'
+    + '- N\u1ebfu th\u00f4ng tin KH\u00d4NG c\u00f3 trong t\u00e0i li\u1ec7u, h\u00e3y n\u00f3i r\u00f5: "T\u00e0i li\u1ec7u kh\u00f4ng ch\u1ee9a \u0111\u1ee7 th\u00f4ng tin \u0111\u1ec3 tr\u1ea3 l\u1eddi c\u00e2u h\u1ecfi n\u00e0y"\n'
+    + '- KH\u00d4NG b\u1ecba \u0111\u1eb7t ho\u1eb7c th\u00eam th\u00f4ng tin kh\u00f4ng c\u00f3 trong t\u00e0i li\u1ec7u\n'
+    + '- Khi tr\u00edch d\u1eabn, ghi r\u00f5 trang ngu\u1ed3n, v\u00ed d\u1ee5: "(Trang 6)" ho\u1eb7c "(Trang 1, Trang 8)". CH\u1ec8 d\u00f9ng s\u1ed1 trang c\u00f3 trong ph\u1ea7n N\u1ed8I DUNG T\u00c0I LI\u1ec6U b\u00ean d\u01b0\u1edbi\n'
+    + '- KH\u00d4NG \u0110\u01af\u1ee2C vi\u1ebft "Theo Ngu\u1ed3n 1", "Ngu\u1ed3n 5" hay b\u1ea5t k\u1ef3 s\u1ed1 ngu\u1ed3n n\u00e0o \u2014 ch\u1ec9 d\u00f9ng s\u1ed1 trang\n'
+    + '- Tr\u1ea3 l\u1eddi b\u1eb1ng ti\u1ebfng Vi\u1ec7t, r\u00f5 r\u00e0ng v\u00e0 c\u00f3 c\u1ea5u tr\u00fac\n\n'
+    + 'N\u1ed8I DUNG T\u00c0I LI\u1ec6U:\n'
+    + (contextText || '(Kh\u00f4ng t\u00ecm th\u1ea5y n\u1ed9i dung li\u00ean quan trong t\u00e0i li\u1ec7u)')
+    + '\n\n'
+    + (historyText ? ('L\u1ecaCH S\u1eed CU\u1ed8C TR\u00d2 CHUY\u1ec6N:\n' + historyText + '\n') : '')
+    + 'C\u00c2U H\u1eceI G\u1ed0C: ' + question
+    + (rewrittenQuery !== question ? ('\nC\u00c2U H\u1eceI \u0110\u00c3 PH\u00c2N T\u00cdCH: ' + rewrittenQuery) : '')
+    + '\n\nH\u00e3y tr\u1ea3 l\u1eddi:';
+
+  let fullAnswer = '';
+  for await (const chunk of generateStream(prompt, { temperature: 0.2, signal: signal })) {
+    fullAnswer += chunk;
+    yield { type: 'chunk', text: chunk };
+  }
+  pipelineLog.timings.generate = Date.now() - generateStart;
+  pipelineLog.timings.total = Date.now() - startTime;
+
+  // ── Step 7: Format sources ──
+  const sources = selectedChunks.map(function (chunk, index) {
+    var meta = chunk.metadata || {};
+    var page = meta.page_number;
+    var title = page ? ('Trang ' + page) : (meta.section || ('\u0110o\u1ea1n ' + (index + 1)));
+    return {
+      title: title,
+      text: chunk.text.slice(0, 320) + (chunk.text.length > 320 ? '...' : ''),
+      page_number: page,
+      document_id: meta.document_id,
+      section: meta.section || null,
+    };
+  });
+
+  var pipeline;
+  if (debug) {
+    pipeline = Object.assign({}, pipelineLog, {
+      strategyDescription: describeStrategy(strategy),
+    });
+  } else {
+    pipeline = {
+      strategy: strategy,
+      strategyDescription: describeStrategy(strategy),
+      totalTimeMs: pipelineLog.timings.total,
+    };
+  }
+
+  yield { type: 'done', answer: fullAnswer, sources: sources, pipeline: pipeline };
+}
+
 // ── Delete ────────────────────────────────────────────────────────────────────
 
 async function deleteDocumentCollection(collectionName) {
@@ -469,4 +691,4 @@ async function deleteDocumentCollection(collectionName) {
   invalidateHierarchy(collectionName);
 }
 
-module.exports = { ingest, ask, summarize, quiz, mindmap, studyQuestions, deleteDocumentCollection };
+module.exports = { ingest, ask, askStream, summarize, quiz, mindmap, studyQuestions, deleteDocumentCollection };

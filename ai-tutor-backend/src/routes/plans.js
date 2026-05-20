@@ -4,6 +4,7 @@ const { v4: uuidv4 } = require('uuid');
 const { PayOS } = require('@payos/node');
 const { User, UserSubscription, SubscriptionPlan, PaymentTransaction } = require('../db/models');
 const { authMiddleware } = require('../middleware/auth');
+const { sendAdminRealtimeEvent } = require('../utils/notifications');
 
 // ── payOS config ────────────────────────────────────────────────────────────
 const payos = new PayOS({
@@ -104,6 +105,8 @@ async function activateSubscription(userId, plan, transactionId) {
     }
   }
   console.log(`[payOS] ✅ Activated ${plan.id} for user ${userId}, txn: ${transactionId}`);
+  sendAdminRealtimeEvent('subscription_updated', { user_id: userId, plan_id: plan.id, amount: plan.discounted_price_vnd }).catch(console.error);
+  sendAdminRealtimeEvent('revenue_updated', { user_id: userId, amount: plan.discounted_price_vnd }).catch(console.error);
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -257,6 +260,7 @@ router.delete('/cancel', authMiddleware, async (req, res) => {
       { user_id: req.userId },
       { $set: { status: 'cancelled', cancelled_at: now, updated_at: now } }
     );
+    sendAdminRealtimeEvent('subscription_updated', { user_id: req.userId, plan_id: 'free', status: 'cancelled' }).catch(console.error);
     res.json({ message: 'Đã hủy gói thành công. Bạn đã quay lại gói Miễn phí.' });
   } catch (err) {
     res.status(500).json({ detail: 'Lỗi server' });

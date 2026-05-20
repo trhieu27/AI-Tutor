@@ -5,7 +5,7 @@ import reactHooks from "eslint-plugin-react-hooks";
 import reactRefresh from "eslint-plugin-react-refresh";
 
 export default defineConfig([
-  { ignores: ["dist", ".next", "out", "build", "node_modules", ".agents", ".impeccable"] },
+  { ignores: ["dist", "build", "node_modules", ".agents", ".impeccable"] },
   {
     files: ["**/*.{js,jsx}"],
     plugins: {

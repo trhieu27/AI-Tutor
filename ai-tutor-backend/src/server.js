@@ -20,6 +20,7 @@ const fs = require('fs');
 
 const config = require('./config');
 const { connectDB } = require('./db/mongoose');
+const { warmAuthCache } = require('./db/authDb');
 const { notificationManager } = require('./utils/notifications');
 
 // Routes
@@ -49,6 +50,7 @@ app.use(cors({
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
   allowedHeaders: ['Authorization', 'Content-Type', 'Accept'],
+  exposedHeaders: ['X-Pagination'],
 }));
 
 // ── Body parser ──────────────────────────────────────────────────────────────
@@ -143,6 +145,9 @@ server.on('upgrade', (request, socket, head) => {
 // ── Start ────────────────────────────────────────────────────────────────────
 async function start() {
   await connectDB();
+  await warmAuthCache().catch((err) => {
+    console.warn('Could not warm auth cache:', err.message);
+  });
   server.listen(config.port, '0.0.0.0', () => {
     console.log(`🚀 AI Tutor Backend (Node.js) running on http://0.0.0.0:${config.port}`);
     console.log(`📡 WebSocket available at ws://0.0.0.0:${config.port}/api/v1/ws/notifications`);

@@ -14,7 +14,10 @@ const {
 } = require('../db/models');
 const { adminMiddleware } = require('../middleware/admin');
 const { retryDocumentProcessing, deleteDocumentResources } = require('../utils/documentOps');
+const { parsePagination } = require('../utils/pagination');
 const { usageToday } = require('../utils/quota');
+const { refreshConnections } = require('../db/mongoose');
+const { sendAdminRealtimeEvent } = require('../utils/notifications');
 
 const router = express.Router();
 router.use(adminMiddleware);
@@ -23,6 +26,9 @@ const VALID_ROLES = new Set(['STUDENT', 'ADMIN']);
 const VALID_USER_STATUSES = new Set(['active', 'blocked', 'deleted']);
 const VALID_PLAN_IDS = new Set(['free', 'pro_monthly', 'pro_annual']);
 const VALID_SORTS = new Set(['created_desc', 'created_asc', 'last_active_desc', 'documents_desc', 'ai_today_desc']);
+const DEFAULT_ACTIVITY_WINDOW_MINUTES = 15;
+const USER_LIST_PROJECTION = 'id student_id full_name email role status created_at updated_at';
+const DOCUMENT_LIST_PROJECTION = 'id owner_id file_name file_size_mb page_count status uploaded_at updated_at';
 const DANGEROUS_ACTIONS = {
   USER_BLOCKED: 'USER_BLOCKED',
   USER_UNBLOCKED: 'USER_UNBLOCKED',
@@ -38,6 +44,10 @@ function getClientIp(req) {
   return (req.headers['x-forwarded-for'] || req.ip || req.connection?.remoteAddress || '').toString().split(',')[0].trim();
 }
 
+function escapeRegex(value) {
+  return String(value || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
 function stripMongo(doc) {
   if (!doc) return null;
   const raw = typeof doc.toObject === 'function' ? doc.toObject() : { ...doc };
@@ -48,9 +58,7 @@ function stripMongo(doc) {
 }
 
 function parsePageLimit(query, defaultLimit = 20, maxLimit = 100) {
-  const page = Math.max(1, Number.parseInt(query.page, 10) || 1);
-  const limit = Math.min(maxLimit, Math.max(1, Number.parseInt(query.limit, 10) || defaultLimit));
-  return { page, limit, skip: (page - 1) * limit };
+  return parsePagination(query, { defaultLimit, maxLimit });
 }
 
 function startOfToday() {
@@ -135,6 +143,22 @@ function serializeDocument(doc, owner = null) {
   };
 }
 
+function serializeDocumentListItem(doc, owner = null) {
+  const clean = stripMongo(doc);
+  if (!clean) return null;
+  return {
+    id: clean.id,
+    owner_id: clean.owner_id,
+    file_name: clean.file_name,
+    file_size_mb: clean.file_size_mb || 0,
+    page_count: clean.page_count || 0,
+    status: clean.status || 'UPLOADING',
+    uploaded_at: clean.uploaded_at,
+    updated_at: clean.updated_at,
+    owner: owner ? serializeUser(owner) : null,
+  };
+}
+
 async function logAudit(req, action, targetType, targetId, metadata = {}) {
   await AdminAuditLog.create({
     id: uuidv4(),
@@ -151,13 +175,18 @@ async function ensurePaymentTransactionsBackfilled() {
   const subscriptions = await UserSubscription.find({
     amount_paid_vnd: { $gt: 0 },
   }).lean();
+  if (subscriptions.length === 0) return;
 
+  const transactionIds = subscriptions.map((sub) => sub.transaction_id || `SUB_${sub.id}`);
+  const existingTxs = await PaymentTransaction.find({ transaction_id: { $in: transactionIds } }).select('transaction_id').lean();
+  const existingSet = new Set(existingTxs.map((tx) => tx.transaction_id));
+
+  const newTxs = [];
   for (const sub of subscriptions) {
     const transactionId = sub.transaction_id || `SUB_${sub.id}`;
-    const existing = await PaymentTransaction.findOne({ transaction_id: transactionId }).lean();
-    if (existing) continue;
+    if (existingSet.has(transactionId)) continue;
 
-    await PaymentTransaction.create({
+    newTxs.push({
       id: uuidv4(),
       user_id: sub.user_id,
       plan_id: sub.plan_id,
@@ -169,15 +198,20 @@ async function ensurePaymentTransactionsBackfilled() {
       created_at: sub.created_at || sub.started_at || new Date(),
     });
   }
+
+  if (newTxs.length > 0) {
+    await PaymentTransaction.insertMany(newTxs);
+  }
 }
 
-async function getActiveProSubscriptions() {
+async function countActiveProSubscriptions(extra = {}) {
   const now = new Date();
-  return UserSubscription.find({
+  return UserSubscription.countDocuments({
+    ...extra,
     status: 'active',
     plan_id: { $ne: 'free' },
     $or: [{ expires_at: null }, { expires_at: { $gt: now } }],
-  }).lean();
+  });
 }
 
 async function getPlanMap() {
@@ -186,7 +220,6 @@ async function getPlanMap() {
 }
 
 async function getRevenueTotals() {
-  await ensurePaymentTransactionsBackfilled();
   const today = startOfToday();
   const monthStart = startOfMonth();
   const yearStart = startOfYear();
@@ -214,11 +247,16 @@ async function getRevenueTotals() {
 }
 
 async function countChatMessagesSince(since, role = null) {
-  const match = { 'messages.created_at': { $gte: since } };
-  if (role) match['messages.role'] = role;
+  const initialMatch = { 'messages.created_at': { $gte: since } };
+  const exactMatch = { 'messages.created_at': { $gte: since } };
+  if (role) {
+    initialMatch['messages.role'] = role;
+    exactMatch['messages.role'] = role;
+  }
   const rows = await ChatSession.aggregate([
+    { $match: initialMatch },
     { $unwind: '$messages' },
-    { $match: match },
+    { $match: exactMatch },
     { $count: 'count' },
   ]);
   return rows[0]?.count || 0;
@@ -226,6 +264,7 @@ async function countChatMessagesSince(since, role = null) {
 
 async function chatMessagesByUserSince(since, limit = 8) {
   return ChatSession.aggregate([
+    { $match: { 'messages.role': 'user', 'messages.created_at': { $gte: since } } },
     { $unwind: '$messages' },
     { $match: { 'messages.role': 'user', 'messages.created_at': { $gte: since } } },
     { $group: { _id: '$user_id', chat_messages: { $sum: 1 } } },
@@ -261,13 +300,101 @@ async function getCountsByField(model, field, ids) {
   return new Map(rows.map((row) => [row._id, row.count]));
 }
 
-async function getLastActiveByUser(userIds) {
+async function getPresenceByUser(userIds) {
   if (!userIds.length) return new Map();
+  const now = new Date();
   const rows = await UserSession.aggregate([
     { $match: { user_id: { $in: userIds } } },
-    { $group: { _id: '$user_id', last_active: { $max: '$last_active' } } },
+    {
+      $group: {
+        _id: '$user_id',
+        last_active: { $max: '$last_active' },
+        online_until: { $max: '$online_until' },
+        online_sessions: {
+          $sum: {
+            $cond: [
+              { $and: [{ $eq: ['$is_online', true] }, { $gt: ['$online_until', now] }] },
+              1,
+              0,
+            ],
+          },
+        },
+      },
+    },
   ]);
-  return new Map(rows.map((row) => [row._id, row.last_active]));
+  return new Map(rows.map((row) => [row._id, row]));
+}
+
+async function getOnlineUserIds() {
+  const now = new Date();
+  const rows = await UserSession.aggregate([
+    { $match: { is_online: true, online_until: { $gt: now } } },
+    { $group: { _id: '$user_id' } },
+  ]);
+  return rows.map((row) => row._id);
+}
+
+async function getUserIdConstraintForPlan(plan) {
+  if (!plan) return null;
+  const now = new Date();
+  const activeProQuery = {
+    status: 'active',
+    plan_id: { $ne: 'free' },
+    $or: [{ expires_at: null }, { expires_at: { $gt: now } }],
+  };
+
+  if (plan === 'pro') {
+    return { $in: await UserSubscription.distinct('user_id', activeProQuery) };
+  }
+
+  if (plan === 'free') {
+    return { $nin: await UserSubscription.distinct('user_id', activeProQuery) };
+  }
+
+  if (plan === 'pro_monthly' || plan === 'pro_annual') {
+    const activeSpecificPlanQuery = {
+      status: 'active',
+      plan_id: plan,
+      $or: [{ expires_at: null }, { expires_at: { $gt: now } }],
+    };
+    return { $in: await UserSubscription.distinct('user_id', activeSpecificPlanQuery) };
+  }
+
+  return { $in: [] };
+}
+
+async function buildUserListQuery(req, { includeSearch = true } = {}) {
+  const searchQuery = userMatchesSearchQuery(req.query.search);
+  const query = includeSearch ? { ...searchQuery } : {};
+  const idConstraints = [];
+
+  if (req.query.role && VALID_ROLES.has(req.query.role)) {
+    if (req.query.role === 'STUDENT') {
+      query.role = { $in: ['STUDENT', null] };
+    } else {
+      query.role = req.query.role;
+    }
+  }
+  if (req.query.status && VALID_USER_STATUSES.has(req.query.status)) {
+    if (req.query.status === 'active') {
+      query.status = { $in: ['active', null] };
+    } else {
+      query.status = req.query.status;
+    }
+  } else {
+    query.status = { $ne: 'deleted' };
+  }
+
+  const planConstraint = await getUserIdConstraintForPlan(String(req.query.plan || ''));
+  if (planConstraint) idConstraints.push({ id: planConstraint });
+
+  if (req.query.active === 'true' || req.query.active === 'false') {
+    const onlineUserIds = await getOnlineUserIds();
+    idConstraints.push({ id: req.query.active === 'true' ? { $in: onlineUserIds } : { $nin: onlineUserIds } });
+  }
+
+  if (idConstraints.length) query.$and = idConstraints;
+  return { query };
 }
 
 async function activeAdminCountExcluding(userId) {
@@ -280,11 +407,11 @@ async function activeAdminCountExcluding(userId) {
 
 async function enrichUsers(users) {
   const userIds = users.map((user) => user.id);
-  const [subs, documentCounts, chatCounts, lastActive, aiUsageToday, chatToday] = await Promise.all([
+  const [subs, documentCounts, chatCounts, presenceByUser, aiUsageToday, chatToday] = await Promise.all([
     UserSubscription.find({ user_id: { $in: userIds } }).lean(),
     getCountsByField(Document, 'owner_id', userIds),
     getCountsByField(ChatSession, 'user_id', userIds),
-    getLastActiveByUser(userIds),
+    getPresenceByUser(userIds),
     getUsageTodayByUser(userIds),
     getChatTodayByUser(userIds),
   ]);
@@ -294,14 +421,20 @@ async function enrichUsers(users) {
 
   return users.map((user) => {
     const sub = subMap.get(user.id);
-    const plan = sub ? planMap.get(sub.plan_id) : planMap.get('free');
+    const isPro = Boolean(sub && sub.status === 'active' && sub.plan_id !== 'free' && (!sub.expires_at || new Date(sub.expires_at) > new Date()));
+    const plan = isPro ? planMap.get(sub.plan_id) : planMap.get('free');
+    const presence = presenceByUser.get(user.id) || {};
+    const lastActiveAt = presence.last_active || null;
+    const isOnline = (user.status || 'active') === 'active' && (presence.online_sessions || 0) > 0;
     return serializeUser(user, {
       plan: plan ? serializePlan(plan) : null,
       subscription: sub ? serializeSubscription(sub) : null,
       document_count: documentCounts.get(user.id) || 0,
       chat_count: chatCounts.get(user.id) || 0,
       ai_usage_today: (aiUsageToday.get(user.id) || 0) + (chatToday.get(user.id) || 0),
-      last_active: lastActive.get(user.id) || null,
+      last_active: lastActiveAt,
+      is_online: Boolean(isOnline),
+      online_until: presence.online_until || null,
       is_pro: Boolean(sub && sub.status === 'active' && sub.plan_id !== 'free' && (!sub.expires_at || new Date(sub.expires_at) > new Date())),
     });
   });
@@ -309,7 +442,9 @@ async function enrichUsers(users) {
 
 function userMatchesSearchQuery(search) {
   if (!search) return {};
-  const regex = new RegExp(String(search).trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i');
+  const raw = String(search).trim();
+  const escaped = escapeRegex(raw);
+  const regex = new RegExp(escaped, 'i');
   return { $or: [{ email: regex }, { full_name: regex }, { student_id: regex }] };
 }
 
@@ -317,6 +452,7 @@ function sortUsers(users, sort) {
   const chosen = VALID_SORTS.has(sort) ? sort : 'created_desc';
   const sorted = [...users];
   sorted.sort((a, b) => {
+    if (Boolean(a.is_online) !== Boolean(b.is_online)) return a.is_online ? -1 : 1;
     if (chosen === 'created_asc') return new Date(a.created_at || 0) - new Date(b.created_at || 0);
     if (chosen === 'last_active_desc') return new Date(b.last_active || 0) - new Date(a.last_active || 0);
     if (chosen === 'documents_desc') return (b.document_count || 0) - (a.document_count || 0);
@@ -362,17 +498,26 @@ async function getRecentSubscriptions(limit = 8) {
 
 async function getAttentionDocuments(limit = 8) {
   const docs = await Document.find({ status: { $in: ['FAILED', 'PROCESSING', 'UPLOADING'] } })
+    .select(DOCUMENT_LIST_PROJECTION)
     .sort({ updated_at: -1 })
     .limit(limit)
     .lean();
-  const owners = await User.find({ id: { $in: docs.map((doc) => doc.owner_id) } }).lean();
+  const owners = await User.find({ id: { $in: docs.map((doc) => doc.owner_id) } }).select(USER_LIST_PROJECTION).lean();
   const ownerMap = new Map(owners.map((user) => [user.id, user]));
-  return docs.map((doc) => serializeDocument(doc, ownerMap.get(doc.owner_id)));
+  return docs.map((doc) => serializeDocumentListItem(doc, ownerMap.get(doc.owner_id)));
 }
 
-async function getActiveUsersList(limit = 8, minutes = 15) {
-  const since = new Date(Date.now() - minutes * 60 * 1000);
-  const sessions = await UserSession.find({ last_active: { $gte: since } }).sort({ last_active: -1 }).limit(limit).lean();
+async function getActiveUsersList(limit = 8) {
+  const now = new Date();
+  const match = { is_online: true, online_until: { $gt: now } };
+  const rows = await UserSession.aggregate([
+    { $match: match },
+    { $sort: { last_active: -1 } },
+    { $group: { _id: '$user_id', session: { $first: '$$ROOT' }, last_active: { $max: '$last_active' } } },
+    { $sort: { last_active: -1 } },
+    { $limit: limit },
+  ]);
+  const sessions = rows.map((row) => ({ ...row.session, last_active: row.last_active }));
   const users = await User.find({ id: { $in: sessions.map((session) => session.user_id) } }).lean();
   const userMap = new Map(users.map((user) => [user.id, user]));
   const docCounts = await getCountsByField(Document, 'owner_id', sessions.map((session) => session.user_id));
@@ -384,37 +529,125 @@ async function getActiveUsersList(limit = 8, minutes = 15) {
 }
 
 async function buildRevenueSeries(from, to, groupBy) {
-  await ensurePaymentTransactionsBackfilled();
   const rows = await PaymentTransaction.find({
     status: 'paid',
     paid_at: { $gte: from, $lte: to },
   }).sort({ paid_at: 1 }).lean();
 
   const bucketMap = new Map();
+
+  // Pre-populate with all keys between from and to
+  let current = new Date(from);
+  const end = new Date(to);
+  while (current <= end) {
+    const key = addGroupKey(current, groupBy);
+    bucketMap.set(key, { revenue: 0, count: 0 });
+
+    if (groupBy === 'year') {
+      current.setFullYear(current.getFullYear() + 1);
+    } else if (groupBy === 'month') {
+      current.setMonth(current.getMonth() + 1);
+    } else {
+      current.setDate(current.getDate() + 1);
+    }
+  }
+  const endKey = addGroupKey(end, groupBy);
+  if (!bucketMap.has(endKey)) {
+    bucketMap.set(endKey, { revenue: 0, count: 0 });
+  }
+
   rows.forEach((row) => {
     const key = addGroupKey(row.paid_at || row.created_at, groupBy);
-    bucketMap.set(key, (bucketMap.get(key) || 0) + (row.amount_vnd || 0));
+    const bucket = bucketMap.get(key) || { revenue: 0, count: 0 };
+    bucket.revenue += (row.amount_vnd || 0);
+    bucket.count += 1;
+    bucketMap.set(key, bucket);
   });
 
-  return [...bucketMap.entries()].map(([date, revenue]) => ({ date, revenue }));
+  return [...bucketMap.entries()].map(([date, { revenue, count }]) => ({ date, revenue, count }));
 }
 
 async function buildOverviewRevenueSeries() {
   return buildRevenueSeries(startOfMonth(), new Date(), 'day');
 }
 
-// GET /api/v1/admin/overview
-router.get('/overview', async (req, res) => {
-  try {
-    const today = startOfToday();
+let overviewCache = null;
+let overviewCacheTime = 0;
+let overviewInFlight = null;
+let overviewFailureUntil = 0;
+const OVERVIEW_CACHE_TTL = 30000; // 30 seconds
+const OVERVIEW_FAILURE_COOLDOWN = 30000; // 30 seconds
+const overviewFallback = buildFallbackOverview();
+
+function clearOverviewCache() {
+  overviewCache = null;
+  overviewCacheTime = 0;
+}
+
+function buildFallbackOverview() {
+  return {
+    totalUsers: 0,
+    newUsersToday: 0,
+    newUsersThisMonth: 0,
+    proUsers: 0,
+    freeUsers: 0,
+    blockedUsers: 0,
+    totalDocuments: 0,
+    readyDocuments: 0,
+    processingDocuments: 0,
+    failedDocuments: 0,
+    totalPages: 0,
+    totalChatSessions: 0,
+    chatMessagesToday: 0,
+    aiGenerationsToday: 0,
+    monthlyRevenue: 0,
+    yearlyRevenue: 0,
+    revenueToday: 0,
+    freeToProConversionRate: 0,
+    topUsedFeature: null,
+    featureUsage: [],
+    revenueSeries: [],
+    heavyAiUsers: [],
+    attentionDocuments: [],
+    recentSubscriptions: [],
+    alerts: [],
+    activeUsers: 0,
+    activeUsersList: [],
+  };
+}
+
+function sendOverviewFallback(res, source = 'fallback') {
+  res.set('X-Admin-Overview-Cache', source);
+  return res.json(overviewCache || overviewFallback);
+}
+
+function isMongoUnavailableError(err) {
+  return ['MongoNetworkTimeoutError', 'MongoNetworkError', 'MongoServerSelectionError'].includes(err?.name)
+    || /timed out|ECONNRESET|ETIMEDOUT|ENOTFOUND/i.test(err?.message || '');
+}
+
+async function buildOverviewResponse(req, now, today) {
+  // 1. Fetch real-time active users
+  const [activeRows, activeUsersList] = await Promise.all([
+    UserSession.aggregate([
+      { $match: { is_online: true, online_until: { $gt: now } } },
+      { $group: { _id: '$user_id' } },
+      { $count: 'count' }
+    ]),
+    getActiveUsersList(8),
+  ]);
+
+  const activeUsers = activeRows[0]?.count || 0;
+
+  // 2. Compute or load cached heavy statistics
+  let stats = overviewCache;
+  if (!stats || (now.getTime() - overviewCacheTime > OVERVIEW_CACHE_TTL)) {
     const monthStart = startOfMonth();
-    const activeSince = new Date(Date.now() - 15 * 60 * 1000);
 
     const [
       totalUsers,
       newUsersToday,
       newUsersThisMonth,
-      activeRows,
       blockedUsers,
       totalDocuments,
       readyDocuments,
@@ -424,19 +657,17 @@ router.get('/overview', async (req, res) => {
       totalChatSessions,
       chatMessagesToday,
       aiGenerationsToday,
-      activeProSubs,
+      activeProCount,
       revenueTotals,
       featureUsage,
       heavyRows,
-      activeUsersList,
       attentionDocuments,
       recentSubscriptions,
       revenueSeries,
     ] = await Promise.all([
-      User.countDocuments({ status: { $ne: 'deleted' } }),
-      User.countDocuments({ created_at: { $gte: today }, status: { $ne: 'deleted' } }),
-      User.countDocuments({ created_at: { $gte: monthStart }, status: { $ne: 'deleted' } }),
-      UserSession.aggregate([{ $match: { last_active: { $gte: activeSince } } }, { $group: { _id: '$user_id' } }, { $count: 'count' }]),
+      User.countDocuments({ id: { $ne: req.userId }, status: { $ne: 'deleted' } }),
+      User.countDocuments({ id: { $ne: req.userId }, created_at: { $gte: today }, status: { $ne: 'deleted' } }),
+      User.countDocuments({ id: { $ne: req.userId }, created_at: { $gte: monthStart }, status: { $ne: 'deleted' } }),
       User.countDocuments({ status: 'blocked' }),
       Document.countDocuments({}),
       Document.countDocuments({ status: 'READY' }),
@@ -446,17 +677,15 @@ router.get('/overview', async (req, res) => {
       ChatSession.countDocuments({}),
       countChatMessagesSince(today, 'user'),
       UsageLog.countDocuments({ feature: 'ai_features', date: todayUTC() }),
-      getActiveProSubscriptions(),
+      countActiveProSubscriptions({ user_id: { $ne: req.userId } }),
       getRevenueTotals(),
       buildFeatureUsage(),
       chatMessagesByUserSince(today, 8),
-      getActiveUsersList(8, 15),
       getAttentionDocuments(8),
       getRecentSubscriptions(8),
       buildOverviewRevenueSeries(),
     ]);
 
-    const proUserIds = new Set(activeProSubs.map((sub) => sub.user_id));
     const usersForHeavy = await User.find({ id: { $in: heavyRows.map((row) => row._id) } }).lean();
     const heavyUserMap = new Map(usersForHeavy.map((user) => [user.id, user]));
     const topUsedFeature = featureUsage[0] || null;
@@ -482,13 +711,12 @@ router.get('/overview', async (req, res) => {
       } : null,
     ].filter(Boolean);
 
-    res.json({
+    stats = {
       totalUsers,
       newUsersToday,
       newUsersThisMonth,
-      activeUsers: activeRows[0]?.count || 0,
-      proUsers: proUserIds.size,
-      freeUsers: Math.max(totalUsers - proUserIds.size, 0),
+      proUsers: activeProCount,
+      freeUsers: Math.max(totalUsers - activeProCount, 0),
       blockedUsers,
       totalDocuments,
       readyDocuments,
@@ -501,7 +729,7 @@ router.get('/overview', async (req, res) => {
       monthlyRevenue: revenueTotals.monthlyRevenue,
       yearlyRevenue: revenueTotals.yearlyRevenue,
       revenueToday: revenueTotals.revenueToday,
-      freeToProConversionRate: totalUsers ? Math.round((proUserIds.size / totalUsers) * 1000) / 10 : 0,
+      freeToProConversionRate: totalUsers ? Math.round((activeProCount / totalUsers) * 1000) / 10 : 0,
       topUsedFeature,
       featureUsage,
       revenueSeries,
@@ -509,12 +737,53 @@ router.get('/overview', async (req, res) => {
         user: serializeUser(heavyUserMap.get(row._id)),
         chat_messages: row.chat_messages,
       })),
-      activeUsersList,
       attentionDocuments,
       recentSubscriptions,
       alerts,
-    });
+    };
+  }
+
+  return {
+    ...stats,
+    activeUsers,
+    activeUsersList,
+  };
+}
+
+// GET /api/v1/admin/overview
+router.get('/overview', async (req, res) => {
+  try {
+    const now = new Date();
+    if (overviewCache && (now.getTime() - overviewCacheTime <= OVERVIEW_CACHE_TTL)) {
+      res.set('X-Admin-Overview-Cache', 'hit');
+      return res.json(overviewCache);
+    }
+    if (!overviewCache && now.getTime() < overviewFailureUntil) {
+      return sendOverviewFallback(res, 'cooldown');
+    }
+
+    const today = startOfToday();
+    if (!overviewInFlight) {
+      overviewInFlight = buildOverviewResponse(req, now, today).finally(() => {
+        overviewInFlight = null;
+      });
+    }
+
+    const responseData = await overviewInFlight;
+    overviewCache = responseData;
+    overviewCacheTime = now.getTime();
+    res.json(responseData);
   } catch (err) {
+    if (isMongoUnavailableError(err)) {
+      console.warn('Admin overview MongoDB timeout, refreshing connections:', err.message);
+      refreshConnections().catch(() => {});
+      if (overviewCache) {
+        res.set('X-Admin-Overview-Cache', 'stale');
+        return res.json(overviewCache);
+      }
+      overviewFailureUntil = Date.now() + OVERVIEW_FAILURE_COOLDOWN;
+      return sendOverviewFallback(res, 'fallback');
+    }
     console.error('Admin overview error:', err);
     res.status(500).json({ detail: 'Lỗi tải tổng quan admin' });
   }
@@ -523,35 +792,18 @@ router.get('/overview', async (req, res) => {
 // GET /api/v1/admin/users
 router.get('/users', async (req, res) => {
   try {
-    const { page, limit } = parsePageLimit(req.query);
-    const query = { ...userMatchesSearchQuery(req.query.search) };
-    if (req.query.role && VALID_ROLES.has(req.query.role)) query.role = req.query.role;
-    if (req.query.status && VALID_USER_STATUSES.has(req.query.status)) query.status = req.query.status;
-    else query.status = { $ne: 'deleted' };
+    const { page, limit, skip } = parsePageLimit(req.query);
+    const sort = VALID_SORTS.has(req.query.sort) ? req.query.sort : 'created_desc';
+    const requiresComputedSort = ['last_active_desc', 'documents_desc', 'ai_today_desc'].includes(sort);
+    const { query } = await buildUserListQuery(req, { includeSearch: true });
+    const sortSpec = sort === 'created_asc' ? { created_at: 1 } : { created_at: -1 };
 
-    const users = await User.find(query).lean();
-    let enriched = await enrichUsers(users);
-
-    if (req.query.plan) {
-      const plan = String(req.query.plan);
-      enriched = enriched.filter((user) => {
-        if (plan === 'pro') return user.is_pro;
-        if (plan === 'free') return !user.is_pro;
-        return user.subscription?.plan_id === plan;
-      });
-    }
-
-    if (req.query.active === 'true' || req.query.active === 'false') {
-      const since = new Date(Date.now() - 15 * 60 * 1000);
-      enriched = enriched.filter((user) => {
-        const isActive = user.last_active && new Date(user.last_active) >= since;
-        return req.query.active === 'true' ? isActive : !isActive;
-      });
-    }
-
-    enriched = sortUsers(enriched, req.query.sort);
-    const total = enriched.length;
-    const items = enriched.slice((page - 1) * limit, page * limit);
+    const [total, users] = await Promise.all([
+      User.countDocuments(query),
+      User.find(query).select(USER_LIST_PROJECTION).sort(sortSpec).skip(skip).limit(limit).lean(),
+    ]);
+    let items = await enrichUsers(users);
+    if (requiresComputedSort) items = sortUsers(items, sort);
 
     res.json({
       items,
@@ -574,9 +826,9 @@ router.get('/users/:id', async (req, res) => {
     const user = await User.findOne({ id: req.params.id }).lean();
     if (!user) return res.status(404).json({ detail: 'Người dùng không tồn tại' });
 
-    const [subscription, docs, sessions, chatCount, usageLogs, recentUsage, chatUsed, aiUsed, docCount] = await Promise.all([
+    const [subscription, docs, sessions, chatCount, usageLogs, recentUsage, chatUsed, aiUsed, docCount, presenceByUser] = await Promise.all([
       UserSubscription.findOne({ user_id: user.id }).lean(),
-      Document.find({ owner_id: user.id }).sort({ uploaded_at: -1 }).limit(30).lean(),
+      Document.find({ owner_id: user.id }).select(DOCUMENT_LIST_PROJECTION).sort({ uploaded_at: -1 }).limit(30).lean(),
       UserSession.find({ user_id: user.id }).sort({ last_active: -1 }).limit(20).lean(),
       ChatSession.countDocuments({ user_id: user.id }),
       UsageLog.find({ user_id: user.id }).sort({ created_at: -1 }).limit(40).lean(),
@@ -584,15 +836,20 @@ router.get('/users/:id', async (req, res) => {
       usageToday(user.id, 'chat_messages'),
       usageToday(user.id, 'ai_features'),
       Document.countDocuments({ owner_id: user.id }),
+      getPresenceByUser([user.id]),
     ]);
 
     const planMap = await getPlanMap();
     const plan = subscription ? planMap.get(subscription.plan_id) : planMap.get('free');
     const owner = serializeUser(user);
+    const presence = presenceByUser.get(user.id) || {};
 
     res.json({
       user: serializeUser(user, {
         is_pro: Boolean(subscription && subscription.status === 'active' && subscription.plan_id !== 'free' && (!subscription.expires_at || new Date(subscription.expires_at) > new Date())),
+        is_online: (user.status || 'active') === 'active' && (presence.online_sessions || 0) > 0,
+        last_active: presence.last_active || null,
+        online_until: presence.online_until || null,
       }),
       subscription: subscription ? serializeSubscription(subscription) : null,
       plan: plan ? serializePlan(plan) : null,
@@ -602,7 +859,7 @@ router.get('/users/:id', async (req, res) => {
         ai_generations: aiUsed,
         limits: plan?.quota || null,
       },
-      documents: docs.map((doc) => serializeDocument(doc, owner)),
+      documents: docs.map((doc) => serializeDocumentListItem(doc, owner)),
       sessions: sessions.map(stripMongo),
       chat_sessions_count: chatCount,
       usage_logs: usageLogs.map(stripMongo),
@@ -672,6 +929,8 @@ router.patch('/users/:id', async (req, res) => {
     }
 
     await User.updateOne({ id: target.id }, { $set: updates });
+    clearOverviewCache();
+    sendAdminRealtimeEvent('user_updated', { user_id: target.id, role: updates.role, status: updates.status }).catch(console.error);
     const updated = await User.findOne({ id: target.id }).lean();
 
     if (changed.status?.to === 'blocked') await logAudit(req, DANGEROUS_ACTIONS.USER_BLOCKED, 'user', target.id, changed);
@@ -729,6 +988,8 @@ router.post('/users/:id/subscription', async (req, res) => {
       { $set: payload, $setOnInsert: { id: uuidv4(), user_id: user.id, created_at: now } },
       { upsert: true, new: true }
     ).lean();
+    clearOverviewCache();
+    sendAdminRealtimeEvent('subscription_updated', { user_id: user.id, plan_id: plan.id }).catch(console.error);
 
     await logAudit(req, DANGEROUS_ACTIONS.SUBSCRIPTION_CHANGED, 'user', user.id, {
       plan_id: plan.id,
@@ -751,35 +1012,33 @@ router.get('/revenue', async (req, res) => {
     to.setHours(23, 59, 59, 999);
     const groupBy = ['day', 'month', 'year'].includes(req.query.groupBy) ? req.query.groupBy : 'month';
 
-    await ensurePaymentTransactionsBackfilled();
-    const transactions = await PaymentTransaction.find({
+    const filter = {
       status: 'paid',
       paid_at: { $gte: from, $lte: to },
-    }).sort({ paid_at: -1 }).lean();
+    };
 
     const planMap = await getPlanMap();
-    const users = await User.find({ id: { $in: transactions.map((tx) => tx.user_id) } }).lean();
+    const [transactionPreview, planRows] = await Promise.all([
+      PaymentTransaction.find(filter).sort({ paid_at: -1 }).limit(50).lean(),
+      PaymentTransaction.aggregate([
+        { $match: filter },
+        { $group: { _id: '$plan_id', revenue: { $sum: '$amount_vnd' }, count: { $sum: 1 } } },
+      ]),
+    ]);
+    const users = await User.find({ id: { $in: transactionPreview.map((tx) => tx.user_id) } }).lean();
     const userMap = new Map(users.map((user) => [user.id, user]));
 
-    const totalRevenue = transactions.reduce((sum, tx) => sum + formatCurrencyAmount(tx.amount_vnd), 0);
-    const monthlyPlanRevenue = transactions
-      .filter((tx) => planMap.get(tx.plan_id)?.billing_cycle === 'monthly')
-      .reduce((sum, tx) => sum + formatCurrencyAmount(tx.amount_vnd), 0);
-    const annualPlanRevenue = transactions
-      .filter((tx) => planMap.get(tx.plan_id)?.billing_cycle === 'annual')
-      .reduce((sum, tx) => sum + formatCurrencyAmount(tx.amount_vnd), 0);
+    const totalRevenue = planRows.reduce((sum, row) => sum + formatCurrencyAmount(row.revenue), 0);
+    const monthlyPlanRevenue = planRows
+      .filter((row) => planMap.get(row._id)?.billing_cycle === 'monthly')
+      .reduce((sum, row) => sum + formatCurrencyAmount(row.revenue), 0);
+    const annualPlanRevenue = planRows
+      .filter((row) => planMap.get(row._id)?.billing_cycle === 'annual')
+      .reduce((sum, row) => sum + formatCurrencyAmount(row.revenue), 0);
 
-    const planBreakdownMap = new Map();
-    transactions.forEach((tx) => {
-      const current = planBreakdownMap.get(tx.plan_id) || { plan_id: tx.plan_id, revenue: 0, count: 0 };
-      current.revenue += formatCurrencyAmount(tx.amount_vnd);
-      current.count += 1;
-      planBreakdownMap.set(tx.plan_id, current);
-    });
-
-    const [totalUsers, activeProSubs, upgradedThisMonth] = await Promise.all([
+    const [totalUsers, activeProCount, upgradedThisMonth] = await Promise.all([
       User.countDocuments({ status: { $ne: 'deleted' } }),
-      getActiveProSubscriptions(),
+      countActiveProSubscriptions(),
       UserSubscription.countDocuments({ plan_id: { $ne: 'free' }, started_at: { $gte: startOfMonth(now) } }),
     ]);
 
@@ -792,39 +1051,80 @@ router.get('/revenue', async (req, res) => {
       monthlyPlanRevenue,
       annualPlanRevenue,
       revenueSeries: await buildRevenueSeries(from, to, groupBy),
-      transactions: transactions.slice(0, 50).map((tx) => ({
+      transactions: transactionPreview.map((tx) => ({
         ...stripMongo(tx),
         user: serializeUser(userMap.get(tx.user_id)),
         plan: serializePlan(planMap.get(tx.plan_id)),
       })),
-      planBreakdown: [...planBreakdownMap.values()].map((item) => ({
-        ...item,
-        plan: serializePlan(planMap.get(item.plan_id)),
+      planBreakdown: planRows.map((row) => ({
+        plan_id: row._id,
+        revenue: row.revenue,
+        count: row.count,
+        plan: serializePlan(planMap.get(row._id)),
       })),
       conversionStats: {
         totalUsers,
-        proUsers: activeProSubs.length,
-        freeUsers: Math.max(totalUsers - activeProSubs.length, 0),
+        proUsers: activeProCount,
+        freeUsers: Math.max(totalUsers - activeProCount, 0),
         upgradedThisMonth,
-        freeToProConversionRate: totalUsers ? Math.round((activeProSubs.length / totalUsers) * 1000) / 10 : 0,
+        freeToProConversionRate: totalUsers ? Math.round((activeProCount / totalUsers) * 1000) / 10 : 0,
       },
     });
   } catch (err) {
-    console.error('Admin revenue error:', err);
+    if (isMongoUnavailableError(err)) {
+      console.warn('Admin revenue MongoDB timeout, refreshing connections:', err.message);
+      refreshConnections().catch(() => {});
+    } else {
+      console.error('Admin revenue error:', err);
+    }
     res.status(500).json({ detail: 'Lỗi tải doanh thu' });
+  }
+});
+
+// GET /api/v1/admin/transactions
+router.get('/transactions', async (req, res) => {
+  try {
+    const now = new Date();
+    const from = parseDate(req.query.from, startOfYear(now));
+    const to = parseDate(req.query.to, now);
+    to.setHours(23, 59, 59, 999);
+    const { page, limit, skip } = parsePageLimit(req.query);
+
+    const filter = { status: 'paid', paid_at: { $gte: from, $lte: to } };
+    const [total, transactions] = await Promise.all([
+      PaymentTransaction.countDocuments(filter),
+      PaymentTransaction.find(filter).sort({ paid_at: -1 }).skip(skip).limit(limit).lean(),
+    ]);
+
+    const planMap = await getPlanMap();
+    const users = await User.find({ id: { $in: transactions.map((tx) => tx.user_id) } }).lean();
+    const userMap = new Map(users.map((user) => [user.id, user]));
+
+    res.json({
+      items: transactions.map((tx) => ({
+        ...stripMongo(tx),
+        user: serializeUser(userMap.get(tx.user_id)),
+        plan: serializePlan(planMap.get(tx.plan_id)),
+      })),
+      pagination: { page, limit, total, totalPages: Math.ceil(total / limit) },
+    });
+  } catch (err) {
+    console.error('Admin transactions error:', err);
+    res.status(500).json({ detail: 'Lỗi tải giao dịch' });
   }
 });
 
 // GET /api/v1/admin/activity
 router.get('/activity', async (req, res) => {
   try {
-    const activeWithinMinutes = Math.max(1, Number.parseInt(req.query.activeWithinMinutes, 10) || 15);
+    const activeWithinMinutes = Math.max(1, Number.parseInt(req.query.activeWithinMinutes, 10) || DEFAULT_ACTIVITY_WINDOW_MINUTES);
     const { page, limit, skip } = parsePageLimit(req.query);
     const since = new Date(Date.now() - activeWithinMinutes * 60 * 1000);
+    const match = { user_id: { $ne: req.userId }, last_active: { $gte: since } };
 
     const [total, sessions] = await Promise.all([
-      UserSession.countDocuments({ last_active: { $gte: since } }),
-      UserSession.find({ last_active: { $gte: since } }).sort({ last_active: -1 }).skip(skip).limit(limit).lean(),
+      UserSession.countDocuments(match),
+      UserSession.find(match).sort({ last_active: -1 }).skip(skip).limit(limit).lean(),
     ]);
 
     const userIds = sessions.map((session) => session.user_id);
@@ -861,35 +1161,36 @@ router.get('/activity', async (req, res) => {
 // GET /api/v1/admin/documents
 router.get('/documents', async (req, res) => {
   try {
-    const { page, limit } = parsePageLimit(req.query);
+    const { page, limit, skip } = parsePageLimit(req.query);
     const query = {};
     if (req.query.status) query.status = String(req.query.status).toUpperCase();
     if (req.query.owner) query.owner_id = String(req.query.owner);
     if (req.query.from || req.query.to) {
       query.uploaded_at = {};
-      if (req.query.from) query.uploaded_at.$gte = parseDate(req.query.from, null);
-      if (req.query.to) query.uploaded_at.$lte = parseDate(req.query.to, null);
+      const from = parseDate(req.query.from, null);
+      const to = parseDate(req.query.to, null);
+      if (from) query.uploaded_at.$gte = from;
+      if (to) query.uploaded_at.$lte = to;
+      if (!Object.keys(query.uploaded_at).length) delete query.uploaded_at;
     }
-
-    let docs = await Document.find(query).sort({ uploaded_at: -1 }).lean();
-    const owners = await User.find({ id: { $in: docs.map((doc) => doc.owner_id) } }).lean();
-    const ownerMap = new Map(owners.map((user) => [user.id, user]));
 
     if (req.query.search) {
-      const search = String(req.query.search).toLowerCase();
-      docs = docs.filter((doc) => {
-        const owner = ownerMap.get(doc.owner_id);
-        return [
-          doc.file_name,
-          owner?.email,
-          owner?.full_name,
-          owner?.student_id,
-        ].some((value) => String(value || '').toLowerCase().includes(search));
-      });
+      const regex = new RegExp(escapeRegex(req.query.search), 'i');
+      const owners = await User.find({
+        $or: [{ email: regex }, { full_name: regex }, { student_id: regex }],
+      }).select(USER_LIST_PROJECTION).lean();
+      const ownerIds = owners.map((owner) => owner.id);
+      query.$or = [{ file_name: regex }];
+      if (ownerIds.length) query.$or.push({ owner_id: { $in: ownerIds } });
     }
 
-    const total = docs.length;
-    const items = docs.slice((page - 1) * limit, page * limit).map((doc) => serializeDocument(doc, ownerMap.get(doc.owner_id)));
+    const [total, docs] = await Promise.all([
+      Document.countDocuments(query),
+      Document.find(query).select(DOCUMENT_LIST_PROJECTION).sort({ uploaded_at: -1 }).skip(skip).limit(limit).lean(),
+    ]);
+    const owners = await User.find({ id: { $in: docs.map((doc) => doc.owner_id) } }).select(USER_LIST_PROJECTION).lean();
+    const ownerMap = new Map(owners.map((user) => [user.id, user]));
+    const items = docs.map((doc) => serializeDocumentListItem(doc, ownerMap.get(doc.owner_id)));
 
     res.json({
       items,
@@ -910,6 +1211,7 @@ router.get('/documents', async (req, res) => {
 router.post('/documents/:id/retry', async (req, res) => {
   try {
     const doc = await retryDocumentProcessing(req.params.id);
+    clearOverviewCache();
     await logAudit(req, DANGEROUS_ACTIONS.DOCUMENT_RETRIED, 'document', req.params.id, {
       owner_id: doc?.owner_id,
       file_name: doc?.file_name,
@@ -924,6 +1226,7 @@ router.post('/documents/:id/retry', async (req, res) => {
 router.delete('/documents/:id', async (req, res) => {
   try {
     const doc = await deleteDocumentResources(req.params.id);
+    clearOverviewCache();
     await logAudit(req, DANGEROUS_ACTIONS.DOCUMENT_DELETED, 'document', req.params.id, {
       owner_id: doc.owner_id,
       file_name: doc.file_name,
@@ -994,6 +1297,7 @@ router.patch('/plans/:id', async (req, res) => {
     }
 
     await SubscriptionPlan.updateOne({ id: plan.id }, { $set: updates });
+    clearOverviewCache();
     const updated = await SubscriptionPlan.findOne({ id: plan.id }).lean();
     await logAudit(req, DANGEROUS_ACTIONS.PLAN_UPDATED, 'plan', plan.id, updates);
     res.json(serializePlan(updated));
@@ -1007,7 +1311,20 @@ router.get('/audit', async (req, res) => {
   try {
     const { page, limit, skip } = parsePageLimit(req.query);
     const query = {};
-    if (req.query.admin_id) query.admin_id = String(req.query.admin_id);
+    if (req.query.admin_id) {
+      const search = String(req.query.admin_id).trim();
+      if (search) {
+        const matchingAdmins = await User.find({
+          role: 'ADMIN',
+          $or: [
+            { id: search },
+            { full_name: new RegExp(search, 'i') },
+            { email: new RegExp(search, 'i') },
+          ]
+        }).select('id').lean();
+        query.admin_id = { $in: matchingAdmins.map((u) => u.id) };
+      }
+    }
     if (req.query.action) query.action = String(req.query.action);
     if (req.query.target_type) query.target_type = String(req.query.target_type);
     if (req.query.from || req.query.to) {
@@ -1041,4 +1358,10 @@ router.get('/audit', async (req, res) => {
   }
 });
 
+// Run payment transactions backfill exactly once at boot in background
+ensurePaymentTransactionsBackfilled().catch((err) => {
+  console.error('Failed to backfill payment transactions at boot:', err);
+});
+
 module.exports = router;
+module.exports.clearOverviewCache = clearOverviewCache;

@@ -2,11 +2,22 @@ const express = require('express');
 const router = express.Router();
 const bcrypt = require('bcryptjs');
 const { User, UserSession } = require('../db/models');
+const { cacheAuthUser } = require('../db/authDb');
 const { authMiddleware } = require('../middleware/auth');
 const { sendSupportEmail } = require('../utils/email');
 const { isUserPro } = require('../utils/quota');
+const { presenceOfflineUpdate, presenceOnlineUpdate } = require('../utils/presence');
+const { sendAdminRealtimeEvent } = require('../utils/notifications');
+const { buildPagination, parsePagination, sendPaginated } = require('../utils/pagination');
 
 async function serializeUser(user) {
+  let isPro = false;
+  try {
+    isPro = await isUserPro(user.id);
+  } catch (err) {
+    console.warn(`Could not resolve Pro status for user ${user.id}:`, err.message);
+  }
+
   return {
     id: user.id,
     student_id: user.student_id || '',
@@ -15,7 +26,7 @@ async function serializeUser(user) {
     role: user.role || 'STUDENT',
     status: user.status || 'active',
     bio: user.bio || null,
-    is_pro: await isUserPro(user.id),
+    is_pro: isPro,
     preferences: user.preferences || { email_notifications: true, ai_response_detail: 'balanced' },
     created_at: user.created_at ? String(user.created_at) : '',
   };
@@ -24,9 +35,7 @@ async function serializeUser(user) {
 // GET /api/v1/users/me
 router.get('/me', authMiddleware, async (req, res) => {
   try {
-    const user = await User.findOne({ id: req.userId });
-    if (!user) return res.status(404).json({ detail: 'Người dùng không tồn tại' });
-    res.json(await serializeUser(user));
+    res.json(await serializeUser(req.user));
   } catch (err) {
     res.status(500).json({ detail: 'Lỗi server' });
   }
@@ -45,6 +54,7 @@ router.put('/profile', authMiddleware, async (req, res) => {
 
     await User.updateOne({ id: req.userId }, { $set: updates });
     const user = await User.findOne({ id: req.userId });
+    if (user) cacheAuthUser(user);
     res.json(await serializeUser(user));
   } catch (err) {
     res.status(500).json({ detail: 'Lỗi server' });
@@ -65,6 +75,8 @@ router.put('/password', authMiddleware, async (req, res) => {
 
     const hashed = await bcrypt.hash(new_password, 12);
     await User.updateOne({ id: req.userId }, { $set: { hashed_password: hashed, updated_at: new Date() } });
+    const updatedUser = await User.findOne({ id: req.userId });
+    if (updatedUser) cacheAuthUser(updatedUser);
     res.json({ message: 'Mật khẩu đã được cập nhật thành công' });
   } catch (err) {
     res.status(500).json({ detail: 'Lỗi server' });
@@ -72,6 +84,47 @@ router.put('/password', authMiddleware, async (req, res) => {
 });
 
 // (upgrade-pro endpoint removed — Pro status is determined by subscription)
+
+// POST /api/v1/users/presence
+router.post('/presence', authMiddleware, async (req, res) => {
+  try {
+    if (!req.sessionId) {
+      return res.json({ is_online: false, last_active: null, online_until: null });
+    }
+
+    const now = new Date();
+    const wantsOffline = req.body?.state === 'offline';
+    const update = wantsOffline ? presenceOfflineUpdate(now) : presenceOnlineUpdate(now);
+
+    const previousSession = await UserSession.findOne({ id: req.sessionId, user_id: req.userId }).lean();
+    const wasOnline = Boolean(previousSession?.is_online && previousSession?.online_until && new Date(previousSession.online_until) > now);
+    const isOnline = !wantsOffline;
+
+    await UserSession.updateOne(
+      { id: req.sessionId, user_id: req.userId },
+      { $set: update }
+    );
+
+    if (wasOnline !== isOnline) {
+      sendAdminRealtimeEvent('presence_changed', {
+        user_id: req.userId,
+        session_id: req.sessionId,
+        is_online: isOnline,
+        last_active: update.last_active,
+        online_until: update.online_until,
+      }).catch((err) => console.warn('[AdminRealtime] presence_changed failed:', err.message));
+    }
+
+    res.json({
+      is_online: isOnline,
+      last_active: update.last_active,
+      online_until: update.online_until,
+    });
+  } catch (err) {
+    console.warn('[Presence] DB error:', err.message);
+    res.json({ is_online: false, last_active: null, online_until: null });
+  }
+});
 
 // PUT /api/v1/users/preferences
 router.put('/preferences', authMiddleware, async (req, res) => {
@@ -89,6 +142,7 @@ router.put('/preferences', authMiddleware, async (req, res) => {
       await User.updateOne({ id: req.userId }, { $set: updates });
     }
     const user = await User.findOne({ id: req.userId });
+    if (user) cacheAuthUser(user);
     res.json(await serializeUser(user));
   } catch (err) {
     res.status(500).json({ detail: 'Lỗi server' });
@@ -98,9 +152,18 @@ router.put('/preferences', authMiddleware, async (req, res) => {
 // GET /api/v1/users/sessions
 router.get('/sessions', authMiddleware, async (req, res) => {
   try {
-    const sessions = await UserSession.find({ user_id: req.userId }).sort({ last_active: -1 }).limit(20).lean();
-    sessions.forEach(s => { delete s._id; });
-    res.json(sessions);
+    const { page, limit, skip } = parsePagination(req.query, { defaultLimit: 20, maxLimit: 100 });
+    const query = { user_id: req.userId };
+    const [total, sessions] = await Promise.all([
+      UserSession.countDocuments(query),
+      UserSession.find(query).sort({ last_active: -1 }).skip(skip).limit(limit).lean(),
+    ]);
+    const items = sessions.map((session) => {
+      const clean = { ...session };
+      delete clean._id;
+      return clean;
+    });
+    sendPaginated(res, items, buildPagination({ page, limit, total }), req.query);
   } catch (err) {
     res.status(500).json({ detail: 'Lỗi server' });
   }
