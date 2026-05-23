@@ -6,8 +6,8 @@ const config = require('../config');
 const genAI = new GoogleGenerativeAI(config.geminiApiKey);
 
 const EMBED_MODEL = 'models/gemini-embedding-2';
-const CHAT_MODEL = 'gemini-3.5-flash';
-const VISION_MODEL = 'gemini-2.5-flash';
+const CHAT_MODEL = 'gemini-2.5-flash';
+const VISION_MODEL = 'gemini-2.5-flash-lite';
 const LITE_MODEL = 'gemini-2.5-flash-lite';
 
 // Model resolver: 'chat' | 'vision' | 'lite'
@@ -75,7 +75,7 @@ async function embedQuery(text, requestOptions = {}) {
 /**
  * Generate text (non-streaming) with support for Browser Tool (Function Calling)
  */
-async function generateText(prompt, { temperature = 0.3, maxTokens = 8192, signal, useTools = true, modelTier = 'chat' } = {}) {
+async function generateText(prompt, { temperature = 0.3, maxTokens = 8192, signal, useTools = false, modelTier = 'chat' } = {}) {
   const selectedModel = resolveModel(modelTier);
   const enableTools = useTools && modelTier === 'chat';
   const modelOptions = {
@@ -224,7 +224,7 @@ async function describeDocumentImages(pdfBuffer, pageCount, imagePageNums) {
 
   const model = genAI.getGenerativeModel({
     model: VISION_MODEL,
-    generationConfig: { temperature: 0.2, maxOutputTokens: 8192 },
+    generationConfig: { temperature: 0.2, maxOutputTokens: 4096 },
   });
 
   const base64 = pdfBuffer.toString('base64');
@@ -282,7 +282,7 @@ async function describeDocxImages(images) {
 
   const model = genAI.getGenerativeModel({
     model: VISION_MODEL,
-    generationConfig: { temperature: 0.2, maxOutputTokens: 8192 },
+    generationConfig: { temperature: 0.2, maxOutputTokens: 4096 },
   });
 
   const BATCH = 10;

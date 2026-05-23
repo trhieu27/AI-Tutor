@@ -107,7 +107,10 @@ export default function ChatThreadList({
                       type="button"
                       aria-label={T.deleteSession}
                       title={T.deleteSession}
-                      className="mr-1.5 grid h-7 w-7 shrink-0 place-items-center rounded-md text-[var(--muted)] opacity-0 transition hover:text-[var(--foreground)] focus-visible:opacity-100 group-hover:opacity-100"
+                      className={cx(
+                        "mr-1.5 grid h-7 w-7 shrink-0 place-items-center rounded-md text-[var(--muted)] transition hover:text-[var(--foreground)] focus-visible:opacity-100 group-hover:opacity-100",
+                        active ? "opacity-70" : "opacity-0"
+                      )}
                       onClick={() => onDelete(session.id)}
                     >
                       <span className="material-symbols-outlined icon-thin text-[16px]" aria-hidden="true">

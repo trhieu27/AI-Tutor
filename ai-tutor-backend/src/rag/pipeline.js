@@ -301,7 +301,7 @@ ${historyText ? `LỊCH SỬ CUỘC TRÒ CHUYỆN:\n${historyText}\n` : ''}CÂU 
 
 Hãy trả lời:`;
 
-  const { text: answer, toolExecuted } = await generateText(prompt, { temperature: 0.2, signal });
+  const { text: answer, toolExecuted } = await generateText(prompt, { temperature: 0.2, maxTokens: 4096, signal });
   pipelineLog.timings.generate = Date.now() - generateStart;
   pipelineLog.timings.total = Date.now() - startTime;
   throwIfAborted(signal);
@@ -379,7 +379,7 @@ YÊU CẦU:
 NỘI DUNG TÀI LIỆU:
 ${context}`;
 
-  yield* generateStream(prompt, { temperature: 0.3, maxTokens: 4096 });
+  yield* generateStream(prompt, { temperature: 0.3, maxTokens: 4096, modelTier: 'lite' });
 }
 
 // ── Quiz ──────────────────────────────────────────────────────────────────────
@@ -434,7 +434,7 @@ QUY TẮC:
 NỘI DUNG TÀI LIỆU:
 ${context}`;
 
-  yield* generateStream(prompt, { temperature: 0.4, maxTokens: 16384 });
+  yield* generateStream(prompt, { temperature: 0.4, maxTokens: 8192, modelTier: 'lite' });
 }
 
 // ── Mindmap ───────────────────────────────────────────────────────────────────
@@ -496,7 +496,7 @@ QUY TẮC BẮT BUỘC:
 NỘI DUNG TÀI LIỆU:
 ${context}`;
 
-  yield* generateStream(prompt, { temperature: 0.3, maxTokens: 4096 });
+  yield* generateStream(prompt, { temperature: 0.3, maxTokens: 4096, modelTier: 'lite' });
 }
 
 // ── Study Questions ───────────────────────────────────────────────────────────
@@ -530,7 +530,7 @@ YÊU CẦU:
 NỘI DUNG TÀI LIỆU:
 ${context}`;
 
-  yield* generateStream(prompt, { temperature: 0.4, maxTokens: 2048 });
+  yield* generateStream(prompt, { temperature: 0.4, maxTokens: 2048, modelTier: 'lite' });
 }
 
 // ── Ask Stream (SSE-friendly async generator) ────────────────────────────────
@@ -718,7 +718,7 @@ async function* askStream(collectionName, question, chatHistory, options) {
     + '\n\nH\u00e3y tr\u1ea3 l\u1eddi:';
 
   let fullAnswer = '';
-  for await (const chunk of generateStream(prompt, { temperature: 0.2, signal: signal })) {
+  for await (const chunk of generateStream(prompt, { temperature: 0.2, maxTokens: 4096, signal: signal })) {
     fullAnswer += chunk;
     yield { type: 'chunk', text: chunk };
   }

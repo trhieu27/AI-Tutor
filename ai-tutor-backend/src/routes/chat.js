@@ -198,7 +198,7 @@ router.post('/:documentId/ask', authMiddleware, requireChatQuota(), async (req, 
         id: sessionId,
         user_id: req.userId,
         document_id: documentId,
-        title: (questionText || '').slice(0, 50) + '...',
+        title: (questionText || '').slice(0, 50),
         messages: [userMsg, aiMsg],
       });
     }
@@ -368,7 +368,7 @@ router.post('/:documentId/ask-stream', authMiddleware, requireChatQuota(), async
         id: sessionId,
         user_id: req.userId,
         document_id: documentId,
-        title: (questionText || '').slice(0, 50) + '...',
+        title: (questionText || '').slice(0, 50),
         messages: [userMsg, aiMsg],
       });
     }

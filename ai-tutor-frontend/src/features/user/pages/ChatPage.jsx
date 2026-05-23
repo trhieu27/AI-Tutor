@@ -780,6 +780,10 @@ export default function ChatPage() {
   const loadSession = useCallback(
     async (sessionId, options = {}) => {
       if (!sessionId) return;
+      if (activeAskRef.current) activeAskRef.current.cancelled = true;
+      activeAskRef.current?.controller?.abort();
+      abortRef.current?.abort();
+      setIsSending(false);
       try {
         const detail = await fetchSessionDetail(sessionId);
         setMessages(detail.messages || []);
@@ -1041,9 +1045,18 @@ export default function ChatPage() {
     activeAskRef.current?.controller?.abort();
     abortRef.current?.abort();
     setIsSending(false);
+    setMessages((prev) =>
+      prev
+        .map((msg) => (msg._streaming ? { ...msg, _streaming: false } : msg))
+        .filter((msg) => !(msg.role === "assistant" && !msg.content))
+    );
   };
 
   const startNewChat = () => {
+    if (activeAskRef.current) activeAskRef.current.cancelled = true;
+    activeAskRef.current?.controller?.abort();
+    abortRef.current?.abort();
+    setIsSending(false);
     setCurrentSessionId(null);
     setMessages([]);
     navigate(`/chat/${documentId}`, { replace: true });
