@@ -76,7 +76,7 @@ export async function uploadDocument(file) {
   const formData = new FormData();
   formData.append('file', file, sanitizedName);
   const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 60_000);
+  const timeoutId = setTimeout(() => controller.abort(), 300_000);
   let res;
   try {
     res = await authFetch(`${UPLOAD_BASE}/documents/upload`, {

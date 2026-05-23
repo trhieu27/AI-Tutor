@@ -89,7 +89,8 @@ function sectionIconFromTitle(title) {
   if (text.includes("chi tiết")) return "info";
   if (text.includes("dòng thao tác")) return "receipt_long";
   if (text.includes("cấu hình")) return "tune";
-  if (text.includes("cảnh báo") || text.includes("nhật ký")) return "shield";
+  if (text.includes("cảnh báo")) return "shield";
+  if (text.includes("nhật ký")) return "history";
   if (text.includes("doanh thu") || text.includes("giao dịch")) return "payments";
   if (text.includes("người") || text.includes("phiên")) return "group";
   if (text.includes("tài liệu")) return "description";

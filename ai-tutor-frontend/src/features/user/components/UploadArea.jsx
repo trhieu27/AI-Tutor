@@ -159,7 +159,7 @@ export default function UploadArea({ onUploadSuccess }) {
                 <button
                   type="button"
                   onClick={() => removeFromQueue(item.id)}
-                  className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-[var(--muted-light)] opacity-0 transition-all hover:bg-[hsl(346_78%_53%/0.10)] hover:text-[var(--brand-rose)] group-hover/item:opacity-100"
+                  className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-[var(--muted-light)] opacity-0 transition-all hover:bg-[hsl(346_78%_53%/0.10)] hover:text-[var(--brand-rose)] group-hover/item:opacity-100 max-sm:opacity-100"
                   aria-label={UPLOAD_DROPZONE_TEXTS.removeFromQueue}
                 >
                   <span className="material-symbols-outlined icon-thin text-[16px]">close</span>
