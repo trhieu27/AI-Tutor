@@ -72,6 +72,7 @@ jobs:
 
             echo "🧹 Stopping services gracefully..."
             sudo docker compose -f docker-compose.prod.yml down --remove-orphans 2>/dev/null || true
+            sudo docker rm -f $(sudo docker ps -aq) 2>/dev/null || true
             sudo docker image prune -af 2>/dev/null || true
 
             echo "🔨 Building and restarting..."
