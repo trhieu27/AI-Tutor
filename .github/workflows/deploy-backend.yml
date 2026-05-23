@@ -70,14 +70,13 @@ jobs:
               echo "Docker Compose: $(sudo docker compose version)"
             fi
 
-            echo "🧹 Stopping all containers and freeing disk..."
-            sudo docker stop $(sudo docker ps -aq) 2>/dev/null || true
-            sudo docker rm -f $(sudo docker ps -aq) 2>/dev/null || true
-            sudo docker system prune -af --volumes 2>/dev/null || true
+            echo "🧹 Stopping services gracefully..."
+            sudo docker compose -f docker-compose.prod.yml down --remove-orphans 2>/dev/null || true
+            sudo docker image prune -af 2>/dev/null || true
 
-            echo "🔨 Building and restarting backend..."
+            echo "🔨 Building and restarting..."
             sudo docker compose -f docker-compose.prod.yml build --no-cache backend
-            sudo docker compose -f docker-compose.prod.yml up -d --force-recreate backend nginx
+            sudo docker compose -f docker-compose.prod.yml up -d
 
             echo "🧹 Cleaning up unused Docker images..."
             docker image prune -f
