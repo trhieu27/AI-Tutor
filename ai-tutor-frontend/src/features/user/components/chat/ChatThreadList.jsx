@@ -80,25 +80,25 @@ export default function ChatThreadList({
             </p>
           </div>
         ) : (
-          <div className="space-y-1">
+          <div className="space-y-px">
             {sessions.map((session) => {
               const active = String(session.id) === String(activeSessionId);
               return (
                 <div
                   key={session.id}
                   className={cx(
-                    "group flex items-center gap-1 rounded-[10px] border transition",
+                    "group flex items-center rounded-lg transition-colors",
                     active
-                      ? "border-[color:var(--border-emphasis)] bg-[var(--surface)] text-[var(--foreground)]"
-                      : "border-transparent text-[var(--foreground)] hover:border-[color:var(--border-subtle)] hover:bg-[var(--surface)]"
+                      ? "bg-[var(--surface)] text-[var(--foreground)]"
+                      : "text-[var(--foreground)] hover:bg-[var(--surface)]"
                   )}
                 >
                   <button
                     type="button"
                     onClick={() => onSelect(session.id)}
-                    className="min-w-0 flex-1 rounded-[10px] px-3 py-3 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--focus-ring)]"
+                    className="min-w-0 flex-1 px-3 py-2 text-left focus-visible:outline-none"
                   >
-                    <span className="block truncate text-[13px] font-semibold leading-5">
+                    <span className={cx("block truncate text-[13px] leading-5", active ? "font-semibold" : "font-medium")}>
                       {getSessionTitle(session)}
                     </span>
                   </button>
@@ -107,13 +107,10 @@ export default function ChatThreadList({
                       type="button"
                       aria-label={T.deleteSession}
                       title={T.deleteSession}
-                      className={cx(
-                        "mr-1 grid h-8 w-8 shrink-0 place-items-center rounded-lg text-[var(--muted-light)] opacity-0 transition hover:bg-[var(--card-bg-hover)] hover:text-[var(--foreground)] focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--focus-ring)] group-hover:opacity-100",
-                        active && "opacity-70"
-                      )}
+                      className="mr-1.5 grid h-7 w-7 shrink-0 place-items-center rounded-md text-[var(--muted)] opacity-0 transition hover:text-[var(--foreground)] focus-visible:opacity-100 group-hover:opacity-100"
                       onClick={() => onDelete(session.id)}
                     >
-                      <span className="material-symbols-outlined icon-strong text-[18px]" aria-hidden="true">
+                      <span className="material-symbols-outlined icon-thin text-[16px]" aria-hidden="true">
                         delete
                       </span>
                     </button>

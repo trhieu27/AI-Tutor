@@ -18,6 +18,7 @@ import {
   locateDocumentCitation,
   QuotaError,
 } from "@/shared/services/api.service";
+import ConfirmDialog from "@/shared/ui/ConfirmDialog";
 import Button, { IconButton } from "@/shared/ui/Button";
 import LiquidGlassButton from "@/shared/ui/LiquidGlassButton";
 import { EmptyState, ErrorState, Skeleton } from "@/shared/ui/States";
@@ -723,7 +724,8 @@ export default function ChatPage() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const initialAction = searchParams.get("action");
-  const initialSession = searchParams.get("session");
+  const initialSessionRef = useRef(searchParams.get("session"));
+  const initialSession = initialSessionRef.current;
   const hasHandledInitialAction = useRef(false);
   const messagesEndRef = useRef(null);
   const abortRef = useRef(null);
@@ -754,9 +756,9 @@ export default function ChatPage() {
   const [studyQuestions, setStudyQuestions] = useState([]);
   const [modalLoading, setModalLoading] = useState(false);
   const [pdfPreviewSource, setPdfPreviewSource] = useState(null);
+  const [deleteSessionId, setDeleteSessionId] = useState(null);
 
   const refreshSessions = useCallback(async () => {
-    setSessionsLoading(true);
     try {
       const list = await fetchChatSessions(documentId, { page: 1, limit: 100 });
       const items = Array.isArray(list) ? list : (list.items || []);
@@ -822,7 +824,7 @@ export default function ChatPage() {
       active = false;
       abortRef.current?.abort();
     };
-  }, [documentId, initialSession, loadSession]);
+  }, [documentId, loadSession]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
@@ -1048,8 +1050,12 @@ export default function ChatPage() {
     setHistoryOpen(false);
   };
 
-  const handleDeleteSession = async (sessionId) => {
-    if (!confirm(T.page.deleteConfirm)) return;
+  const handleDeleteSession = (sessionId) => setDeleteSessionId(sessionId);
+
+  const confirmDeleteSession = async () => {
+    const sessionId = deleteSessionId;
+    setDeleteSessionId(null);
+    if (!sessionId) return;
     try {
       await deleteChatSession(sessionId);
       setSessions((prev) => prev.filter((session) => String(session.id) !== String(sessionId)));
@@ -1255,6 +1261,16 @@ export default function ChatPage() {
       )}
 
       {quotaExceeded && <QuotaModal type={quotaExceeded} onClose={() => setQuotaExceeded(null)} />}
+      <ConfirmDialog
+        open={!!deleteSessionId}
+        title={T.page.deleteConfirm}
+        message="Cuộc trò chuyện và toàn bộ tin nhắn sẽ bị xóa vĩnh viễn."
+        confirmLabel="Xóa"
+        cancelLabel="Huỷ"
+        variant="danger"
+        onConfirm={confirmDeleteSession}
+        onCancel={() => setDeleteSessionId(null)}
+      />
       {pdfPreviewSource && (
         <PdfPreviewModal
           source={pdfPreviewSource}

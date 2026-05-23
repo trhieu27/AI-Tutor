@@ -371,6 +371,7 @@ CẤU TRÚC BẢN TÓM TẮT:
 
 YÊU CẦU:
 - Viết bằng tiếng Việt, rõ ràng cho sinh viên
+- KHÔNG dùng LaTeX ($...$). Dùng Unicode: α, β, Ŷ, β₀, Σ, √, ², ≥, ≤, → hoặc text
 - Dùng markdown formatting (heading, bold, bullet, bảng nếu cần)
 - Nếu tài liệu có hình ảnh/biểu đồ được mô tả, hãy đề cập
 - Không bỏ sót ý chính nào trong tài liệu
@@ -413,6 +414,7 @@ NGUYÊN TẮC RA ĐỀ:
 - Đáp án nhiễu nên là lỗi phổ biến sinh viên hay mắc
 - Giải thích rõ: tại sao đáp án đúng, và tại sao các đáp án khác sai (1-2 câu)
 - Viết hoàn toàn bằng tiếng Việt, rõ ràng
+- KHÔNG dùng cú pháp LaTeX ($...$, \\hat, \\alpha, \\beta, \\frac...). Dùng ký tự Unicode: α, β, Ŷ, β₀, β₁, x̄, Σ, √, ², ≥, ≤, ≠, → hoặc viết text (ví dụ: "alpha", "beta")
 
 Trả về ĐÚNG định dạng JSON sau, không thêm text nào ngoài JSON:
 [
@@ -458,6 +460,7 @@ Yêu cầu sơ đồ:
 - Sắp xếp các nhánh chính xen kẽ: nhánh 1 → phải, nhánh 2 → trái, nhánh 3 → phải, ...
 - Nhãn ngắn gọn, súc tích (tối đa 6 từ mỗi nhãn)
 - Viết bằng tiếng Việt
+- KHÔNG dùng LaTeX. Dùng Unicode: α, β, Σ, √, ² hoặc text
 
 Trả về ĐÚNG định dạng Mermaid mindmap, chỉ code thuần không thêm gì khác:
 
@@ -520,6 +523,7 @@ YÊU CẦU:
   + 2 câu Đánh giá/Sáng tạo (nhận xét, đề xuất)
 - Câu hỏi rõ ràng, cụ thể, có thể trả lời được từ tài liệu
 - Viết bằng tiếng Việt
+- KHÔNG dùng LaTeX ($...$). Dùng Unicode: α, β, Ŷ, β₀, Σ, √, ², ≥, ≤, → hoặc text
 - Định dạng: mỗi câu một dòng, bắt đầu bằng số (1. 2. 3. ...)
 - CHỈ trả về 10 câu hỏi, không mở đầu, không kết luận
 
