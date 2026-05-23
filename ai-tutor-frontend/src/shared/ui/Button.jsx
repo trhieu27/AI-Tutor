@@ -51,7 +51,7 @@ export default function Button({
       aria-disabled={isDisabled || undefined}
       disabled={!to && !as ? isDisabled : undefined}
       className={cx(
-        "inline-flex shrink-0 items-center justify-center gap-2 rounded-[var(--radius-control)] border font-[760] leading-none transition-[background,border-color,color,box-shadow,transform,opacity] duration-150 ease-[var(--ease-reveal)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--focus-ring)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--background)] active:scale-[0.97] disabled:pointer-events-none disabled:opacity-50",
+        "inline-flex shrink-0 items-center justify-center gap-2 rounded-[var(--radius-control)] border font-[760] leading-tight transition-[background,border-color,color,box-shadow,transform,opacity] duration-150 ease-[var(--ease-reveal)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--focus-ring)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--background)] active:scale-[0.97] disabled:pointer-events-none disabled:opacity-50",
         VARIANT_CLASS[variant] || VARIANT_CLASS.primary,
         SIZE_CLASS[iconOnly ? "icon" : size] || SIZE_CLASS.md,
         className

@@ -51,7 +51,7 @@ export default function StatusBadge({ status, className = "", children }) {
   return (
     <span
       className={cx(
-        "inline-flex items-center gap-1.5 rounded-[var(--radius-chip)] border px-2.5 py-1 text-[11px] font-[760] leading-none",
+        "inline-flex items-center gap-1.5 rounded-[var(--radius-chip)] border px-2.5 py-1 text-[11px] font-[760] leading-normal",
         item.className,
         className
       )}

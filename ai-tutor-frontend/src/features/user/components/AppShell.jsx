@@ -63,7 +63,7 @@ export default function AppShell() {
 
           <div
             className={`relative z-10 bg-[var(--background)] pt-16 text-[var(--foreground)] selection:bg-[hsl(166_61%_35%/0.22)] lg:pl-64 ${
-              fullscreen ? "h-[100dvh] overflow-hidden" : ""
+              fullscreen ? "h-[100dvh] overflow-hidden" : "min-h-screen"
             }`}
           >
             <main className={fullscreen ? "h-full" : undefined}>
