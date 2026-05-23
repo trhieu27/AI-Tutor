@@ -1530,8 +1530,8 @@ export const ADMIN_TEXTS = {
       { to: "/admin/documents", label: "Tài liệu", icon: "description" },
       { to: "/admin/plans", label: "Gói dịch vụ", icon: "workspace_premium" },
       { to: "/admin/revenue", label: "Doanh thu", icon: "payments" },
-      { to: "/admin/activity", label: "Hoạt động", icon: "monitoring" },
-      { to: "/admin/audit", label: "Nhật ký", icon: "shield" },
+      { to: "/admin/activity", label: "Hoạt động", icon: "timeline" },
+      { to: "/admin/audit", label: "Nhật ký", icon: "history" },
     ],
     titles: {
       "/admin": "Tổng quan",
