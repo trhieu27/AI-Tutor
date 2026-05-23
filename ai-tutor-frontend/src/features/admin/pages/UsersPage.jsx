@@ -478,11 +478,8 @@ export default function AdminUsersPage() {
     load();
   }, [load]);
 
-  useEffect(() => {
-    if (filters.page <= 1 || filters.active === "false") return;
-    if (!(data?.items || []).some(isUserOnline)) return;
-    setFilters((current) => current.page === filters.page ? { ...current, page: 1 } : current);
-  }, [data?.items, filters.active, filters.page]);
+
+
 
   useEffect(() => {
     const handleVisibility = () => {
@@ -570,7 +567,6 @@ export default function AdminUsersPage() {
     const pinItems = filters.page === 1 && filters.active !== "false" ? onlinePins : [];
     const seen = new Set();
     return [...pinItems, ...(data?.items || [])]
-      .filter((item) => item.id !== currentUser?.id && item.email !== currentUser?.email)
       .filter((item) => {
         if (seen.has(item.id)) return false;
         seen.add(item.id);
@@ -587,7 +583,7 @@ export default function AdminUsersPage() {
       })
       .map(({ item }) => item)
       .slice(0, pageLimit);
-  }, [data?.items, data?.pagination?.limit, filters.active, filters.limit, filters.page, onlinePins, currentUser?.id, currentUser?.email]);
+  }, [data?.items, data?.pagination?.limit, filters.active, filters.limit, filters.page, onlinePins]);
 
   return (
     <div>
