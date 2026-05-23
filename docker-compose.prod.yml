@@ -7,7 +7,7 @@ services:
     container_name: ai_tutor_chromadb
     restart: always
     volumes:
-      - chroma_data:/chroma/chroma
+      - chroma_data:/data
     networks:
       - ai_tutor_network
     # no healthcheck — ChromaDB image does not include curl or wget

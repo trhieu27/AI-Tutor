@@ -17,7 +17,7 @@ services:
     ports:
       - "8000:8000"
     volumes:
-      - chroma_data:/chroma/chroma
+      - chroma_data:/data
     networks:
       - ai_tutor_network
 
