@@ -98,7 +98,7 @@ export default function ChatThreadList({
                     onClick={() => onSelect(session.id)}
                     className="min-w-0 flex-1 rounded-[10px] px-3 py-3 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--focus-ring)]"
                   >
-                    <span className="block break-words text-[13px] font-semibold leading-5">
+                    <span className="block truncate text-[13px] font-semibold leading-5">
                       {getSessionTitle(session)}
                     </span>
                   </button>

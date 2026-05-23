@@ -677,8 +677,8 @@ export const PRICING_PAGE_TEXTS = {
     annualNote: 'Thanh toán theo năm, tiết kiệm hơn',
     monthly: 'Hàng tháng',
     annual: 'Hàng năm',
-    saveBadge: 'Tiết kiệm 40%',
-    saveShort: '40%',
+    saveBadge: (n) => n > 0 ? `Tiết kiệm ${n}%` : '',
+    saveShort: (n) => n > 0 ? `${n}%` : '',
   },
   plans: {
     free: {

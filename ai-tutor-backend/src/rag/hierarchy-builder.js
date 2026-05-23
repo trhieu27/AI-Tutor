@@ -107,7 +107,7 @@ Trả về ĐÚNG JSON sau, không giải thích:
 
 CHỈ trả về JSON:`;
 
-  const result = await generateText(prompt, { temperature: 0.1, maxTokens: 2048 });
+  const result = await generateText(prompt, { temperature: 0.1, maxTokens: 2048, modelTier: 'vision' });
 
   const cleaned = result.trim();
   const match = cleaned.match(/\{[\s\S]*\}/);
@@ -214,7 +214,7 @@ Trả về ĐÚNG JSON mảng chỉ số các phần liên quan, kèm mức đ�
 
 Chọn tối đa 3 phần liên quan nhất. CHỈ trả về JSON:`;
 
-  const result = await generateText(prompt, { temperature: 0.0, maxTokens: 256 });
+  const result = await generateText(prompt, { temperature: 0.0, maxTokens: 256, modelTier: 'lite' });
 
   const cleaned = result.trim();
   const match = cleaned.match(/\[[\s\S]*\]/);

@@ -2,6 +2,7 @@ import { useState, useRef, useEffect, useCallback } from 'react';
 import { useAuth } from '@/features/auth/context/AuthContext';
 import { useNotifications } from '@/shared/hooks/useNotifications';
 import { useToast } from '@/shared/ui/NotificationToast';
+import { useUpload } from '@/features/user/context/UploadContext';
 import { ThemeToggle } from '@/shared/ui/ThemeToggle';
 import { APP_SHELL_TEXTS, HEADER_TEXTS } from '@/shared/constants/texts';
 import { fetchNotifications, markAllNotificationsRead, clearAllNotifications } from '@/shared/services/api.service';
@@ -17,6 +18,7 @@ export default function Header({ onMenuClick }) {
   const notificationRef = useRef(null);
   const userMenuRef = useRef(null);
   const { addToast } = useToast();
+  const { notifyDocReady } = useUpload();
   const T = APP_SHELL_TEXTS.header;
 
   useEffect(() => { setMounted(true); }, []);
@@ -39,13 +41,17 @@ export default function Header({ onMenuClick }) {
 
   const handleNotification = useCallback(notification => {
     setNotifications(prev => [{ ...notification, is_read: false }, ...prev]);
+    // Trigger document list refresh when processing finishes
+    if (notification.type === 'document_ready' || notification.type === 'document_failed') {
+      notifyDocReady();
+    }
     addToast({
       type: notification.type === 'document_ready' ? 'document_ready' : notification.type === 'document_failed' ? 'document_failed' : 'system',
       title: notification.title || T.notificationFallbackTitle,
       message: notification.message || '',
       documentId: notification.document_id,
     });
-  }, [addToast]);
+  }, [addToast, notifyDocReady]);
 
   useNotifications({ token: accessToken, onNotification: handleNotification });
 

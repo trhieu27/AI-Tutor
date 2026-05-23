@@ -60,4 +60,54 @@ async function extractText(filePath) {
   throw new Error(`Định dạng file không hỗ trợ: ${ext}`);
 }
 
-module.exports = { extractText };
+/**
+ * Scan PDF pages using PDF.js operators to detect which ones contain images.
+ */
+async function detectImagePages(buffer) {
+  const pdfjs = await getPdfjs();
+  const data = new Uint8Array(buffer);
+  const loadingTask = pdfjs.getDocument({ data, useSystemFonts: true });
+  const pdfDoc = await loadingTask.promise;
+  const numPages = pdfDoc.numPages;
+  const imagePages = [];
+
+  for (let i = 1; i <= numPages; i++) {
+    const page = await pdfDoc.getPage(i);
+    const ops = await page.getOperatorList();
+    const hasImage = ops.fnArray.some(function(op) {
+      return op === pdfjs.OPS.paintImageXObject ||
+             op === pdfjs.OPS.paintImageXObjectRepeat ||
+             op === pdfjs.OPS.paintJpegXObject;
+    });
+    if (hasImage) {
+      imagePages.push(i);
+    }
+  }
+
+  return imagePages;
+}
+
+/**
+ * Extract images from DOCX using mammoth.
+ */
+async function extractDocxImages(buffer) {
+  const images = [];
+  let imageIndex = 0;
+
+  await mammoth.convertToHtml({ buffer }, {
+    convertImage: function(element) {
+      return element.read('base64').then(function(imageData) {
+        images.push({
+          contentType: element.contentType || 'image/png',
+          base64: imageData,
+          index: ++imageIndex,
+        });
+        return { src: '' };
+      });
+    }
+  });
+
+  return images;
+}
+
+module.exports = { extractText, detectImagePages, extractDocxImages };

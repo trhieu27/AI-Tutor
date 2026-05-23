@@ -9,6 +9,7 @@ export const UploadProvider = ({
 }) => {
   const [queue, setQueue] = useState([]);
   const [lastUploadTime, setLastUploadTime] = useState(0);
+  const [lastDocReadyTime, setLastDocReadyTime] = useState(0);
   const isAnyUploading = queue.some(item => item.status === "uploading" || item.status === "waiting");
   const removeFromQueue = useCallback(id => {
     setQueue(prev => prev.filter(item => item.id !== id));
@@ -84,7 +85,9 @@ export const UploadProvider = ({
       removeFromQueue,
       isAnyUploading,
       clearQueue,
-      lastUploadTime
+      lastUploadTime,
+      lastDocReadyTime,
+      notifyDocReady: () => setLastDocReadyTime(Date.now()),
     },
     children: children
   });

@@ -5,8 +5,17 @@ const config = require('../config');
 // Using gemini-embedding-001 = same model as old Python service (GoogleGenerativeAIEmbeddings)
 const genAI = new GoogleGenerativeAI(config.geminiApiKey);
 
-const EMBED_MODEL = 'models/gemini-embedding-001';
-const CHAT_MODEL = 'gemini-flash-latest'; // Python cũ dùng gemini-flash-latest = alias của gemini-2.0-flash
+const EMBED_MODEL = 'models/gemini-embedding-2';
+const CHAT_MODEL = 'gemini-3.5-flash';
+const VISION_MODEL = 'gemini-2.5-flash';
+const LITE_MODEL = 'gemini-2.5-flash-lite';
+
+// Model resolver: 'chat' | 'vision' | 'lite'
+function resolveModel(tier) {
+  if (tier === 'vision') return VISION_MODEL;
+  if (tier === 'lite') return LITE_MODEL;
+  return CHAT_MODEL;
+}
 
 // ── Browser Tool (Function Calling) Definition ───────────────────────────────
 
@@ -66,17 +75,25 @@ async function embedQuery(text, requestOptions = {}) {
 /**
  * Generate text (non-streaming) with support for Browser Tool (Function Calling)
  */
-async function generateText(prompt, { temperature = 0.3, maxTokens = 8192, signal, useTools = true } = {}) {
+async function generateText(prompt, { temperature = 0.3, maxTokens = 8192, signal, useTools = true, modelTier = 'chat' } = {}) {
+  const selectedModel = resolveModel(modelTier);
+  const enableTools = useTools && modelTier === 'chat';
   const modelOptions = {
-    model: CHAT_MODEL,
+    model: selectedModel,
     generationConfig: { temperature, maxOutputTokens: maxTokens },
   };
 
-  if (useTools) {
+  if (enableTools) {
     modelOptions.tools = [browserTool];
   }
 
   const model = genAI.getGenerativeModel(modelOptions);
+
+  // Lite/Vision: simple generation, return plain text string
+  if (modelTier !== 'chat') {
+    const result = await model.generateContent(prompt, signal ? { signal } : undefined);
+    return result.response.text();
+  }
 
   // Khởi tạo nội dung hội thoại ban đầu
   const contents = [
@@ -170,9 +187,9 @@ async function generateText(prompt, { temperature = 0.3, maxTokens = 8192, signa
 /**
  * Async generator that yields text chunks from Gemini streaming.
  */
-async function* generateStream(prompt, { temperature = 0.3, maxTokens = 8192, signal } = {}) {
+async function* generateStream(prompt, { temperature = 0.3, maxTokens = 8192, signal, modelTier = 'chat' } = {}) {
   const model = genAI.getGenerativeModel({
-    model: CHAT_MODEL,
+    model: resolveModel(modelTier),
     generationConfig: { temperature, maxOutputTokens: maxTokens },
   });
   try {
@@ -192,4 +209,124 @@ async function* generateStream(prompt, { temperature = 0.3, maxTokens = 8192, si
   }
 }
 
-module.exports = { embedTexts, embedQuery, generateText, generateStream, browserTool };
+// ── Vision: Describe images in PDF ────────────────────────────────────────────
+
+/**
+ * Send a PDF buffer to Gemini Vision and get descriptions of images/diagrams.
+ * Only describes pages where PDF.js detected image operators.
+ * @param {Buffer} pdfBuffer - Raw PDF file buffer
+ * @param {number} pageCount - Total pages in the PDF
+ * @param {number[]} imagePageNums - Page numbers with detected images
+ * @returns {Promise<Array<{page_number: number, description: string}>>}
+ */
+async function describeDocumentImages(pdfBuffer, pageCount, imagePageNums) {
+  if (!imagePageNums || imagePageNums.length === 0) return [];
+
+  const model = genAI.getGenerativeModel({
+    model: VISION_MODEL,
+    generationConfig: { temperature: 0.2, maxOutputTokens: 8192 },
+  });
+
+  const base64 = pdfBuffer.toString('base64');
+  const pageList = imagePageNums.join(', ');
+  const prompt = [
+    'B\u1ea1n l\u00e0 chuy\u00ean gia ph\u00e2n t\u00edch t\u00e0i li\u1ec7u h\u1ecdc thu\u1eadt.',
+    'Nhi\u1ec7m v\u1ee5: m\u00f4 t\u1ea3 CHI TI\u1ebeT m\u1ecdi h\u00ecnh \u1ea3nh, bi\u1ec3u \u0111\u1ed3, s\u01a1 \u0111\u1ed3, b\u1ea3ng bi\u1ec3u trong t\u00e0i li\u1ec7u PDF n\u00e0y.',
+    '',
+    'CH\u1ec8 t\u1eadp trung v\u00e0o c\u00e1c trang: ' + pageList + '. B\u1ece QUA ho\u00e0n to\u00e0n c\u00e1c trang kh\u00e1c.',
+    '',
+    'V\u1edbi m\u1ed7i trang c\u00f3 h\u00ecnh, tr\u1ea3 v\u1ec1 theo \u0111\u1ecbnh d\u1ea1ng:',
+    '---PAGE X---',
+    '1. Lo\u1ea1i h\u00ecnh: (bi\u1ec3u \u0111\u1ed3 UML, flowchart, ER diagram, b\u1ea3ng, \u0111\u1ed3 th\u1ecb, \u1ea3nh minh h\u1ecda...)',
+    '2. Th\u00e0nh ph\u1ea7n ch\u00ednh: (t\u00ean class, node, c\u1ed9t, h\u00e0ng, nh\u00e3n...)',
+    '3. M\u1ed1i quan h\u1ec7: (k\u1ebf th\u1eeba, ph\u1ee5 thu\u1ed9c, lu\u1ed3ng d\u1eef li\u1ec7u, m\u0169i t\u00ean...)',
+    '4. N\u1ed9i dung text trong h\u00ecnh: (ghi ch\u00fa, nh\u00e3n, s\u1ed1 li\u1ec7u...)',
+    '5. \u00dd ngh\u0129a t\u1ed5ng th\u1ec3: (h\u00ecnh n\u00e0y minh h\u1ecda \u0111i\u1ec1u g\u00ec trong ng\u1eef c\u1ea3nh t\u00e0i li\u1ec7u)',
+    '',
+    'Tr\u1ea3 l\u1eddi b\u1eb1ng ti\u1ebfng Vi\u1ec7t, chi ti\u1ebft v\u00e0 ch\u00ednh x\u00e1c.',
+  ].join('\n');
+
+  const result = await model.generateContent([
+    {
+      inlineData: {
+        mimeType: 'application/pdf',
+        data: base64,
+      },
+    },
+    prompt,
+  ]);
+
+  const text = result.response.text();
+  const pages = [];
+  const sections = text.split(/---PAGE\s*(\d+)---/i);
+  for (let i = 1; i < sections.length; i += 2) {
+    const pageNum = parseInt(sections[i], 10);
+    const desc = (sections[i + 1] || '').trim();
+    if (pageNum > 0 && pageNum <= pageCount && desc.length > 20) {
+      pages.push({ page_number: pageNum, description: desc });
+    }
+  }
+  return pages;
+}
+
+// ── Vision: Describe images in DOCX ──────────────────────────────────────────
+
+/**
+ * Describe images extracted from a DOCX file.
+ * Batches all images into a single Gemini request.
+ * @param {Array<{contentType: string, base64: string, index: number}>} images
+ * @returns {Promise<Array<{index: number, description: string}>>}
+ */
+async function describeDocxImages(images) {
+  if (!images || images.length === 0) return [];
+
+  const model = genAI.getGenerativeModel({
+    model: VISION_MODEL,
+    generationConfig: { temperature: 0.2, maxOutputTokens: 8192 },
+  });
+
+  const BATCH = 10;
+  const results = [];
+
+  for (let i = 0; i < images.length; i += BATCH) {
+    const batch = images.slice(i, i + BATCH);
+    const parts = [];
+
+    for (const img of batch) {
+      parts.push({
+        inlineData: {
+          mimeType: img.contentType,
+          data: img.base64,
+        },
+      });
+    }
+
+    const indices = batch.map(function(img) { return img.index; }).join(', ');
+    parts.push(
+      'B\u1ea1n l\u00e0 chuy\u00ean gia ph\u00e2n t\u00edch t\u00e0i li\u1ec7u h\u1ecdc thu\u1eadt. M\u00f4 t\u1ea3 CHI TI\u1ebeT t\u1eebng h\u00ecnh \u1ea3nh/bi\u1ec3u \u0111\u1ed3/s\u01a1 \u0111\u1ed3 \u1edf tr\u00ean.\n' +
+      'C\u00e1c h\u00ecnh theo th\u1ee9 t\u1ef1: ' + indices + '.\n\n' +
+      'V\u1edbi m\u1ed7i h\u00ecnh, m\u00f4 t\u1ea3:\n' +
+      '1. Lo\u1ea1i h\u00ecnh (bi\u1ec3u \u0111\u1ed3, s\u01a1 \u0111\u1ed3, b\u1ea3ng, \u1ea3nh minh h\u1ecda...)\n' +
+      '2. C\u00e1c th\u00e0nh ph\u1ea7n v\u00e0 m\u1ed1i quan h\u1ec7\n' +
+      '3. Text/nh\u00e3n trong h\u00ecnh\n' +
+      '4. \u00dd ngh\u0129a t\u1ed5ng th\u1ec3\n\n' +
+      'Tr\u1ea3 v\u1ec1 theo \u0111\u1ecbnh d\u1ea1ng:\n---IMAGE X---\nM\u00f4 t\u1ea3 chi ti\u1ebft.\n\nTr\u1ea3 l\u1eddi b\u1eb1ng ti\u1ebfng Vi\u1ec7t.'
+    );
+
+    const result = await model.generateContent(parts);
+    const text = result.response.text();
+
+    const sections = text.split(/---IMAGE\s*(\d+)---/i);
+    for (let j = 1; j < sections.length; j += 2) {
+      const idx = parseInt(sections[j], 10);
+      const desc = (sections[j + 1] || '').trim();
+      if (desc.length > 20) {
+        results.push({ index: idx, description: desc });
+      }
+    }
+  }
+
+  return results;
+}
+
+module.exports = { embedTexts, embedQuery, generateText, generateStream, describeDocumentImages, describeDocxImages, browserTool };

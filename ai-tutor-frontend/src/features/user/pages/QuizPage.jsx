@@ -15,12 +15,49 @@ const T = QUIZ_WORKSPACE_TEXTS;
 
 function parseStreamedQuiz(text) {
   let jsonStr = text.trim();
+
+  // Strip markdown code fences
   if (jsonStr.includes("```json")) {
     jsonStr = jsonStr.split("```json")[1].split("```")[0];
   } else if (jsonStr.includes("```")) {
     jsonStr = jsonStr.split("```")[1].split("```")[0];
   }
-  return JSON.parse(jsonStr.trim());
+
+  jsonStr = jsonStr.trim();
+
+  // Find the outermost JSON array
+  const start = jsonStr.indexOf("[");
+  if (start !== -1) {
+    jsonStr = jsonStr.slice(start);
+  }
+
+  // Try direct parse first
+  try {
+    return JSON.parse(jsonStr);
+  } catch (_) {
+    // Attempt repair: close unclosed brackets/braces
+    let repaired = jsonStr;
+
+    // Remove trailing incomplete object (after last complete },)
+    const lastCompleteObj = repaired.lastIndexOf("},");
+    if (lastCompleteObj > 0) {
+      repaired = repaired.slice(0, lastCompleteObj + 1) + "]";
+    }
+
+    try {
+      return JSON.parse(repaired);
+    } catch (__) {
+      // Last resort: close all open brackets
+      let open = 0, close = 0;
+      for (const ch of repaired) {
+        if (ch === "[") open++;
+        if (ch === "]") close++;
+      }
+      repaired += "]".repeat(Math.max(0, open - close));
+
+      return JSON.parse(repaired);
+    }
+  }
 }
 
 function QuizLoadingState() {

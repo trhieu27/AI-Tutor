@@ -53,7 +53,7 @@ async function scoreChunks(query, chunks, signal) {
     `[${i}] ${c.text.slice(0, 400)}`
   ).join('\n\n');
 
-  const prompt = `Bạn là hệ thống đánh giá mức độ liên quan. Cho câu hỏi và danh sách các đoạn trích từ tài liệu, hãy đánh giá mức độ liên quan của mỗi đoạn.
+  const prompt = `Bạn là hệ thống xếp hạng ngữ nghĩa chuyên dụng. Cho câu hỏi và các đoạn trích từ tài liệu, hãy đánh giá chính xác mức độ liên quan của mỗi đoạn với câu hỏi.
 
 CÂU HỎI: ${query}
 
@@ -73,6 +73,7 @@ CHỈ trả về mảng JSON, không giải thích:`;
     temperature: 0.0,
     maxTokens: 128,
     signal,
+    modelTier: 'lite',
   });
 
   // Parse the JSON array of scores

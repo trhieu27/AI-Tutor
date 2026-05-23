@@ -9,9 +9,10 @@
  */
 
 const { v4: uuidv4 } = require('uuid');
-const { extractText } = require('./extractor');
+const path = require('path');
+const { extractText, detectImagePages, extractDocxImages } = require('./extractor');
 const { chunkText } = require('./chunker');
-const { embedTexts, embedQuery, generateText, generateStream } = require('./gemini');
+const { embedTexts, embedQuery, generateText, generateStream, describeDocumentImages, describeDocxImages } = require('./gemini');
 const vectorstore = require('./vectorstore');
 const { rewriteQuery } = require('./query-rewriter');
 const { hybridSearch } = require('./hybrid-search');
@@ -37,6 +38,8 @@ function throwIfAborted(signal) {
  * @returns { collection_name: string, page_count: number }
  */
 async function ingest(filePath, documentId) {
+  const ext = path.extname(filePath).toLowerCase();
+  const buffer = require('fs').readFileSync(filePath);
   const { text, pageCount, pages } = await extractText(filePath);
 
   if (!text || text.trim().length < 10) {
@@ -54,6 +57,49 @@ async function ingest(filePath, documentId) {
         text: chunk,
         metadata: { document_id: documentId },
       }));
+
+  // ── Vision: mô tả hình ảnh/biểu đồ trong tài liệu ──
+  try {
+    if (ext === '.pdf') {
+      const imagePages = await detectImagePages(buffer);
+      if (imagePages.length > 0) {
+        console.log(`[Ingest] Phát hiện ${imagePages.length} trang có hình: ${imagePages.join(', ')}`);
+        const descriptions = await describeDocumentImages(buffer, pageCount, imagePages);
+        for (const desc of descriptions) {
+          chunkRecords.push({
+            text: `[Hình ảnh/Biểu đồ Trang ${desc.page_number}]\n${desc.description}`,
+            metadata: {
+              page_number: desc.page_number,
+              document_id: documentId,
+              content_type: 'image_description',
+            },
+          });
+        }
+        console.log(`[Ingest] Đã mô tả ${descriptions.length} trang hình ảnh`);
+      }
+    } else if (ext === '.docx' || ext === '.doc') {
+      const images = await extractDocxImages(buffer);
+      if (images.length > 0) {
+        console.log(`[Ingest] Phát hiện ${images.length} hình trong DOCX`);
+        const descriptions = await describeDocxImages(images);
+        for (const desc of descriptions) {
+          chunkRecords.push({
+            text: `[Hình ảnh ${desc.index}]\n${desc.description}`,
+            metadata: {
+              document_id: documentId,
+              content_type: 'image_description',
+              image_index: desc.index,
+            },
+          });
+        }
+        console.log(`[Ingest] Đã mô tả ${descriptions.length} hình DOCX`);
+      }
+    }
+  } catch (visionErr) {
+    console.warn('[Ingest] Vision processing failed (non-blocking):', visionErr.message);
+    // Vision lỗi không chặn ingest — text vẫn được lưu bình thường
+  }
+
   const chunks = chunkRecords.map(record => record.text);
   if (chunks.length === 0) {
     throw new Error('Tài liệu không có nội dung văn bản.');
@@ -231,15 +277,22 @@ async function ask(collectionName, question, chatHistory = [], options = {}) {
     .map(m => `${m.role === 'human' ? 'Học sinh' : 'Trợ lý'}: ${m.content}`)
     .join('\n');
 
-  const prompt = `Bạn là trợ lý AI hỗ trợ học tập thông minh. Dựa trên nội dung tài liệu được cung cấp, hãy trả lời câu hỏi một cách chính xác, rõ ràng và có cấu trúc.
+  const prompt = `Bạn là trợ lý AI chuyên hỗ trợ học tập cho sinh viên Việt Nam. Nhiệm vụ: trả lời câu hỏi DỰA HOÀN TOÀN vào nội dung tài liệu được cung cấp.
 
-QUY TẮC QUAN TRỌNG:
-- CHỈ trả lời dựa trên nội dung tài liệu được cung cấp bên dưới
-- Nếu thông tin KHÔNG có trong tài liệu, hãy nói rõ: "Tài liệu không chứa đủ thông tin để trả lời câu hỏi này"
-- KHÔNG bịa đặt hoặc thêm thông tin không có trong tài liệu
-- Khi trích dẫn, ghi rõ trang nguồn, ví dụ: "(Trang 6)" hoặc "(Trang 1, Trang 8)". CHỈ dùng số trang có trong phần NỘI DUNG TÀI LIỆU bên dưới
-- KHÔNG ĐƯỢC viết "Theo Nguồn 1", "Nguồn 5" hay bất kỳ số nguồn nào — chỉ dùng số trang
+VAI TRÒ:
+- Bạn là gia sư kiên nhẫn, giải thích dễ hiểu, đưa ví dụ minh họa khi cần
+- Ưu tiên trả lời có cấu trúc: tiêu đề, bullet points, bảng so sánh nếu phù hợp
+- Dùng markdown formatting (bold, italic, heading) để trả lời rõ ràng hơn
+
+QUY TẮC BẮT BUỘC:
+- CHỈ dùng thông tin từ phần NỘI DUNG TÀI LIỆU bên dưới
+- Nếu tài liệu không chứa câu trả lời → nói thẳng: "Tài liệu không đề cập đến nội dung này"
+- TUYỆT ĐỐI KHÔNG bịa đặt, không thêm kiến thức ngoài tài liệu
+- Trích dẫn trang nguồn: "(Trang 6)" hoặc "(Trang 1, 8)". CHỈ dùng số trang xuất hiện trong NỘI DUNG TÀI LIỆU
+- KHÔNG viết "Theo Nguồn 1", "Nguồn 5" — chỉ dùng số trang
+- Nếu nội dung bao gồm mô tả hình ảnh/biểu đồ (đánh dấu [Đồ họa trang X]), hãy sử dụng thông tin đó để trả lời
 - Trả lời bằng tiếng Việt, rõ ràng và có cấu trúc
+- KHÔNG dùng cú pháp LaTeX ($...$, \\hat, \\beta, \\frac...). Thay bằng ký tự Unicode: Ŷ, β₀, β₁, x̄, Σ, √, ², ³, ≥, ≤, ≠, →, ×, ÷ hoặc viết dạng text (ví dụ: "Y mũ", "beta 0")
 
 NỘI DUNG TÀI LIỆU:
 ${contextText || '(Không tìm thấy nội dung liên quan trong tài liệu)'}
@@ -305,13 +358,22 @@ async function* summarize(collectionName) {
   // Use first 30 chunks to stay within token limits
   const context = chunks.slice(0, 30).join('\n\n');
 
-  const prompt = `Bạn là trợ lý AI hỗ trợ học tập. Hãy tạo bản tóm tắt toàn diện và có cấu trúc cho tài liệu học tập sau đây.
+  const prompt = `Bạn là giảng viên đại học có kinh nghiệm. Hãy tạo bản tóm tắt chuyên sâu cho tài liệu học tập sau.
 
-Bản tóm tắt cần:
-- Bắt đầu bằng tổng quan ngắn gọn (2-3 câu)
-- Trình bày các chủ đề và khái niệm chính theo thứ tự logic
-- Sử dụng tiêu đề và gạch đầu dòng cho rõ ràng
-- Viết bằng tiếng Việt, dễ hiểu cho học sinh/sinh viên
+CẤU TRÚC BẢN TÓM TẮT:
+1. **Tổng quan** (2-3 câu): Chủ đề chính, mục tiêu học tập
+2. **Các phần chính**: Trình bày theo thứ tự logic của tài liệu
+   - Dùng tiêu đề ## cho mỗi phần lớn
+   - Giải thích khái niệm quan trọng bằng ngôn ngữ dễ hiểu
+   - Đánh dấu **thuật ngữ chuyên ngành** bằng bold
+3. **Mối liên hệ**: Chỉ ra cách các phần liên kết với nhau
+4. **Điểm cần nhớ**: Bullet points tóm gọn kiến thức cốt lõi
+
+YÊU CẦU:
+- Viết bằng tiếng Việt, rõ ràng cho sinh viên
+- Dùng markdown formatting (heading, bold, bullet, bảng nếu cần)
+- Nếu tài liệu có hình ảnh/biểu đồ được mô tả, hãy đề cập
+- Không bỏ sót ý chính nào trong tài liệu
 
 NỘI DUNG TÀI LIỆU:
 ${context}`;
@@ -340,16 +402,17 @@ async function* quiz(collectionName) {
     chunkCount <= 35 ? '15-22' :
     '22-30';
 
-  const prompt = `Bạn là chuyên gia tạo đề kiểm tra. Dựa vào nội dung tài liệu học tập bên dưới, hãy tạo số lượng câu hỏi trắc nghiệm (4 đáp án) phù hợp với độ dài và mật độ kiến thức của tài liệu.
+  const prompt = `Bạn là chuyên gia kiểm tra đánh giá giáo dục. Dựa vào tài liệu học tập bên dưới, hãy tạo đề trắc nghiệm chất lượng cao.
 
-Yêu cầu:
+NGUYÊN TẮC RA ĐỀ:
 - Không cố định 10 câu. Với tài liệu này, hãy tạo khoảng ${questionRange} câu nếu nội dung đủ căn cứ
 - Nếu tài liệu ngắn hoặc ít ý chính, tạo ít câu hơn thay vì lặp ý
 - Nếu tài liệu dài và nhiều ý chính, tạo nhiều hơn 10 câu để bao phủ nội dung
-- Câu hỏi đa dạng: kiến thức, hiểu biết, áp dụng
-- Mỗi câu có đúng 1 đáp án đúng
-- Giải thích ngắn gọn tại sao đáp án đó đúng
-- Viết hoàn toàn bằng tiếng Việt
+- Phân bổ theo thang Bloom: 30% Ghi nhớ, 30% Hiểu, 25% Áp dụng, 15% Phân tích
+- Mỗi câu có đúng 1 đáp án đúng, 3 đáp án nhiễu phải hợp lý (không quá dễ loại)
+- Đáp án nhiễu nên là lỗi phổ biến sinh viên hay mắc
+- Giải thích rõ: tại sao đáp án đúng, và tại sao các đáp án khác sai (1-2 câu)
+- Viết hoàn toàn bằng tiếng Việt, rõ ràng
 
 Trả về ĐÚNG định dạng JSON sau, không thêm text nào ngoài JSON:
 [
@@ -364,11 +427,12 @@ Trả về ĐÚNG định dạng JSON sau, không thêm text nào ngoài JSON:
 QUY TẮC:
 - "options" là mảng 4 phần tử (chuỗi)
 - "correct_index" là số nguyên 0-3 (vị trí đáp án đúng trong mảng options)
+- QUAN TRỌNG: PHẢI trả về JSON hoàn chỉnh, đóng đủ dấu ] ở cuối. Không được cắt giữa chừng
 
 NỘI DUNG TÀI LIỆU:
 ${context}`;
 
-  yield* generateStream(prompt, { temperature: 0.4, maxTokens: 8192 });
+  yield* generateStream(prompt, { temperature: 0.4, maxTokens: 16384 });
 }
 
 // ── Mindmap ───────────────────────────────────────────────────────────────────
@@ -385,7 +449,7 @@ async function* mindmap(collectionName) {
   }
   const context = chunks.slice(0, 25).join('\n\n');
 
-  const prompt = `Bạn là chuyên gia tổ chức kiến thức. Dựa vào nội dung tài liệu học tập bên dưới, hãy tạo sơ đồ tư duy (mindmap) bằng cú pháp Mermaid.
+  const prompt = `Bạn là chuyên gia tổ chức kiến thức và trực quan hóa thông tin. Dựa vào tài liệu học tập bên dưới, hãy tạo sơ đồ tư duy (mindmap) bằng cú pháp Mermaid. Sơ đồ phải phản ánh đúng cấu trúc logic của tài liệu.
 
 Yêu cầu sơ đồ:
 - Chủ đề trung tâm là tiêu đề hoặc chủ đề chính của tài liệu
@@ -446,15 +510,18 @@ async function* studyQuestions(collectionName) {
   }
   const context = chunks.slice(0, 20).join('\n\n');
 
-  const prompt = `Bạn là giáo viên có kinh nghiệm. Dựa vào nội dung tài liệu học tập bên dưới, hãy tạo 10 câu hỏi ôn tập tự luận giúp học sinh hiểu sâu kiến thức.
+  const prompt = `Bạn là giảng viên đại học dày dạn kinh nghiệm. Dựa vào tài liệu bên dưới, hãy tạo 10 câu hỏi ôn tập tự luận chất lượng cao.
 
-Yêu cầu:
-- Câu hỏi kích thích tư duy, không chỉ ghi nhớ đơn thuần
-- Đa dạng về mức độ: nhớ, hiểu, phân tích, đánh giá
-- Ngắn gọn, rõ ràng
+YÊU CẦU:
+- Phân bổ theo thang Bloom:
+  + 2 câu Ghi nhớ (định nghĩa, liệt kê)
+  + 3 câu Hiểu (giải thích, so sánh)
+  + 3 câu Áp dụng/Phân tích (tình huống, ví dụ)
+  + 2 câu Đánh giá/Sáng tạo (nhận xét, đề xuất)
+- Câu hỏi rõ ràng, cụ thể, có thể trả lời được từ tài liệu
 - Viết bằng tiếng Việt
-- Mỗi câu hỏi trên một dòng riêng, bắt đầu bằng số thứ tự (1. 2. 3. ...)
-- Chỉ trả về danh sách 10 câu hỏi, không chào hỏi, không mở đầu, không kết luận
+- Định dạng: mỗi câu một dòng, bắt đầu bằng số (1. 2. 3. ...)
+- CHỈ trả về 10 câu hỏi, không mở đầu, không kết luận
 
 NỘI DUNG TÀI LIỆU:
 ${context}`;
@@ -636,7 +703,8 @@ async function* askStream(collectionName, question, chatHistory, options) {
     + '- KH\u00d4NG b\u1ecba \u0111\u1eb7t ho\u1eb7c th\u00eam th\u00f4ng tin kh\u00f4ng c\u00f3 trong t\u00e0i li\u1ec7u\n'
     + '- Khi tr\u00edch d\u1eabn, ghi r\u00f5 trang ngu\u1ed3n, v\u00ed d\u1ee5: "(Trang 6)" ho\u1eb7c "(Trang 1, Trang 8)". CH\u1ec8 d\u00f9ng s\u1ed1 trang c\u00f3 trong ph\u1ea7n N\u1ed8I DUNG T\u00c0I LI\u1ec6U b\u00ean d\u01b0\u1edbi\n'
     + '- KH\u00d4NG \u0110\u01af\u1ee2C vi\u1ebft "Theo Ngu\u1ed3n 1", "Ngu\u1ed3n 5" hay b\u1ea5t k\u1ef3 s\u1ed1 ngu\u1ed3n n\u00e0o \u2014 ch\u1ec9 d\u00f9ng s\u1ed1 trang\n'
-    + '- Tr\u1ea3 l\u1eddi b\u1eb1ng ti\u1ebfng Vi\u1ec7t, r\u00f5 r\u00e0ng v\u00e0 c\u00f3 c\u1ea5u tr\u00fac\n\n'
+    + '- Tr\u1ea3 l\u1eddi b\u1eb1ng ti\u1ebfng Vi\u1ec7t, r\u00f5 r\u00e0ng v\u00e0 c\u00f3 c\u1ea5u tr\u00fac\n'
+    + '- KH\u00d4NG d\u00f9ng c\u00fa ph\u00e1p LaTeX ($...$, \\hat, \\beta, \\frac...). Thay b\u1eb1ng k\u00fd t\u1ef1 Unicode: \u0176, \u03b2\u2080, \u03b2\u2081, x\u0304, \u03a3, \u221a, \u00b2, \u00b3, \u2265, \u2264, \u2260, \u2192, \u00d7, \u00f7 ho\u1eb7c vi\u1ebft d\u1ea1ng text (v\u00ed d\u1ee5: "Y m\u0169", "beta 0")\n\n'
     + 'N\u1ed8I DUNG T\u00c0I LI\u1ec6U:\n'
     + (contextText || '(Kh\u00f4ng t\u00ecm th\u1ea5y n\u1ed9i dung li\u00ean quan trong t\u00e0i li\u1ec7u)')
     + '\n\n'

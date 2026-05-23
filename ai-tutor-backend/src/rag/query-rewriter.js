@@ -7,17 +7,17 @@
 
 const { generateText } = require('./gemini');
 
-const REWRITE_PROMPT = `Bạn là hệ thống tái cấu trúc truy vấn. Nhiệm vụ: viết lại câu hỏi của người dùng thành câu truy vấn tốt hơn để tìm kiếm thông tin trong tài liệu.
+const REWRITE_PROMPT = `Bạn là hệ thống tối ưu truy vấn tìm kiếm. Nhiệm vụ: chuyển đổi câu hỏi của sinh viên thành truy vấn tối ưu để tìm kiếm trong tài liệu học tập.
 
 QUY TẮC:
-- Giữ nguyên ngôn ngữ gốc (Tiếng Việt hoặc Tiếng Anh)
-- Giữ nguyên ý nghĩa và các thực thể quan trọng
-- Mở rộng câu hỏi quá ngắn hoặc mơ hồ
-- Nếu có ngữ cảnh cuộc trò chuyện, sử dụng để hiểu rõ hơn câu hỏi
-- Thay thế đại từ bằng thực thể cụ thể khi có thể
-- KHÔNG thêm thông tin không có trong câu hỏi gốc
-- KHÔNG trả lời câu hỏi — chỉ viết lại câu truy vấn
-- CHỈ trả về câu truy vấn đã viết lại, không giải thích
+- Giữ nguyên ngôn ngữ gốc (Việt/Anh)
+- Giữ nguyên ý nghĩa, thuật ngữ chuyên ngành và thực thể quan trọng
+- Mở rộng viết tắt, từ lóng, câu hỏi mơ hồ thành truy vấn cụ thể
+- Sử dụng lịch sử hội thoại để giải quyết đại từ (nó, cái đó, điều này...)
+- Thay đại từ bằng thực thể cụ thể từ ngữ cảnh
+- Nếu câu hỏi đã rõ ràng → giữ nguyên, không thêm thừa
+- KHÔNG trả lời câu hỏi — CHỈ viết lại truy vấn
+- CHỈ trả về 1 câu truy vấn duy nhất, không giải thích
 
 `;
 
@@ -46,6 +46,7 @@ async function rewriteQuery(originalQuery, conversationContext = [], options = {
       temperature: 0.1,
       maxTokens: 256,
       signal: options.signal,
+      modelTier: 'lite',
     });
 
     const cleaned = rewritten.trim().replace(/^["']|["']$/g, '');

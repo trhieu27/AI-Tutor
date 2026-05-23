@@ -24,7 +24,7 @@ export const DocumentProvider = ({
     page: 1, limit: 5, search: "", status: "all", sort: "recent",
   });
 
-  const { lastUploadTime } = useUpload();
+  const { lastUploadTime, lastDocReadyTime } = useUpload();
 
   // Refs to avoid stale closures
   const filtersRef = useRef(filters);
@@ -145,6 +145,16 @@ export const DocumentProvider = ({
       doPickerFetch(pickerFiltersRef.current);
     }
   }, [lastUploadTime, doFetch, doPickerFetch]);
+
+  // Auto refresh when document finishes processing (WS document_ready)
+  const prevDocReadyTime = useRef(lastDocReadyTime);
+  useEffect(() => {
+    if (lastDocReadyTime > 0 && lastDocReadyTime !== prevDocReadyTime.current) {
+      prevDocReadyTime.current = lastDocReadyTime;
+      doFetch(filtersRef.current);
+      doPickerFetch(pickerFiltersRef.current);
+    }
+  }, [lastDocReadyTime, doFetch, doPickerFetch]);
 
   return /*#__PURE__*/_jsx(DocumentContext.Provider, {
     value: {

@@ -275,7 +275,7 @@ function PlanCard({ plan, isActive, featured, onSelect }) {
         </div>
         {featured && (
           <span className="shrink-0 rounded-[var(--radius-chip)] bg-[var(--foreground)] px-2.5 py-1 text-[10px] font-bold text-[var(--background)]">
-            {plan.billing_cycle === "annual" ? T.toggle.saveBadge : texts.popularBadge || T.planFallbacks.popular}
+            {plan.billing_cycle === "annual" && plan.discount_percent > 0 ? T.toggle.saveBadge(plan.discount_percent) : texts.popularBadge || T.planFallbacks.popular}
           </span>
         )}
       </div>
@@ -340,7 +340,7 @@ function PricingSkeleton() {
   );
 }
 
-function BillingToggle({ billingAnnual, onChange }) {
+function BillingToggle({ billingAnnual, onChange, annualDiscount = 0 }) {
   return (
     <div className="flex items-center">
       <SegmentedControl
@@ -354,9 +354,11 @@ function BillingToggle({ billingAnnual, onChange }) {
             label: (
               <span className="inline-flex items-center gap-1.5">
                 <span>{T.toggle.annual}</span>
-                <span className="rounded-[var(--radius-chip)] border border-[var(--success-border)] bg-[var(--success-soft)] px-1.5 py-0.5 text-[9px] font-[820] leading-none text-[var(--brand-success)]">
-                  {T.toggle.saveShort}
-                </span>
+                {annualDiscount > 0 && (
+                  <span className="rounded-[var(--radius-chip)] border border-[var(--success-border)] bg-[var(--success-soft)] px-1.5 py-0.5 text-[9px] font-[820] leading-none text-[var(--brand-success)]">
+                    {T.toggle.saveShort(annualDiscount)}
+                  </span>
+                )}
               </span>
             ),
           },
@@ -403,6 +405,11 @@ export default function PricingPage() {
     [billingAnnual, plans]
   );
 
+  const annualDiscount = useMemo(
+    () => plans.find((p) => p.billing_cycle === "annual")?.discount_percent || 0,
+    [plans]
+  );
+
   const handleSuccess = () => {
     updateUser({});
     load();
@@ -431,7 +438,7 @@ export default function PricingPage() {
               {billingAnnual ? T.toggle.annualNote : T.toggle.monthlyNote}
             </p>
           </div>
-          <BillingToggle billingAnnual={billingAnnual} onChange={setBillingAnnual} />
+          <BillingToggle billingAnnual={billingAnnual} onChange={setBillingAnnual} annualDiscount={annualDiscount} />
         </div>
       </div>
 
