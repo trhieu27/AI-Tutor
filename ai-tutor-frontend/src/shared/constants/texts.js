@@ -537,7 +537,7 @@ export const HELP_PAGE_TEXTS = {
   },
   contact: {
     formTitle: "Gửi yêu cầu hỗ trợ",
-    formSubtitle: "Mô tả vấn đề bạn gặp phải, chúng tôi sẽ phản hồi qua email.",
+    formSubtitle: "Mô tả vấn đề bạn gặp phải để chúng tôi hỗ trợ nhanh nhất.",
     subjectLabel: "Tiêu đề",
     subjectPlaceholder: "Ví dụ khi tải lên tài liệu PDF",
     messageLabel: "Nội dung chi tiết",
@@ -1494,7 +1494,7 @@ export const HELP_WORKSPACE_TEXTS = {
   ],
   toast: {
     closeAria: "Đóng thông báo",
-    success: "Đã gửi yêu cầu hỗ trợ. Chúng tôi sẽ phản hồi qua email."
+    success: "Đã gửi yêu cầu hỗ trợ thành công."
   },
   validation: {
     subjectRequired: "Vui lòng nhập tiêu đề.",

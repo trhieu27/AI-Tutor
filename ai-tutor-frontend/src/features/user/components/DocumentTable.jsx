@@ -25,29 +25,22 @@ const SORT_OPTIONS = DOCUMENT_LIBRARY_TEXTS.sortOptions;
 const PAGE_SIZE_OPTIONS = [5, 10, 20];
 
 function getPaginationItems(currentPage, totalPages) {
-  if (totalPages <= 7) return Array.from({ length: totalPages }, (_, i) => i + 1);
+  if (totalPages <= 5) return Array.from({ length: totalPages }, (_, i) => i + 1);
 
-  const items = [];
-  items.push(1, 2);
-
-  if (currentPage > 4) {
-    items.push("ellipsis-start");
+  const pages = new Set([1, totalPages]);
+  for (let i = Math.max(2, currentPage - 1); i <= Math.min(totalPages - 1, currentPage + 1); i++) {
+    pages.add(i);
   }
 
-  const rangeStart = Math.max(3, currentPage - 1);
-  const rangeEnd = Math.min(totalPages - 2, currentPage + 1);
-  for (let i = rangeStart; i <= rangeEnd; i++) {
-    if (!items.includes(i)) items.push(i);
+  const sorted = [...pages].sort((a, b) => a - b);
+  const result = [];
+  for (let i = 0; i < sorted.length; i++) {
+    if (i > 0 && sorted[i] - sorted[i - 1] > 1) {
+      result.push(result.includes("ellipsis-start") ? "ellipsis-end" : "ellipsis-start");
+    }
+    result.push(sorted[i]);
   }
-
-  if (currentPage < totalPages - 3) {
-    items.push("ellipsis-end");
-  }
-
-  if (!items.includes(totalPages - 1)) items.push(totalPages - 1);
-  if (!items.includes(totalPages)) items.push(totalPages);
-
-  return items;
+  return result;
 }
 
 function getRedirectUrl(docId, defaultAction) {
@@ -787,7 +780,7 @@ export default function DocumentTable({
             pageSize={pageSize}
             rangeEnd={rangeEnd}
             rangeStart={rangeStart}
-            totalItems={documents.length}
+            totalItems={totalItems}
             totalPages={totalPages}
             onPageChange={setPage}
             onPageSizeChange={setPageSize}
