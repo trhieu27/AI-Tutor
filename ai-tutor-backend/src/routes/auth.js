@@ -172,7 +172,7 @@ router.post('/admin-login', async (req, res) => {
 
     await limiter.checkLimit(`admin_${normalizedEmail}`);
 
-    const user = await findAdminAuthUser(normalizedEmail, { fallbackToCache: true, preferCache: true });
+    const user = await findAdminAuthUser(normalizedEmail);
     const passwordOk = user && user.hashed_password
       ? await bcrypt.compare(password, user.hashed_password)
       : false;

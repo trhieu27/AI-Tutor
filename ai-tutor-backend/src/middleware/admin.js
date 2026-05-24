@@ -17,7 +17,7 @@ async function adminMiddleware(req, res, next) {
       return res.status(401).json({ detail: 'Invalid token type' });
     }
 
-    const user = await findAuthUserById(payload.sub, { fallbackToCache: true, preferCache: true });
+    const user = await findAuthUserById(payload.sub);
     if (!user) return res.status(401).json({ detail: 'Người dùng không tồn tại' });
     if ((user.status || 'active') !== 'active') {
       return res.status(403).json({ detail: 'Tài khoản admin không còn hoạt động' });
