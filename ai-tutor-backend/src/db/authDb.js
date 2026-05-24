@@ -15,6 +15,7 @@ const AUTH_USER_PROJECTION = {
     role: 1,
     status: 1,
     hashed_password: 1,
+
     provider: 1,
     preferences: 1,
     created_at: 1,
@@ -205,6 +206,7 @@ async function createGoogleAuthUser({ id, studentId, fullName, email }) {
         role: 'STUDENT',
         status: 'active',
         hashed_password: '',
+
         provider: 'google',
         preferences: {
             email_notifications: true,

@@ -1,4 +1,5 @@
 import { Admin, Student } from '@/shared/models/User';
+import { sendWsLogout } from '@/shared/hooks/useNotifications';
 
 const AUTH_BASE = '/api/v1';
 
@@ -200,42 +201,10 @@ class AuthService {
       this._lastRefreshErrorStatus === 401 ||
       this._lastRefreshErrorStatus === 403;
   }
-  _presenceController = null;
-  async updatePresence(state = 'online', options = {}) {
-    try {
-      const accessToken = localStorage.getItem('access_token');
-      if (!accessToken) return null;
-      // Abort any in-flight presence call to prevent pile-up
-      if (this._presenceController) {
-        this._presenceController.abort();
-      }
-      const controller = new AbortController();
-      this._presenceController = controller;
-      // Auto-abort after 8s to avoid hanging requests
-      const timeoutId = setTimeout(() => controller.abort(), 8000);
-      const response = await fetch(`${AUTH_BASE}/users/presence`, {
-        method: 'POST',
-        keepalive: Boolean(options.keepalive),
-        signal: options.keepalive ? undefined : controller.signal,
-        headers: {
-          'Authorization': `Bearer ${accessToken}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ state })
-      });
-      clearTimeout(timeoutId);
-      this._presenceController = null;
-      if (!response.ok) return null;
-      return safeJson(response, null);
-    } catch {
-      this._presenceController = null;
-      return null;
-    }
-  }
   logout() {
+    sendWsLogout(); // Tell server to skip 30s grace → offline immediately
     this._refreshPromise = null;
     this._lastRefreshErrorStatus = null;
-    this.updatePresence('offline', { keepalive: true });
     localStorage.removeItem('access_token');
     localStorage.removeItem('refresh_token');
     localStorage.removeItem('user');

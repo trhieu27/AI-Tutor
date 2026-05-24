@@ -16,8 +16,8 @@ const userSchema = new mongoose.Schema({
   role: { type: String, enum: ['STUDENT', 'ADMIN'], default: 'STUDENT', index: true },
   status: { type: String, enum: ['active', 'blocked', 'deleted'], default: 'active', index: true },
   hashed_password: { type: String, default: '' },
-  bio: { type: String, default: null },
-  // is_pro removed — Pro status is derived from user_subscriptions collection
+
+
   provider: { type: String, default: 'local' },
   preferences: { type: userPreferencesSchema, default: () => ({}) },
   created_at: { type: Date, default: Date.now },
@@ -71,7 +71,6 @@ const chatMessageSchema = new mongoose.Schema({
   role: { type: String, enum: ['user', 'assistant'], required: true },
   content: { type: String, required: true },
   sources: { type: mongoose.Schema.Types.Mixed, default: [] },
-  toolExecuted: { type: mongoose.Schema.Types.Mixed, default: null },
   created_at: { type: Date, default: Date.now },
 }, { _id: false });
 
@@ -88,6 +87,7 @@ const chatSessionSchema = new mongoose.Schema({
 });
 chatSessionSchema.index({ user_id: 1, updated_at: -1 });
 chatSessionSchema.index({ document_id: 1, user_id: 1, updated_at: -1 });
+chatSessionSchema.index({ 'messages.created_at': -1 });
 
 // ── OTP ──────────────────────────────────────────────────────────────────────
 
@@ -98,14 +98,7 @@ const otpSchema = new mongoose.Schema({
   expires_at: { type: Date, required: true },
 });
 
-// ── Rate Limit ────────────────────────────────────────────────────────────────
 
-const rateLimitSchema = new mongoose.Schema({
-  key: { type: String, required: true, unique: true, index: true },
-  attempts: { type: Number, default: 0 },
-  last_attempt: { type: Date, default: Date.now },
-  locked_until: { type: Date, default: null },
-});
 
 // ── Subscription Plan ────────────────────────────────────────────────────────
 // Mô tả các gói đăng ký (seed sẵn vào DB hoặc dùng hằng số).
@@ -196,9 +189,9 @@ const notificationSchema = new mongoose.Schema({
   message: { type: String, required: true },
   is_read: { type: Boolean, default: false },
   metadata: { type: mongoose.Schema.Types.Mixed, default: {} },
-  created_at: { type: String },
+  created_at: { type: Date, default: Date.now },
 });
-notificationSchema.index({ user_id: 1, created_at: -1 });
+notificationSchema.index({ user_id: 1, is_read: 1, created_at: -1 });
 
 // ── Payment Transaction ──────────────────────────────────────────────────────
 
@@ -240,7 +233,7 @@ const UserSession = mongoose.model('UserSession', userSessionSchema, 'user_sessi
 const Document = mongoose.model('Document', documentSchema, 'documents');
 const ChatSession = mongoose.model('ChatSession', chatSessionSchema, 'chat_sessions');
 const OTP = mongoose.model('OTP', otpSchema, 'otps');
-const RateLimit = mongoose.model('RateLimit', rateLimitSchema, 'rate_limits');
+
 const UsageLog = mongoose.model('UsageLog', usageLogSchema, 'usage_logs');
 const Notification = mongoose.model('Notification', notificationSchema, 'notifications');
 const SubscriptionPlan = mongoose.model('SubscriptionPlan', subscriptionPlanSchema, 'subscription_plans');
@@ -254,7 +247,6 @@ module.exports = {
   Document,
   ChatSession,
   OTP,
-  RateLimit,
   UsageLog,
   Notification,
   SubscriptionPlan,

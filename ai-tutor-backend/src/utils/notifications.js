@@ -1,6 +1,5 @@
 /**
  * WebSocket Notification Manager — multi-tab support per user.
- * Converts Python's NotificationManager class to JS.
  */
 const { Notification, User } = require('../db/models');
 const { v4: uuidv4 } = require('uuid');
@@ -26,13 +25,17 @@ class NotificationManager {
     if (sockets.size === 0) this._connections.delete(userId);
   }
 
+  getOnlineUserIds() {
+    return Array.from(this._connections.keys());
+  }
+
   async push(userId, payload) {
     const sockets = this._connections.get(userId);
     if (!sockets || sockets.size === 0) return;
     const dead = [];
     for (const ws of sockets) {
       try {
-        if (ws.readyState === 1) { // OPEN
+        if (ws.readyState === 1) {
           ws.send(JSON.stringify(payload));
         } else {
           dead.push(ws);
@@ -41,7 +44,7 @@ class NotificationManager {
         dead.push(ws);
       }
     }
-    dead.forEach(ws => sockets.delete(ws));
+    dead.forEach((ws) => sockets.delete(ws));
   }
 
   async pushAdmins(payload) {
@@ -56,11 +59,12 @@ class NotificationManager {
 
 const notificationManager = new NotificationManager();
 
-async function sendAdminRealtimeEvent(event, metadata = {}) {
+async function sendAdminRealtimeEvent(event, data = {}) {
+  console.log(`[AdminRT] Sending ${event}:`, JSON.stringify(data));
   await notificationManager.pushAdmins({
     type: 'admin_realtime',
     event,
-    metadata,
+    data,
     created_at: new Date().toISOString(),
   });
 }
@@ -74,7 +78,7 @@ async function sendNotification(userId, notifType, title, message, metadata = {}
     message,
     is_read: false,
     metadata,
-    created_at: new Date().toISOString(),
+    created_at: new Date(),
   };
   await Notification.create(doc);
 

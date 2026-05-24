@@ -51,30 +51,7 @@ function AdminSidebar({ onNavigate }) {
   );
 }
 
-function AdminMobileNav() {
-  return (
-    <nav className="admin-mobile-nav fixed inset-x-0 bottom-0 z-40 border-t px-2 py-2 md:hidden" aria-label="Admin mobile">
-      <div className="flex gap-1 overflow-x-auto custom-scrollbar">
-        {ADMIN_TEXTS.shell.nav.map((item) => (
-          <NavLink
-            key={item.to}
-            to={item.to}
-            end={item.exact}
-            className={({ isActive }) =>
-              cx(
-                "admin-mobile-link flex min-w-16 flex-col items-center justify-center gap-1 rounded-[var(--radius-control)] px-2 py-2 text-[10px] font-bold text-[var(--muted)] transition",
-                isActive && "is-active"
-              )
-            }
-          >
-            <span className="material-symbols-outlined icon-strong text-[18px]" aria-hidden="true">{item.icon}</span>
-            <span className="max-w-20 truncate">{item.label}</span>
-          </NavLink>
-        ))}
-      </div>
-    </nav>
-  );
-}
+
 
 export default function AdminLayout() {
   const [open, setOpen] = useState(false);
@@ -179,11 +156,11 @@ export default function AdminLayout() {
       </header>
 
       <div className="min-w-0 pt-16 md:ml-72">
-        <main className="min-w-0 pb-24 md:pb-0">
+        <main className="min-w-0">
           <Outlet />
         </main>
       </div>
-      <AdminMobileNav />
+
     </div>
   );
 }

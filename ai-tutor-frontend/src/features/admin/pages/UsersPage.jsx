@@ -86,10 +86,7 @@ function statusTone(status) {
 }
 
 function isUserOnline(user) {
-  if (typeof user?.is_online === "boolean") return user.is_online;
-  if (user?.status && user.status !== "active") return false;
-  const onlineUntil = new Date(user?.online_until || 0);
-  return !Number.isNaN(onlineUntil.getTime()) && onlineUntil.getTime() > Date.now();
+  return Boolean(user?._online) && user?.status !== "blocked" && user?.status !== "deleted";
 }
 
 function activityTone(user) {
@@ -103,9 +100,13 @@ function formatUserActivityStatus(user) {
   return isUserOnline(user) ? "Đang online" : "Không online";
 }
 
+function isUserPro(user) {
+  return user?.plan && user.plan.id !== 'free';
+}
+
 function planLabel(user) {
-  if (!user.is_pro) return "Miễn phí";
-  return user.plan?.display_name || user.subscription?.plan_name || "Pro";
+  if (!isUserPro(user)) return "Miễn phí";
+  return user.plan?.display_name || "Pro";
 }
 
 function UserActions({ user, onDetail, onPatch }) {
@@ -495,7 +496,35 @@ export default function AdminUsersPage() {
 
   const detailUserId = detail?.user?.id;
   useAdminRealtime(useCallback((message) => {
-    if (!["presence_changed", "usage_recorded", "chat_message_created", "user_updated", "subscription_updated"].includes(message.event)) return;
+    if (message.event === "presence_changed") {
+      const { user_id, is_online, last_active, online_until } = message.data || {};
+      if (!user_id) return;
+      // Optimistic: update user online status in-place, no refetch
+      const patchPresence = (items) =>
+        items?.map((u) =>
+          u.id === user_id ? { ...u, is_online, last_active: last_active || u.last_active, online_until: online_until || u.online_until } : u
+        );
+      setData((prev) => prev ? { ...prev, items: patchPresence(prev.items) } : prev);
+      setOnlinePins((prev) => {
+        if (is_online) {
+          // Add to pins if not already there
+          const exists = prev.some((u) => u.id === user_id);
+          if (!exists) {
+            // Refetch to get full user data for the pin
+            refreshUsers();
+            return prev;
+          }
+          return patchPresence(prev);
+        }
+        // Remove from pins when offline
+        return prev.filter((u) => u.id !== user_id);
+      });
+      if (detailUserId === user_id) {
+        fetchAdminUserDetail(user_id).then(setDetail).catch(console.error);
+      }
+      return;
+    }
+    if (!["usage_recorded", "chat_message_created", "user_updated", "subscription_updated"].includes(message.event)) return;
     refreshUsers();
     const updatedUserId = message.data?.user_id || message.data?.id;
     if (updatedUserId && detailUserId === updatedUserId) {
@@ -564,9 +593,12 @@ export default function AdminUsersPage() {
 
   const visibleUsers = useMemo(() => {
     const pageLimit = Number(data?.pagination?.limit || filters.limit || 20);
-    const pinItems = filters.page === 1 && filters.active !== "false" ? onlinePins : [];
+    const pinItems = filters.page === 1 && filters.active !== "false"
+      ? onlinePins.map((u) => ({ ...u, _online: true }))
+      : [];
+    const onlineIds = new Set(pinItems.map((u) => u.id));
     const seen = new Set();
-    return [...pinItems, ...(data?.items || [])]
+    return [...pinItems, ...(data?.items || []).map((u) => onlineIds.has(u.id) ? { ...u, _online: true } : u)]
       .filter((item) => {
         if (seen.has(item.id)) return false;
         seen.add(item.id);
@@ -576,9 +608,6 @@ export default function AdminUsersPage() {
       .sort((a, b) => {
         const onlineDelta = Number(isUserOnline(b.item)) - Number(isUserOnline(a.item));
         if (onlineDelta !== 0) return onlineDelta;
-        if (isUserOnline(a.item) && isUserOnline(b.item)) {
-          return new Date(b.item.last_active || 0) - new Date(a.item.last_active || 0);
-        }
         return a.index - b.index;
       })
       .map(({ item }) => item)
@@ -663,10 +692,7 @@ export default function AdminUsersPage() {
                         </div>
                       </td>
                       <td className="px-4 py-4">
-                        <div className="min-w-0 space-y-2">
                           <AdminStatusPill tone={activityTone(user)}>{formatUserActivityStatus(user)}</AdminStatusPill>
-                          <p className="truncate text-[11px] font-semibold text-[var(--muted)]">{formatDateTime(user.last_active)}</p>
-                        </div>
                       </td>
                       <td className="px-4 py-4 text-left">
                         <UserActions user={user} onDetail={openDetail} onPatch={patchUser} />

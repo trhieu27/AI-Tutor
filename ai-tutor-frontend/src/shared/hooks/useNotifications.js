@@ -14,14 +14,29 @@ const WS_BASE = typeof window !== "undefined"
     ? `wss://${window.location.host}`
     : `ws://${window.location.host}`
   : "ws://localhost:3000";
+
+// Module-level ref — allows sendWsLogout() to send before close
+let _activeWs = null;
+
+/**
+ * Send 'logout' message through the active WS connection.
+ * Called from AuthService.logout() to signal intentional logout
+ * so the server can skip the 30s offline grace period.
+ */
+export function sendWsLogout() {
+  if (_activeWs && _activeWs.readyState === WebSocket.OPEN) {
+    _activeWs.send("logout");
+  }
+}
+
 export function useNotifications({
   token,
-  onNotification
+  onNotification,
 }) {
   const wsRef = useRef(null);
   const reconnectTimerRef = useRef(null);
   const pingIntervalRef = useRef(null);
-  const connectTimerRef = useRef(null); // StrictMode delay timer
+  const connectTimerRef = useRef(null);
   const isUnmountedRef = useRef(false);
   const cleanup = useCallback(() => {
     if (reconnectTimerRef.current) clearTimeout(reconnectTimerRef.current);
@@ -30,11 +45,11 @@ export function useNotifications({
     if (wsRef.current) {
       const ws = wsRef.current;
       wsRef.current = null;
+      _activeWs = null;
       ws.onopen = null;
       ws.onmessage = null;
       ws.onerror = null;
-      ws.onclose = null; // prevent reconnect on intentional close
-      // Only close if not already closed/closing
+      ws.onclose = null;
       if (ws.readyState === WebSocket.CONNECTING || ws.readyState === WebSocket.OPEN) {
         ws.close();
       }
@@ -46,6 +61,7 @@ export function useNotifications({
     const url = `${WS_BASE}/api/v1/ws/notifications?token=${token}`;
     const ws = new WebSocket(url);
     wsRef.current = ws;
+    _activeWs = ws;
     ws.onopen = () => {
       if (isUnmountedRef.current) {
         ws.close();
@@ -80,10 +96,6 @@ export function useNotifications({
   }, [token, onNotification, cleanup]);
   useEffect(() => {
     isUnmountedRef.current = false;
-
-    // 50ms delay absorbs React 18 StrictMode double-invoke:
-    // StrictMode: mount → cleanup (immediately) → remount
-    // The timeout ensures we only connect on the stable mount.
     connectTimerRef.current = setTimeout(() => {
       if (!isUnmountedRef.current) connect();
     }, 50);

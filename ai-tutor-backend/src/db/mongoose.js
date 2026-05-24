@@ -55,8 +55,6 @@ const MONGO_OPTIONS = {
   // Phù hợp Atlas vì data đã được replicate.
   readPreference: 'nearest',
 
-  // ── Database Name ──
-  dbName: config.databaseName,
 };
 
 async function connectDB() {

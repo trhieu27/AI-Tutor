@@ -4,7 +4,7 @@ import { Admin, Student } from '@/shared/models/User';
 import { authService } from '@/shared/services/auth.service';
 import { jsx as _jsx } from "react/jsx-runtime";
 const AuthContext = /*#__PURE__*/createContext(undefined);
-const PRESENCE_HEARTBEAT_MS = 60_000;
+
 const createUserInstance = userData => {
   if (!userData) return null;
   try {
@@ -84,37 +84,6 @@ export function AuthProvider({
       document.removeEventListener('visibilitychange', handleVisibility);
     };
   }, [syncFromStorage]);
-  useEffect(() => {
-    if (!accessToken || !user) return undefined;
-
-    let lastOnlineSentAt = 0;
-    const markOnline = () => {
-      if (document.visibilityState !== 'visible') return;
-      const now = Date.now();
-      if (now - lastOnlineSentAt < 5_000) return;
-      lastOnlineSentAt = now;
-      authService.updatePresence('online');
-    };
-    const markOffline = () => {
-      authService.updatePresence('offline', { keepalive: true });
-    };
-    const handlePresenceVisibility = () => {
-      if (document.visibilityState === 'visible') markOnline();
-    };
-
-    markOnline();
-    const heartbeatId = window.setInterval(markOnline, PRESENCE_HEARTBEAT_MS);
-    document.addEventListener('visibilitychange', handlePresenceVisibility);
-    window.addEventListener('focus', markOnline);
-    window.addEventListener('pagehide', markOffline);
-
-    return () => {
-      window.clearInterval(heartbeatId);
-      document.removeEventListener('visibilitychange', handlePresenceVisibility);
-      window.removeEventListener('focus', markOnline);
-      window.removeEventListener('pagehide', markOffline);
-    };
-  }, [accessToken, user?.id]);
   const login = async (email, password) => {
     setIsLoading(true);
     setError(null);

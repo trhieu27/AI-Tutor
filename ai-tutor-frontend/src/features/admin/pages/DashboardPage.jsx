@@ -96,7 +96,27 @@ export default function AdminOverviewPage() {
   }, []);
 
   useAdminRealtime(useCallback((message) => {
-    if (!["presence_changed", "document_status_changed", "subscription_updated", "revenue_updated"].includes(message.event)) return;
+    if (message.event === "presence_changed") {
+      const { user_id, is_online, user } = message.data || {};
+      setData((prev) => {
+        if (!prev) return prev;
+        let activeUsersList = prev.activeUsersList || [];
+        const exists = activeUsersList.some((item) => item.user?.id === user_id);
+
+        if (is_online) {
+          if (exists) return prev; // Already tracked — skip duplicate
+          if (user) activeUsersList = [...activeUsersList, { user, document_count: 0 }];
+        } else {
+          if (!exists) return prev; // Not in list — skip
+          activeUsersList = activeUsersList.filter((item) => item.user?.id !== user_id);
+        }
+
+        const activeUsers = Math.max(0, (prev.activeUsers || 0) + (is_online ? 1 : -1));
+        return { ...prev, activeUsers, activeUsersList };
+      });
+      return;
+    }
+    if (!["document_status_changed", "subscription_updated", "revenue_updated"].includes(message.event)) return;
     if (document.visibilityState !== "visible") return;
     throttledLoad();
   }, [throttledLoad]));
@@ -129,8 +149,8 @@ export default function AdminOverviewPage() {
           <AdminSection title={ADMIN_TEXTS.dashboard.sections.activeUsers}>
             {(data.activeUsersList || []).length ? (
               <div className="divide-y divide-[var(--border-subtle)]">
-                {data.activeUsersList.slice(0, DASHBOARD_PREVIEW_LIMIT).map((session) => (
-                  <UserLine key={session.id} user={session.user} meta={formatDateTime(session.last_active)} />
+              {data.activeUsersList.slice(0, DASHBOARD_PREVIEW_LIMIT).map((item) => (
+                  <UserLine key={item.user?.id} user={item.user} meta={`${item.document_count || 0} tài liệu`} />
                 ))}
               </div>
             ) : (

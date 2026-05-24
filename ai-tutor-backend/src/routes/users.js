@@ -105,7 +105,9 @@ router.post('/presence', authMiddleware, async (req, res) => {
       { $set: update }
     );
 
-    if (wasOnline !== isOnline) {
+    // Fire event when status changes OR on first online presence call
+    if (wasOnline !== isOnline || (isOnline && !previousSession?.online_until)) {
+      try { require('./admin').clearOverviewCache?.(); } catch {}
       sendAdminRealtimeEvent('presence_changed', {
         user_id: req.userId,
         session_id: req.sessionId,

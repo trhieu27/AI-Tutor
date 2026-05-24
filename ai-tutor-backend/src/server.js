@@ -20,8 +20,8 @@ const fs = require('fs');
 
 const config = require('./config');
 const { connectDB } = require('./db/mongoose');
-const { warmAuthCache } = require('./db/authDb');
-const { notificationManager } = require('./utils/notifications');
+const { warmAuthCache, getCachedAuthUserById } = require('./db/authDb');
+const { notificationManager, sendAdminRealtimeEvent } = require('./utils/notifications');
 
 // Routes
 const authRoutes = require('./routes/auth');
@@ -97,18 +97,77 @@ app.use((err, req, res, next) => {
 // ── WebSocket: /api/v1/ws/notifications ──────────────────────────────────────
 const wss = new WebSocket.Server({ noServer: true });
 
+// Track disconnect timers to debounce tab close vs full offline
+const offlineTimers = new Map();
+const OFFLINE_GRACE_MS = 30_000; // 30s grace before marking offline
+
 wss.on('connection', (ws, userId) => {
+  // Check if this is the first connection for this user (was offline → now online)
+  const wasPreviouslyOffline = !notificationManager._connections.has(userId) ||
+    notificationManager._connections.get(userId).size === 0;
+
   notificationManager.connect(userId, ws);
 
+  // Cancel any pending offline timer — user reconnected
+  if (offlineTimers.has(userId)) {
+    clearTimeout(offlineTimers.get(userId));
+    offlineTimers.delete(userId);
+  }
+
+  const cachedUser = getCachedAuthUserById(userId);
+  const isAdmin = cachedUser?.role === 'ADMIN';
+
+  // Only fire online event on first connection (0→1), not on reconnect/new tab
+  if (!isAdmin && wasPreviouslyOffline) {
+    sendAdminRealtimeEvent('presence_changed', {
+      user_id: userId,
+      is_online: true,
+      user: cachedUser ? {
+        id: cachedUser.id,
+        full_name: cachedUser.full_name,
+        email: cachedUser.email,
+      } : null,
+    }).catch(() => {});
+  }
+
   ws.send(JSON.stringify({ type: 'connected', message: 'WebSocket connected' }));
+
+  let intentionalLogout = false;
 
   ws.on('message', (data) => {
     const msg = data.toString();
     if (msg === 'ping') ws.send('pong');
+    if (msg === 'logout') intentionalLogout = true;
   });
 
   ws.on('close', () => {
     notificationManager.disconnect(userId, ws);
+
+    if (isAdmin) return;
+
+    const remaining = notificationManager._connections.get(userId);
+    if (!remaining || remaining.size === 0) {
+      if (intentionalLogout) {
+        // Logout — fire offline immediately, no grace period
+        sendAdminRealtimeEvent('presence_changed', {
+          user_id: userId,
+          is_online: false,
+        }).catch(() => {});
+      } else {
+        // Tab close/refresh — debounce 30s before declaring offline
+        const timer = setTimeout(() => {
+          offlineTimers.delete(userId);
+          const stillConnected = notificationManager._connections.get(userId);
+          if (!stillConnected || stillConnected.size === 0) {
+            sendAdminRealtimeEvent('presence_changed', {
+              user_id: userId,
+              is_online: false,
+            }).catch(() => {});
+          }
+        }, OFFLINE_GRACE_MS);
+        offlineTimers.set(userId, timer);
+      }
+    }
   });
 
   ws.on('error', (err) => {

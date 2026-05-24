@@ -17,7 +17,7 @@ const { retryDocumentProcessing, deleteDocumentResources } = require('../utils/d
 const { parsePagination } = require('../utils/pagination');
 const { usageToday } = require('../utils/quota');
 const { refreshConnections } = require('../db/mongoose');
-const { sendAdminRealtimeEvent } = require('../utils/notifications');
+const { sendAdminRealtimeEvent, notificationManager } = require('../utils/notifications');
 
 const router = express.Router();
 router.use(adminMiddleware);
@@ -46,6 +46,30 @@ function getClientIp(req) {
 
 function escapeRegex(value) {
   return String(value || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+// Vietnamese diacritics-insensitive search
+const VIET_MAP = {
+  a: '[aàáảãạăằắẳẵặâầấẩẫậ]',
+  e: '[eèéẻẽẹêềếểễệ]',
+  i: '[iìíỉĩị]',
+  o: '[oòóỏõọôồốổỗộơờớởỡợ]',
+  u: '[uùúủũụưừứửữự]',
+  y: '[yỳýỷỹỵ]',
+  d: '[dđ]',
+};
+
+function removeDiacritics(str) {
+  return str.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[đĐ]/g, 'd');
+}
+
+function buildVietnameseRegex(input) {
+  const normalized = removeDiacritics(String(input).trim()).toLowerCase();
+  let pattern = '';
+  for (const ch of normalized) {
+    pattern += VIET_MAP[ch] || escapeRegex(ch);
+  }
+  return new RegExp(pattern, 'i');
 }
 
 function stripMongo(doc) {
@@ -325,13 +349,8 @@ async function getPresenceByUser(userIds) {
   return new Map(rows.map((row) => [row._id, row]));
 }
 
-async function getOnlineUserIds() {
-  const now = new Date();
-  const rows = await UserSession.aggregate([
-    { $match: { is_online: true, online_until: { $gt: now } } },
-    { $group: { _id: '$user_id' } },
-  ]);
-  return rows.map((row) => row._id);
+function getOnlineUserIds() {
+  return notificationManager.getOnlineUserIds();
 }
 
 async function getUserIdConstraintForPlan(plan) {
@@ -374,6 +393,9 @@ async function buildUserListQuery(req, { includeSearch = true } = {}) {
     } else {
       query.role = req.query.role;
     }
+  } else {
+    // Exclude admins by default
+    query.role = { $in: ['STUDENT', null] };
   }
   if (req.query.status && VALID_USER_STATUSES.has(req.query.status)) {
     if (req.query.status === 'active') {
@@ -407,11 +429,10 @@ async function activeAdminCountExcluding(userId) {
 
 async function enrichUsers(users) {
   const userIds = users.map((user) => user.id);
-  const [subs, documentCounts, chatCounts, presenceByUser, aiUsageToday, chatToday] = await Promise.all([
+  const [subs, documentCounts, chatCounts, aiUsageToday, chatToday] = await Promise.all([
     UserSubscription.find({ user_id: { $in: userIds } }).lean(),
     getCountsByField(Document, 'owner_id', userIds),
     getCountsByField(ChatSession, 'user_id', userIds),
-    getPresenceByUser(userIds),
     getUsageTodayByUser(userIds),
     getChatTodayByUser(userIds),
   ]);
@@ -423,28 +444,24 @@ async function enrichUsers(users) {
     const sub = subMap.get(user.id);
     const isPro = Boolean(sub && sub.status === 'active' && sub.plan_id !== 'free' && (!sub.expires_at || new Date(sub.expires_at) > new Date()));
     const plan = isPro ? planMap.get(sub.plan_id) : planMap.get('free');
-    const presence = presenceByUser.get(user.id) || {};
-    const lastActiveAt = presence.last_active || null;
-    const isOnline = (user.status || 'active') === 'active' && (presence.online_sessions || 0) > 0;
-    return serializeUser(user, {
+    return {
+      id: user.id,
+      student_id: user.student_id || '',
+      full_name: user.full_name || '',
+      email: user.email || '',
+      role: user.role || 'STUDENT',
+      status: user.status || 'active',
       plan: plan ? serializePlan(plan) : null,
-      subscription: sub ? serializeSubscription(sub) : null,
       document_count: documentCounts.get(user.id) || 0,
       chat_count: chatCounts.get(user.id) || 0,
       ai_usage_today: (aiUsageToday.get(user.id) || 0) + (chatToday.get(user.id) || 0),
-      last_active: lastActiveAt,
-      is_online: Boolean(isOnline),
-      online_until: presence.online_until || null,
-      is_pro: Boolean(sub && sub.status === 'active' && sub.plan_id !== 'free' && (!sub.expires_at || new Date(sub.expires_at) > new Date())),
-    });
+    };
   });
 }
 
 function userMatchesSearchQuery(search) {
   if (!search) return {};
-  const raw = String(search).trim();
-  const escaped = escapeRegex(raw);
-  const regex = new RegExp(escaped, 'i');
+  const regex = buildVietnameseRegex(search);
   return { $or: [{ email: regex }, { full_name: regex }, { student_id: regex }] };
 }
 
@@ -507,24 +524,14 @@ async function getAttentionDocuments(limit = 8) {
   return docs.map((doc) => serializeDocumentListItem(doc, ownerMap.get(doc.owner_id)));
 }
 
-async function getActiveUsersList(limit = 8) {
-  const now = new Date();
-  const match = { is_online: true, online_until: { $gt: now } };
-  const rows = await UserSession.aggregate([
-    { $match: match },
-    { $sort: { last_active: -1 } },
-    { $group: { _id: '$user_id', session: { $first: '$$ROOT' }, last_active: { $max: '$last_active' } } },
-    { $sort: { last_active: -1 } },
-    { $limit: limit },
-  ]);
-  const sessions = rows.map((row) => ({ ...row.session, last_active: row.last_active }));
-  const users = await User.find({ id: { $in: sessions.map((session) => session.user_id) } }).lean();
-  const userMap = new Map(users.map((user) => [user.id, user]));
-  const docCounts = await getCountsByField(Document, 'owner_id', sessions.map((session) => session.user_id));
-  return sessions.map((session) => ({
-    ...stripMongo(session),
-    user: serializeUser(userMap.get(session.user_id)),
-    document_count: docCounts.get(session.user_id) || 0,
+async function getActiveUsersList(limit = 8, excludeIds = []) {
+  const onlineIds = getOnlineUserIds().filter((id) => !excludeIds.includes(id)).slice(0, limit);
+  if (!onlineIds.length) return [];
+  const users = await User.find({ id: { $in: onlineIds } }).lean();
+  const docCounts = await getCountsByField(Document, 'owner_id', onlineIds);
+  return users.map((user) => ({
+    user: serializeUser(user),
+    document_count: docCounts.get(user.id) || 0,
   }));
 }
 
@@ -627,17 +634,13 @@ function isMongoUnavailableError(err) {
 }
 
 async function buildOverviewResponse(req, now, today) {
-  // 1. Fetch real-time active users
-  const [activeRows, activeUsersList] = await Promise.all([
-    UserSession.aggregate([
-      { $match: { is_online: true, online_until: { $gt: now } } },
-      { $group: { _id: '$user_id' } },
-      { $count: 'count' }
-    ]),
-    getActiveUsersList(8),
-  ]);
+  // Get admin user IDs to exclude from counts
+  const adminIds = await User.distinct('id', { role: 'ADMIN' });
 
-  const activeUsers = activeRows[0]?.count || 0;
+  // 1. Real-time active users from WS connections (exclude admins)
+  const onlineIds = getOnlineUserIds().filter((id) => !adminIds.includes(id));
+  const activeUsers = onlineIds.length;
+  const activeUsersList = await getActiveUsersList(8, adminIds);
 
   // 2. Compute or load cached heavy statistics
   let stats = overviewCache;
@@ -665,10 +668,10 @@ async function buildOverviewResponse(req, now, today) {
       recentSubscriptions,
       revenueSeries,
     ] = await Promise.all([
-      User.countDocuments({ id: { $ne: req.userId }, status: { $ne: 'deleted' } }),
-      User.countDocuments({ id: { $ne: req.userId }, created_at: { $gte: today }, status: { $ne: 'deleted' } }),
-      User.countDocuments({ id: { $ne: req.userId }, created_at: { $gte: monthStart }, status: { $ne: 'deleted' } }),
-      User.countDocuments({ status: 'blocked' }),
+      User.countDocuments({ id: { $nin: adminIds }, status: { $ne: 'deleted' } }),
+      User.countDocuments({ id: { $nin: adminIds }, created_at: { $gte: today }, status: { $ne: 'deleted' } }),
+      User.countDocuments({ id: { $nin: adminIds }, created_at: { $gte: monthStart }, status: { $ne: 'deleted' } }),
+      User.countDocuments({ status: 'blocked', role: { $ne: 'ADMIN' } }),
       Document.countDocuments({}),
       Document.countDocuments({ status: 'READY' }),
       Document.countDocuments({ status: { $in: ['PROCESSING', 'UPLOADING'] } }),
@@ -677,7 +680,7 @@ async function buildOverviewResponse(req, now, today) {
       ChatSession.countDocuments({}),
       countChatMessagesSince(today, 'user'),
       UsageLog.countDocuments({ feature: 'ai_features', date: todayUTC() }),
-      countActiveProSubscriptions({ user_id: { $ne: req.userId } }),
+      countActiveProSubscriptions({ user_id: { $nin: adminIds } }),
       getRevenueTotals(),
       buildFeatureUsage(),
       chatMessagesByUserSince(today, 8),
@@ -1175,7 +1178,7 @@ router.get('/documents', async (req, res) => {
     }
 
     if (req.query.search) {
-      const regex = new RegExp(escapeRegex(req.query.search), 'i');
+      const regex = buildVietnameseRegex(req.query.search);
       const owners = await User.find({
         $or: [{ email: regex }, { full_name: regex }, { student_id: regex }],
       }).select(USER_LIST_PROJECTION).lean();
