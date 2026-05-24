@@ -72,15 +72,18 @@ jobs:
 
             echo "🧹 Stopping services gracefully..."
             sudo docker compose -f docker-compose.prod.yml down --remove-orphans 2>/dev/null || true
-            sudo docker rm -f $(sudo docker ps -aq) 2>/dev/null || true
-            sudo docker image prune -af 2>/dev/null || true
+            sudo docker container prune -f 2>/dev/null || true
+            sudo docker system prune -f 2>/dev/null || true
+            sudo docker builder prune -f --filter "until=24h" 2>/dev/null || true
+            sudo docker system df || true
 
             echo "🔨 Building and restarting..."
-            sudo docker compose -f docker-compose.prod.yml build --no-cache frontend
+            sudo docker compose -f docker-compose.prod.yml build frontend
             sudo docker compose -f docker-compose.prod.yml up -d
 
             echo "🧹 Cleaning up unused Docker images..."
-            docker image prune -f
+            sudo docker image prune -f
+            sudo docker system df || true
 
             echo "✅ Health check..."
             sleep 15
