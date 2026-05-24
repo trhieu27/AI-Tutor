@@ -391,7 +391,7 @@ ${context}`;
 async function* quiz(collectionName) {
   const chunks = await vectorstore.getAllDocuments(collectionName);
   if (!chunks || chunks.length === 0) {
-    yield '[{"question":"Tài liệu cần được xử lý lại. Vui lòng xóa và tải lại tài liệu.","options":["---","---","---","---"],"correct_index":0,"explanation":"Dữ liệu vector đã bị mất."}]';
+    yield '[{"question":"Tài liệu cần được xử lý lại. Vui lòng xóa và tải lại tài liệu.","options":["---","---","---","---"],"correct_indices":[0],"explanation":"Dữ liệu vector đã bị mất."}]';
     return;
   }
   const context = chunks.slice(0, 40).join('\n\n');
@@ -410,25 +410,40 @@ NGUYÊN TẮC RA ĐỀ:
 - Nếu tài liệu ngắn hoặc ít ý chính, tạo ít câu hơn thay vì lặp ý
 - Nếu tài liệu dài và nhiều ý chính, tạo nhiều hơn 10 câu để bao phủ nội dung
 - Phân bổ theo thang Bloom: 30% Ghi nhớ, 30% Hiểu, 25% Áp dụng, 15% Phân tích
-- Mỗi câu có đúng 1 đáp án đúng, 3 đáp án nhiễu phải hợp lý (không quá dễ loại)
-- Đáp án nhiễu nên là lỗi phổ biến sinh viên hay mắc
+- Khoảng 80% câu hỏi có ĐÚNG 1 đáp án đúng (single-select)
+- Khoảng 20% câu hỏi có NHIỀU đáp án đúng (multi-select), ghi rõ trong đề "Chọn tất cả đáp án đúng"
+- Đáp án nhiễu phải hợp lý (không quá dễ loại), nên là lỗi phổ biến sinh viên hay mắc
 - Giải thích rõ: tại sao đáp án đúng, và tại sao các đáp án khác sai (1-2 câu)
 - Viết hoàn toàn bằng tiếng Việt, rõ ràng
-- KHÔNG dùng cú pháp LaTeX ($...$, \\hat, \\alpha, \\beta, \\frac...). Dùng ký tự Unicode: α, β, Ŷ, β₀, β₁, x̄, Σ, √, ², ≥, ≤, ≠, → hoặc viết text (ví dụ: "alpha", "beta")
+- KHÔNG dùng cú pháp LaTeX ($...$, \\\\hat, \\\\alpha, \\\\beta, \\\\frac...). Dùng ký tự Unicode: α, β, Ŷ, β₀, β₁, x̄, Σ, √, ², ≥, ≤, ≠, → hoặc viết text (ví dụ: "alpha", "beta")
+
+XÁO TRỘN VỊ TRÍ ĐÁP ÁN (BẮT BUỘC):
+- KHÔNG được luôn đặt đáp án đúng ở vị trí A (index 0)
+- Phân bổ đáp án đúng đều giữa các vị trí A, B, C, D (mỗi vị trí khoảng 25%)
+- Với mỗi câu, hãy xáo trộn ngẫu nhiên thứ tự các phương án trước khi gán correct_indices
+- Nếu thấy nhiều câu liên tiếp có cùng vị trí đáp án đúng, hãy thay đổi
 
 Trả về ĐÚNG định dạng JSON sau, không thêm text nào ngoài JSON:
 [
   {
-    "question": "Câu hỏi...",
+    "question": "Câu hỏi chọn 1 đáp án...",
     "options": ["Phương án A", "Phương án B", "Phương án C", "Phương án D"],
-    "correct_index": 0,
+    "correct_indices": [2],
+    "explanation": "Giải thích..."
+  },
+  {
+    "question": "(Chọn tất cả đáp án đúng) Câu hỏi nhiều đáp án...",
+    "options": ["Phương án A", "Phương án B", "Phương án C", "Phương án D"],
+    "correct_indices": [1, 3],
     "explanation": "Giải thích..."
   }
 ]
 
 QUY TẮC:
 - "options" là mảng 4 phần tử (chuỗi)
-- "correct_index" là số nguyên 0-3 (vị trí đáp án đúng trong mảng options)
+- "correct_indices" là MẢNG số nguyên (ví dụ: [2] cho 1 đáp án, [0, 3] cho nhiều đáp án)
+- KHÔNG luôn dùng [0] làm đáp án đúng — xáo trộn đều giữa 0, 1, 2, 3
+- Câu multi-select: bắt đầu question bằng "(Chọn tất cả đáp án đúng)"
 - QUAN TRỌNG: PHẢI trả về JSON hoàn chỉnh, đóng đủ dấu ] ở cuối. Không được cắt giữa chừng
 
 NỘI DUNG TÀI LIỆU:
@@ -449,16 +464,17 @@ async function* mindmap(collectionName) {
     yield 'mindmap\n  root((Cần xử lý lại tài liệu))\n    Dữ liệu vector đã bị mất\n      Xóa và tải lại tài liệu';
     return;
   }
-  const context = chunks.slice(0, 25).join('\n\n');
+  const context = chunks.slice(0, 40).join('\n\n');
 
-  const prompt = `Bạn là chuyên gia tổ chức kiến thức và trực quan hóa thông tin. Dựa vào tài liệu học tập bên dưới, hãy tạo sơ đồ tư duy (mindmap) bằng cú pháp Mermaid. Sơ đồ phải phản ánh đúng cấu trúc logic của tài liệu.
+  const prompt = `Bạn là chuyên gia tổ chức kiến thức và trực quan hóa thông tin. Dựa vào tài liệu học tập bên dưới, hãy tạo sơ đồ tư duy (mindmap) bằng cú pháp Mermaid. Sơ đồ phải bao quát TOÀN BỘ nội dung chính của tài liệu.
 
 Yêu cầu sơ đồ:
 - Chủ đề trung tâm là tiêu đề hoặc chủ đề chính của tài liệu
-- Có ĐÚNG 6 nhánh chính (để đảm bảo cân bằng trái/phải: 3 nhánh bên phải, 3 nhánh bên trái)
-- Mỗi nhánh chính PHẢI có 2-4 nhánh con (bắt buộc)
-- Sắp xếp các nhánh chính xen kẽ: nhánh 1 → phải, nhánh 2 → trái, nhánh 3 → phải, ...
+- Số nhánh chính KHÔNG giới hạn, tạo đủ nhánh để bao quát hết nội dung tài liệu
+- Mỗi nhánh chính PHẢI có 2-5 nhánh con
+- Nhánh con quan trọng CÓ THỂ có 1-3 nhánh con cấp 3 (tổng cộng tối đa 4 cấp depth)
 - Nhãn ngắn gọn, súc tích (tối đa 6 từ mỗi nhãn)
+- Bao quát đầy đủ các khái niệm, định nghĩa, quy trình, ví dụ trong tài liệu
 - Viết bằng tiếng Việt
 - KHÔNG dùng LaTeX. Dùng Unicode: α, β, Σ, √, ² hoặc text
 
@@ -466,37 +482,39 @@ Trả về ĐÚNG định dạng Mermaid mindmap, chỉ code thuần không thê
 
 mindmap
   root((Chủ đề chính))
-    Nhánh 1 (phải)
+    Nhánh chính 1
       Nhánh con 1.1
+        Chi tiết 1.1.1
+        Chi tiết 1.1.2
       Nhánh con 1.2
-    Nhánh 2 (trái)
+      Nhánh con 1.3
+    Nhánh chính 2
       Nhánh con 2.1
       Nhánh con 2.2
-    Nhánh 3 (phải)
+        Chi tiết 2.2.1
+      Nhánh con 2.3
+    Nhánh chính 3
       Nhánh con 3.1
       Nhánh con 3.2
-    Nhánh 4 (trái)
+    Nhánh chính 4
       Nhánh con 4.1
       Nhánh con 4.2
-    Nhánh 5 (phải)
-      Nhánh con 5.1
-      Nhánh con 5.2
-    Nhánh 6 (trái)
-      Nhánh con 6.1
-      Nhánh con 6.2
+      Nhánh con 4.3
 
 QUY TẮC BẮT BUỘC:
-- Có ĐÚNG 6 nhánh chính để cân bằng trái/phải
-- Mỗi nhánh chính PHẢI có ít nhất 2 nhánh con, KHÔNG được để nhánh chính không có con
-- Dùng đúng 2 dấu cách (spaces) để thụt lề mỗi cấp (root=2, nhánh chính=4, nhánh con=6)
+- Số nhánh chính KHÔNG giới hạn, phụ thuộc hoàn toàn vào nội dung tài liệu
+- Mỗi nhánh chính PHẢI có ít nhất 2 nhánh con, KHÔNG được để nhánh chính trống
+- Nhánh con quan trọng nên có thêm nhánh cấp 3 để đi sâu vào chi tiết
+- Dùng đúng 2 dấu cách (spaces) để thụt lề mỗi cấp (root=2, nhánh chính=4, nhánh con=6, cấp 3=8)
 - Không dùng dấu ngoặc đơn (), ngoặc vuông [], hay ký tự đặc biệt trong tên nhánh
 - Chỉ trả về code mindmap thuần, không có markdown fence, không có giải thích
 - Tên nhánh trong ví dụ chỉ là mẫu, hãy thay bằng nội dung thực từ tài liệu
+- MỤC TIÊU: bao quát TẤT CẢ nội dung quan trọng, không bỏ sót chủ đề nào
 
 NỘI DUNG TÀI LIỆU:
 ${context}`;
 
-  yield* generateStream(prompt, { temperature: 0.3, maxTokens: 4096, modelTier: 'lite' });
+  yield* generateStream(prompt, { temperature: 0.3, maxTokens: 8192, modelTier: 'lite' });
 }
 
 // ── Study Questions ───────────────────────────────────────────────────────────

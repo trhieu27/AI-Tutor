@@ -1325,6 +1325,8 @@ export const QUIZ_WORKSPACE_TEXTS = {
     title: "Xem lại giải thích",
     yourAnswer: "Đáp án của bạn",
     correctAnswer: "Đáp án đúng",
+    correctAnswers: "Các đáp án đúng",
+    multiSelect: "Nhiều đáp án",
     explanation: "Giải thích",
     notSelected: "Chưa chọn"
   },
@@ -1336,6 +1338,7 @@ export const QUIZ_WORKSPACE_TEXTS = {
     answered: (answered, total) => `Đã trả lời ${answered} / ${total} câu`,
     unansweredHint: "Hãy trả lời tất cả câu hỏi trước khi nộp bài",
     submit: "Nộp bài",
+    multiSelectHint: "Chọn nhiều đáp án",
     explanation: "Giải thích",
     noExplanation: "Chưa có giải thích cho câu hỏi này.",
     previous: "Câu trước",

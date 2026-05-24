@@ -92,12 +92,31 @@ export default function InteractiveQuizPage() {
   const [completed, setCompleted] = useState(false);
   const [showRegenConfirm, setShowRegenConfirm] = useState(false);
 
+  // Helper: get correct indices array (backward compat with correct_index)
+  const getCorrectIndices = (q) => Array.isArray(q.correct_indices) ? q.correct_indices : (typeof q.correct_index === 'number' ? [q.correct_index] : [0]);
+  const isMulti = (q) => getCorrectIndices(q).length > 1;
+
   const score = useMemo(
-    () => quiz.reduce((total, question, index) => total + (answers[index] === question.correct_index ? 1 : 0), 0),
+    () => quiz.reduce((total, question, index) => {
+      const correct = getCorrectIndices(question);
+      const userAns = answers[index];
+      if (userAns === undefined) return total;
+      if (isMulti(question)) {
+        const userSet = Array.isArray(userAns) ? userAns : [];
+        if (userSet.length !== correct.length) return total;
+        return total + (correct.every(c => userSet.includes(c)) ? 1 : 0);
+      }
+      return total + (userAns === correct[0] ? 1 : 0);
+    }, 0),
     [answers, quiz]
   );
   const answeredCount = useMemo(
-    () => quiz.reduce((total, _question, index) => total + (answers[index] !== undefined ? 1 : 0), 0),
+    () => quiz.reduce((total, question, index) => {
+      const ans = answers[index];
+      if (ans === undefined) return total;
+      if (isMulti(question)) return total + (Array.isArray(ans) && ans.length > 0 ? 1 : 0);
+      return total + 1;
+    }, 0),
     [answers, quiz]
   );
   const progress = quiz.length > 0 ? Math.round((answeredCount / quiz.length) * 100) : 0;
@@ -139,7 +158,7 @@ export default function InteractiveQuizPage() {
 
         if (!isActive()) return;
         const valid = Array.isArray(data)
-          ? data.filter((item) => item?.question && Array.isArray(item?.options) && item.options.length > 0)
+          ? data.filter((item) => item?.question && Array.isArray(item?.options) && item.options.length > 0 && (Array.isArray(item.correct_indices) || typeof item.correct_index === 'number'))
           : [];
 
         if (valid.length > 0) setQuiz(valid);
@@ -166,7 +185,18 @@ export default function InteractiveQuizPage() {
 
   const handleSelect = (questionIndex, optionIndex) => {
     if (completed) return;
-    setAnswers((prev) => ({ ...prev, [questionIndex]: optionIndex }));
+    const question = quiz[questionIndex];
+    if (isMulti(question)) {
+      setAnswers((prev) => {
+        const current = Array.isArray(prev[questionIndex]) ? [...prev[questionIndex]] : [];
+        const idx = current.indexOf(optionIndex);
+        if (idx >= 0) current.splice(idx, 1);
+        else current.push(optionIndex);
+        return { ...prev, [questionIndex]: current };
+      });
+    } else {
+      setAnswers((prev) => ({ ...prev, [questionIndex]: optionIndex }));
+    }
   };
 
   const handleSubmit = () => {
@@ -264,44 +294,50 @@ export default function InteractiveQuizPage() {
             />
             <Surface className="p-4 sm:p-5">
               <h2 className="text-[15px] font-semibold text-[var(--foreground)]">{T.review.title}</h2>
-              <div className="mt-4 space-y-3">
+              <div className="mt-4 space-y-4">
                 {quiz.map((question, index) => {
-                  const correct = answers[index] === question.correct_index;
-                  const userAnswer = question.options?.[answers[index]] || T.review.notSelected;
-                  const correctAnswer = question.options?.[question.correct_index] || T.review.notSelected;
+                  const correctIndices = getCorrectIndices(question);
+                  const multi = isMulti(question);
+                  const userAns = answers[index];
+                  const isCorrect = multi
+                    ? (Array.isArray(userAns) && userAns.length === correctIndices.length && correctIndices.every(c => userAns.includes(c)))
+                    : userAns === correctIndices[0];
                   return (
                     <article key={index} className="rounded-[var(--radius-panel)] border border-[var(--border-subtle)] bg-[var(--surface)] p-4">
-                      <div className="flex items-start gap-3">
-                        <span className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-white ${correct ? "bg-[var(--brand-success)]" : "bg-[var(--brand-rose)]"}`}>
-                          <span className="material-symbols-outlined text-[15px]">{correct ? "check" : "close"}</span>
+                      <div className="flex items-center gap-2">
+                        <span className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-white ${isCorrect ? "bg-[var(--brand-success)]" : "bg-[var(--brand-rose)]"}`}>
+                          <span className="material-symbols-outlined text-[14px]">{isCorrect ? "check" : "close"}</span>
                         </span>
-                        <div className="min-w-0 flex-1">
-                          <h3 className="text-[13px] font-semibold leading-6 text-[var(--foreground)]">{question.question}</h3>
-                          <div className="mt-3 grid gap-2 md:grid-cols-2">
-                            <div
-                              className={cx(
-                                "rounded-[var(--radius-panel)] border p-3",
-                                correct
-                                  ? "border-[var(--success-border)] bg-[var(--success-soft)]"
-                                  : "border-[var(--danger-border)] bg-[var(--danger-soft)]"
-                              )}
-                            >
-                              <p className="text-[11px] font-bold text-[var(--muted)]">{T.review.yourAnswer}</p>
-                              <p className="mt-1 text-[12px] font-semibold leading-5 text-[var(--foreground)]">{userAnswer}</p>
-                            </div>
-                            <div className="rounded-[var(--radius-panel)] border border-[var(--success-border)] bg-[var(--success-soft)] p-3">
-                              <p className="text-[11px] font-bold text-[var(--muted)]">{T.review.correctAnswer}</p>
-                              <p className="mt-1 text-[12px] font-semibold leading-5 text-[var(--foreground)]">{correctAnswer}</p>
-                            </div>
-                          </div>
-                          {question.explanation && (
-                            <div className="mt-3 rounded-[var(--radius-panel)] border border-[var(--border-subtle)] bg-[var(--card-bg)] p-3">
-                              <p className="text-[11px] font-bold text-[var(--muted)]">{T.review.explanation}</p>
-                              <p className="mt-1 text-[12px] font-medium leading-6 text-[var(--muted)]">{question.explanation}</p>
-                            </div>
-                          )}
-                        </div>
+                        <p className="font-mono text-[10px] font-bold uppercase tracking-normal text-[var(--muted)]">
+                          {T.question.progress(index + 1, quiz.length)}
+                        </p>
+                        {multi && <span className="rounded-[var(--radius-chip)] border border-[var(--border-subtle)] bg-[var(--card-bg)] px-1.5 py-0.5 text-[9px] font-bold text-[var(--brand-secondary)]">{T.question.multiSelectHint}</span>}
                       </div>
+                      <h3 className="mt-2 text-[14px] font-semibold leading-7 text-[var(--foreground)]">{question.question}</h3>
+                      <div className="mt-3 grid gap-2">
+                        {question.options.map((option, optionIndex) => (
+                          <QuizOption
+                            key={optionIndex}
+                            option={option}
+                            index={optionIndex}
+                            selected={multi ? (Array.isArray(userAns) && userAns.includes(optionIndex)) : userAns === optionIndex}
+                            correct={correctIndices.includes(optionIndex)}
+                            checked={true}
+                            disabled={true}
+                            multi={multi}
+                            onSelect={() => {}}
+                          />
+                        ))}
+                      </div>
+                      {question.explanation && (
+                        <div className="mt-3 rounded-[var(--radius-panel)] border border-[var(--border-subtle)] bg-[var(--card-bg)] p-3">
+                          <div className="flex items-center gap-1.5">
+                            <span className="material-symbols-outlined text-[14px] text-[var(--brand-secondary)]">lightbulb</span>
+                            <p className="text-[11px] font-bold text-[var(--muted)]">{T.review.explanation}</p>
+                          </div>
+                          <p className="mt-1.5 text-[12px] font-medium leading-6 text-[var(--muted)]">{question.explanation}</p>
+                        </div>
+                      )}
                     </article>
                   );
                 })}
@@ -329,28 +365,37 @@ export default function InteractiveQuizPage() {
             </div>
 
             <div className="space-y-4 p-4 sm:p-5">
-              {quiz.map((question, questionIndex) => (
-                <article key={questionIndex} className="rounded-[var(--radius-panel)] border border-[var(--border-subtle)] bg-[var(--surface)] p-4">
-                  <p className="font-mono text-[10px] font-bold uppercase tracking-normal text-[var(--muted)]">
-                    {T.question.progress(questionIndex + 1, quiz.length)}
-                  </p>
-                  <h3 className="mt-2 text-[15px] font-semibold leading-7 text-[var(--foreground)]">{question.question}</h3>
-                  <div className="mt-4 grid gap-2">
-                    {question.options.map((option, optionIndex) => (
-                      <QuizOption
-                        key={optionIndex}
-                        option={option}
-                        index={optionIndex}
-                        selected={answers[questionIndex] === optionIndex}
-                        correct={optionIndex === question.correct_index}
-                        checked={false}
-                        disabled={false}
-                        onSelect={() => handleSelect(questionIndex, optionIndex)}
-                      />
-                    ))}
-                  </div>
-                </article>
-              ))}
+              {quiz.map((question, questionIndex) => {
+                const multi = isMulti(question);
+                const correctIndices = getCorrectIndices(question);
+                const userAns = answers[questionIndex];
+                return (
+                  <article key={questionIndex} className="rounded-[var(--radius-panel)] border border-[var(--border-subtle)] bg-[var(--surface)] p-4">
+                    <div className="flex items-center gap-2">
+                      <p className="font-mono text-[10px] font-bold uppercase tracking-normal text-[var(--muted)]">
+                        {T.question.progress(questionIndex + 1, quiz.length)}
+                      </p>
+                      {multi && <span className="rounded-[var(--radius-chip)] border border-[var(--border-subtle)] bg-[var(--card-bg)] px-1.5 py-0.5 text-[9px] font-bold text-[var(--brand-secondary)]">{T.question.multiSelectHint}</span>}
+                    </div>
+                    <h3 className="mt-2 text-[15px] font-semibold leading-7 text-[var(--foreground)]">{question.question}</h3>
+                    <div className="mt-4 grid gap-2">
+                      {question.options.map((option, optionIndex) => (
+                        <QuizOption
+                          key={optionIndex}
+                          option={option}
+                          index={optionIndex}
+                          selected={multi ? (Array.isArray(userAns) && userAns.includes(optionIndex)) : userAns === optionIndex}
+                          correct={correctIndices.includes(optionIndex)}
+                          checked={false}
+                          disabled={false}
+                          multi={multi}
+                          onSelect={() => handleSelect(questionIndex, optionIndex)}
+                        />
+                      ))}
+                    </div>
+                  </article>
+                );
+              })}
             </div>
 
             <div className="flex flex-col gap-3 border-t border-[var(--border-subtle)] p-4 sm:flex-row sm:items-center sm:justify-between sm:p-5">

@@ -25,19 +25,26 @@ function sanitizeQuestion(text) {
 /**
  * Normalize quiz item to frontend format:
  *   options: string[]  (array of 4 choices)
- *   correct_index: number (0-based index)
+ *   correct_indices: number[] (array of 0-based indices)
  *
- * Handles both new format (array + correct_index) and
- * old format ({A,B,C,D} object + correct_answer letter).
+ * Handles:
+ *   - New multi-select format (array + correct_indices)
+ *   - Legacy single-select format (array + correct_index)
+ *   - Old format ({A,B,C,D} object + correct_answer letter)
  */
 function normalizeQuiz(raw) {
   if (!Array.isArray(raw)) return [];
   return raw.map(item => {
     if (!item || typeof item !== 'object') return null;
 
-    // Already in new format
-    if (Array.isArray(item.options) && typeof item.correct_index === 'number') {
+    // New format: correct_indices is already an array
+    if (Array.isArray(item.options) && Array.isArray(item.correct_indices)) {
       return item;
+    }
+
+    // Legacy format: correct_index is a single number → convert to array
+    if (Array.isArray(item.options) && typeof item.correct_index === 'number') {
+      return { ...item, correct_indices: [item.correct_index] };
     }
 
     // Old format: options is {A,B,C,D} object, correct_answer is letter
@@ -49,7 +56,7 @@ function normalizeQuiz(raw) {
       return {
         question: item.question || '',
         options,
-        correct_index: correct_index >= 0 ? correct_index : 0,
+        correct_indices: [correct_index >= 0 ? correct_index : 0],
         explanation: item.explanation || '',
       };
     }

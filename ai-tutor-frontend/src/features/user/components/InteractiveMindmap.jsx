@@ -20,16 +20,26 @@ const NODE_COLORS = [
 // ── Layout constants ──────────────────────────────────────────────────────────
 const V_GAP = 16;   // vertical gap between consecutive nodes
 const H_INDENT = 40; // horizontal indent per depth level
-const NODE_H = 44;
-const NODE_MIN_W = 180;
+const NODE_H = 48;
+const NODE_MIN_W = 220;
 const PAD = 120;
-const LAYOUT_VER = 'v16-folder';
+const LAYOUT_VER = 'v17-folder';
+const RESIZE_SNAP = 20; // snap resize to grid to prevent text flickering
 
-// ── Text wrap ─────────────────────────────────────────────────────────────────
+// ── Text wrap (with cache to prevent flickering during resize) ───────────────
+const _wrapCache = new Map();
 function wrapText(text, w, h, fs) {
-  const cw = fs * 0.58, pad = 28;
-  const maxCh = Math.max(6, Math.floor((w - pad) / cw));
-  const maxLn = Math.max(1, Math.floor((h - 16) / (fs * 1.25)));
+  // Snap dimensions to grid so small changes don't cause re-wraps
+  const sw = Math.round(w / RESIZE_SNAP) * RESIZE_SNAP;
+  const sh = Math.round(h / RESIZE_SNAP) * RESIZE_SNAP;
+  const key = `${text}|${sw}|${sh}|${fs}`;
+  if (_wrapCache.has(key)) return _wrapCache.get(key);
+  // Keep cache bounded
+  if (_wrapCache.size > 500) _wrapCache.clear();
+
+  const cw = fs * 0.55, pad = 24;
+  const maxCh = Math.max(8, Math.floor((sw - pad) / cw));
+  const maxLn = Math.max(2, Math.floor((sh - 10) / (fs * 1.25)));
   const words = (text || '').split(' ');
   const lines = [];
   let cur = '';
@@ -37,22 +47,26 @@ function wrapText(text, w, h, fs) {
     if ((cur + word).length <= maxCh) { cur += (cur ? ' ' : '') + word; }
     else {
       if (lines.length + 1 >= maxLn) {
-        lines.push((cur + '...').slice(0, maxCh));
+        const remaining = cur ? cur + ' ' + word : word;
+        lines.push(remaining.length > maxCh ? remaining.slice(0, maxCh - 1) + '…' : remaining);
+        _wrapCache.set(key, lines);
         return lines;
       }
       if (cur) lines.push(cur);
       cur = word;
     }
   }
-  if (cur) lines.push(lines.length >= maxLn ? lines.pop().slice(0, maxCh - 3) + '...' : cur);
-  return lines.length ? lines : [text || ''];
+  if (cur) lines.push(cur);
+  const result = lines.length ? lines : [text || ''];
+  _wrapCache.set(key, result);
+  return result;
 }
 
 // ── Estimated node width ──────────────────────────────────────────────────────
 function estW(text, fs = 13) {
-  // Must match wrapText: cw = fs * 0.58, pad = 28
-  // Add +10 buffer to ensure maxCh > text.length (no wrap/truncation)
-  return Math.max(NODE_MIN_W, Math.ceil((text || '').length * (fs * 0.58)) + 28 + 10);
+  // Must match wrapText: cw = fs * 0.55, pad = 24
+  // Add +16 buffer to ensure maxCh > text.length (no wrap/truncation)
+  return Math.max(NODE_MIN_W, Math.ceil((text || '').length * (fs * 0.55)) + 24 + 16);
 }
 
 // ── Parser ────────────────────────────────────────────────────────────────────
@@ -217,6 +231,8 @@ const InteractiveMindmap = forwardRef(({ chart, onCodeChange, documentId, zoom =
   const svgRef = useRef(null), treeRef = useRef(null), posRef = useRef({});
   const dragRef = useRef(null), resizeDragRef = useRef(null), histRef = useRef([]), redoRef = useRef([]);
   const lastCodeRef = useRef(''), lastStructRef = useRef('');
+  const frozenVbRef = useRef(null); // freeze viewBox during resize to prevent all nodes jumping
+  const resizeRafRef = useRef(null); // rAF throttle for resize
   const SK = `mindmap-pos-${documentId || 'default'}-${LAYOUT_VER}`;
 
   const notifyUR = useCallback(() => onUndoRedoStateChange?.(histRef.current.length > 0, redoRef.current.length > 0), [onUndoRedoStateChange]);
@@ -372,16 +388,21 @@ const InteractiveMindmap = forwardRef(({ chart, onCodeChange, documentId, zoom =
     const onMove = e => {
       const rs = resizeDragRef.current;
       if (rs) {
-        const { cx, cy } = getXY(e);
-        const pt = toSvg(cx, cy);
-        const next = { ...posRef.current };
-        const p = next[rs.id];
-        if (p) {
-          const newW = Math.max(NODE_MIN_W, Math.abs(pt.x - p.x) * 2);
-          const newH = Math.max(NODE_H, Math.abs(pt.y - p.y) * 2);
-          next[rs.id] = { ...p, w: newW, h: newH };
-          setPositions(next); posRef.current = next;
-        }
+        if (resizeRafRef.current) return; // already scheduled
+        resizeRafRef.current = requestAnimationFrame(() => {
+          resizeRafRef.current = null;
+          const { cx, cy } = getXY(e);
+          const pt = toSvg(cx, cy);
+          const next = { ...posRef.current };
+          const p = next[rs.id];
+          if (p) {
+            const newW = Math.max(NODE_MIN_W, Math.round(Math.abs(pt.x - p.x) * 2 / RESIZE_SNAP) * RESIZE_SNAP);
+            const newH = Math.max(NODE_H, Math.round(Math.abs(pt.y - p.y) * 2 / RESIZE_SNAP) * RESIZE_SNAP);
+            if (newW === p.w && newH === p.h) return;
+            next[rs.id] = { ...p, w: newW, h: newH };
+            setPositions(next); posRef.current = next;
+          }
+        });
         return;
       }
       const ds = dragRef.current; if (!ds) return;
@@ -394,6 +415,8 @@ const InteractiveMindmap = forwardRef(({ chart, onCodeChange, documentId, zoom =
     };
     const onUp = e => {
       if (resizeDragRef.current) {
+        if (resizeRafRef.current) { cancelAnimationFrame(resizeRafRef.current); resizeRafRef.current = null; }
+        frozenVbRef.current = null; // unfreeze viewBox
         const snap = { code: toMermaid(treeRef.current), pos: resizeDragRef.current.snap };
         histRef.current = [...histRef.current.slice(-39), snap]; redoRef.current = []; notifyUR();
         resizeDragRef.current = null; document.body.classList.remove('select-none'); return;
@@ -479,13 +502,15 @@ const InteractiveMindmap = forwardRef(({ chart, onCodeChange, documentId, zoom =
   const doDel = () => { if (treeRef.current && selId && selId !== treeRef.current.id) applyUpdate(removeNode(treeRef.current, selId)); };
   const doColor = c => { if (treeRef.current && selId) applyUpdate(updateNode(treeRef.current, selId, { color: c })); };
 
-  const vb = useMemo(() => {
+  const vbComputed = useMemo(() => {
     const ids = Object.keys(positions);
     if (!ids.length) return { x: -600, y: -400, w: 1200, h: 800 };
     let x0 = Infinity, x1 = -Infinity, y0 = Infinity, y1 = -Infinity;
     ids.forEach(id => { const p = positions[id]; x0 = Math.min(x0, p.x - p.w / 2); x1 = Math.max(x1, p.x + p.w / 2); y0 = Math.min(y0, p.y - p.h / 2); y1 = Math.max(y1, p.y + p.h / 2); });
     return { x: x0 - PAD, y: y0 - PAD, w: Math.max(x1 - x0 + PAD * 2, 1200), h: Math.max(y1 - y0 + PAD * 2, 800) };
   }, [positions]);
+  // Freeze viewBox during resize to prevent all nodes from jumping
+  const vb = frozenVbRef.current || vbComputed;
 
   const conns = useMemo(() => {
     if (!tree) return [];
@@ -568,7 +593,13 @@ const InteractiveMindmap = forwardRef(({ chart, onCodeChange, documentId, zoom =
               </text>
               {isSel && [['nw',-1,-1,'nw-resize'],['ne',1,-1,'ne-resize'],['sw',-1,1,'sw-resize'],['se',1,1,'se-resize']].map(([corner,sx,sy,cur])=>{
                 const hx=p.x+sx*(p.w/2+8), hy=p.y+sy*(p.h/2+8), s=8;
-                const startResize = e => { e.stopPropagation(); e.preventDefault(); resizeDragRef.current = { id: n.id, snap: { ...posRef.current } }; document.body.classList.add('select-none'); };
+                const startResize = e => {
+                  e.stopPropagation(); e.preventDefault();
+                  // Freeze viewBox so other nodes don't jump
+                  frozenVbRef.current = { ...vb };
+                  resizeDragRef.current = { id: n.id, snap: { ...posRef.current } };
+                  document.body.classList.add('select-none');
+                };
                 return(<g key={corner} style={{cursor:cur}} onMouseDown={startResize} onTouchStart={startResize}>
                   {/* hit area */}
                   <rect x={hx-s-4} y={hy-s-4} width={(s+4)*2} height={(s+4)*2} fill="transparent"/>
