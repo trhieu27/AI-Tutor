@@ -13,7 +13,7 @@ const config = require('../config');
 const rag = require('../rag/pipeline');
 const { extractText } = require('../rag/extractor');
 const s3 = require('../utils/s3');
-const { ensureLocalFile } = require('../utils/documentOps');
+const { ensureLocalFile, processDocumentBackground, cancelDocumentProcessing, deleteDocumentResources } = require('../utils/documentOps');
 
 const ALLOWED_EXTENSIONS = new Set(['.pdf', '.doc', '.docx']);
 
@@ -86,41 +86,7 @@ const upload = multer({
 });
 
 
-// Background processing: Node.js RAG pipeline
-async function processDocumentBackground(documentId, filePath, ownerId) {
-    const doc = await Document.findOne({ id: documentId });
-    if (!doc) return;
 
-    try {
-        await Document.updateOne({ id: documentId }, { $set: { status: 'PROCESSING' } });
-        sendAdminRealtimeEvent('document_status_changed', { id: documentId, status: 'PROCESSING', file_name: doc.file_name }).catch(console.error);
-
-        const { collection_name, page_count } = await rag.ingest(filePath, documentId);
-
-        await Document.updateOne({ id: documentId }, { $set: { status: 'READY', page_count, chroma_collection_id: collection_name, updated_at: new Date() } });
-        sendAdminRealtimeEvent('document_status_changed', { id: documentId, status: 'READY', file_name: doc.file_name }).catch(console.error);
-        console.log(`✅ Document ${documentId} processed successfully`);
-
-        try {
-            await sendNotification(ownerId, 'document_ready', 'Xử lý thành công',
-                `Tài liệu "${doc.file_name}" đã sẵn sàng để chat với AI.`, { document_id: documentId }
-            );
-        } catch (notifErr) {
-            console.warn('[Notif] Failed to send document_ready notification:', notifErr.message);
-        }
-    } catch (err) {
-        console.error('Document ' + documentId + ' processing failed:', err.message, err.cause || '');
-        try {
-            await Document.updateOne({ id: documentId }, { $set: { status: 'FAILED' } });
-            sendAdminRealtimeEvent('document_status_changed', { id: documentId, status: 'FAILED', file_name: doc.file_name }).catch(console.error);
-            await sendNotification(ownerId, 'document_failed', 'Xử lý thất bại',
-                `Tài liệu "${doc.file_name}" gặp lỗi. Vui lòng thử lại.`, { document_id: documentId }
-            );
-        } catch (notifErr) {
-            console.warn('[Notif] Failed to send document_failed notification:', notifErr.message);
-        }
-    }
-}
 
 // Wrap multer to catch errors with Vietnamese messages
 function handleUpload(req, res, next) {
@@ -350,38 +316,15 @@ router.get('/:documentId', authMiddleware, async(req, res) => {
 // DELETE /api/v1/documents/:documentId
 router.delete('/:documentId', authMiddleware, async(req, res) => {
     try {
+        // Verify ownership first
         const doc = await Document.findOne({ id: req.params.documentId, owner_id: req.userId });
         if (!doc) return res.status(404).json({ detail: 'Tài liệu không tồn tại.' });
 
-        // Delete from ChromaDB
-        if (doc.chroma_collection_id) {
-            try {
-                await rag.deleteDocumentCollection(doc.chroma_collection_id);
-            } catch (e) {
-                console.warn('RAG delete collection error (ignored):', e.message);
-            }
-        }
-
-        // Delete file from disk
-        for (const ext of['.pdf', '.doc', '.docx']) {
-            const fp = path.join(config.uploadDir, `${req.params.documentId}${ext}`);
-            if (fs.existsSync(fp)) { fs.unlinkSync(fp); break; }
-        }
-
-        // Delete from S3
-        if (s3.s3Enabled) {
-            const s3File = await s3.findFile(req.params.documentId);
-            if (s3File) await s3.deleteFile(s3File.filename);
-        }
-
-        const { ChatSession } = require('../db/models');
-        await Document.deleteOne({ id: req.params.documentId });
-        sendAdminRealtimeEvent('document_status_changed', { id: req.params.documentId, status: 'DELETED', file_name: doc.file_name }).catch(console.error);
-        await ChatSession.deleteMany({ document_id: req.params.documentId });
-
+        await deleteDocumentResources(req.params.documentId);
         res.status(204).send();
     } catch (err) {
-        res.status(500).json({ detail: 'Lỗi server' });
+        const status = err.statusCode || 500;
+        res.status(status).json({ detail: err.message || 'Lỗi server' });
     }
 });
 

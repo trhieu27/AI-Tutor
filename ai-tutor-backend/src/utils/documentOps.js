@@ -42,14 +42,32 @@ async function ensureLocalFile(documentId) {
   return null;
 }
 
+// Track active processing AbortControllers
+const _processingJobs = new Map();
+
+function cancelDocumentProcessing(documentId) {
+  const ac = _processingJobs.get(documentId);
+  if (ac) {
+    ac.abort();
+    _processingJobs.delete(documentId);
+    console.log(`[Doc] Cancelled processing for ${documentId}`);
+  }
+}
+
 async function processDocumentBackground(documentId, filePath, ownerId) {
   const doc = await Document.findOne({ id: documentId });
   if (!doc) return;
 
+  const ac = new AbortController();
+  _processingJobs.set(documentId, ac);
+
   try {
     await Document.updateOne({ id: documentId }, { $set: { status: 'PROCESSING', updated_at: new Date() } });
     sendAdminRealtimeEvent('document_status_changed', { id: documentId, status: 'PROCESSING', file_name: doc.file_name }).catch(console.error);
-    const { collection_name, page_count } = await rag.ingest(filePath, documentId);
+    const { collection_name, page_count } = await rag.ingest(filePath, documentId, { signal: ac.signal });
+
+    const stillExists = await Document.findOne({ id: documentId });
+    if (!stillExists) return;
 
     await Document.updateOne(
       { id: documentId },
@@ -66,8 +84,15 @@ async function processDocumentBackground(documentId, filePath, ownerId) {
       console.warn('[Notif] Failed to send document_ready notification:', notifErr.message);
     }
   } catch (err) {
+    // Aborted = document was deleted during processing, skip everything
+    if (err.name === 'AbortError' || ac.signal.aborted) {
+      console.log(`[Doc] Processing aborted for ${documentId} (deleted)`);
+      return;
+    }
     console.error(`Document ${documentId} processing failed:`, err.message, err.cause ?? '');
     try {
+      const stillExists = await Document.findOne({ id: documentId });
+      if (!stillExists) return;
       await Document.updateOne({ id: documentId }, { $set: { status: 'FAILED', updated_at: new Date() } });
       sendAdminRealtimeEvent('document_status_changed', { id: documentId, status: 'FAILED', file_name: doc.file_name }).catch(console.error);
       await sendNotification(ownerId, 'document_failed', 'Xử lý thất bại',
@@ -77,6 +102,8 @@ async function processDocumentBackground(documentId, filePath, ownerId) {
     } catch (notifErr) {
       console.warn('[Notif] Failed to send document_failed notification:', notifErr.message);
     }
+  } finally {
+    _processingJobs.delete(documentId);
   }
 }
 
@@ -103,6 +130,9 @@ async function retryDocumentProcessing(documentId) {
 }
 
 async function deleteDocumentResources(documentId) {
+  // Cancel any in-progress processing job
+  cancelDocumentProcessing(documentId);
+
   const doc = await Document.findOne({ id: documentId });
   if (!doc) {
     const err = new Error('Tài liệu không tồn tại');
@@ -145,6 +175,7 @@ module.exports = {
   findStoredFile,
   ensureLocalFile,
   processDocumentBackground,
+  cancelDocumentProcessing,
   retryDocumentProcessing,
   deleteDocumentResources,
 };

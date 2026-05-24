@@ -67,6 +67,11 @@ function getCachedAuthUserById(id) {
     return readCache(userCacheById, String(id));
 }
 
+function invalidateAuthCache(userId, email) {
+    if (userId) userCacheById.delete(String(userId));
+    if (email) userCacheByEmail.delete(normalizeEmail(email));
+}
+
 function createAuthConnection() {
     return mongoose.createConnection(config.mongoUrl, {
         dbName: config.databaseName,
@@ -265,6 +270,7 @@ module.exports = {
     findStudentAuthUser,
     getCachedAuthUserByEmail,
     getCachedAuthUserById,
+    invalidateAuthCache,
     isAuthUserPro,
     isMongoUnavailableError,
     normalizeEmail,

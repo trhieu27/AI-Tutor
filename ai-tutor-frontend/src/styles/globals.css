@@ -2024,6 +2024,21 @@ select:focus-visible {
   transform: translateX(-50%) translateY(0);
 }
 
+.document-table-row td:last-child {
+  overflow: visible;
+}
+
+.action-tooltip.is-portal {
+  position: fixed;
+  bottom: auto;
+  left: 0;
+  top: 0;
+  z-index: 9999;
+  transform: translate(-50%, calc(-100% - 8px));
+  opacity: 1;
+  pointer-events: none;
+}
+
 /* Hide tooltips on mobile — buttons show text labels there */
 @media (max-width: 639px) {
   .action-tooltip {

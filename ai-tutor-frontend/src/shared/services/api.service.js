@@ -68,6 +68,13 @@ export async function authFetch(url, options = {}) {
       if (window.location.pathname !== '/login') window.location.href = '/login';
     }
   }
+  // Account blocked/locked → force logout
+  if (response.status === 403) {
+    authService.logout();
+    if (window.location.pathname !== '/login') {
+      window.location.href = '/login?reason=blocked';
+    }
+  }
   return response;
 }
 const sanitizeFileName = fileName => fileName.replace(/[''\"]/g, "'").replace(/[^\x00-\x7F]/g, '_').replace(/\s+/g, '_');

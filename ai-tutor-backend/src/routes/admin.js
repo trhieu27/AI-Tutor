@@ -932,6 +932,11 @@ router.patch('/users/:id', async (req, res) => {
     }
 
     await User.updateOne({ id: target.id }, { $set: updates });
+    // Invalidate auth cache ngay khi thay đổi status/role → middleware check mới nhất
+    if (changed.status || changed.role) {
+      const { invalidateAuthCache } = require('../db/authDb');
+      invalidateAuthCache(target.id, target.email);
+    }
     clearOverviewCache();
     sendAdminRealtimeEvent('user_updated', { user_id: target.id, role: updates.role, status: updates.status }).catch(console.error);
     const updated = await User.findOne({ id: target.id }).lean();
@@ -966,7 +971,7 @@ router.post('/users/:id/subscription', async (req, res) => {
       if (Number.isNaN(expiresAt.getTime())) return res.status(400).json({ detail: 'Ngày hết hạn không hợp lệ' });
     } else if (plan.billing_cycle === 'monthly') {
       expiresAt = new Date();
-      expiresAt.setMonth(expiresAt.getMonth() + 1);
+      expiresAt.setMinutes(expiresAt.getMinutes() + 1); // TEST: 1 phút
     } else if (plan.billing_cycle === 'annual') {
       expiresAt = new Date();
       expiresAt.setFullYear(expiresAt.getFullYear() + 1);

@@ -213,6 +213,7 @@ const paymentTransactionSchema = new mongoose.Schema({
 });
 paymentTransactionSchema.index({ status: 1, paid_at: -1 });
 
+
 // ── Admin Audit Log ──────────────────────────────────────────────────────────
 
 const adminAuditLogSchema = new mongoose.Schema({
@@ -226,7 +227,17 @@ const adminAuditLogSchema = new mongoose.Schema({
   created_at: { type: Date, default: Date.now, index: true },
 });
 
-// ── Models ────────────────────────────────────────────────────────────────────
+// ── Pending Payment ───────────────────────────────────────────────────────────
+const pendingPaymentSchema = new mongoose.Schema({
+  order_code: { type: Number, required: true, unique: true, index: true },
+  user_id: { type: String, required: true },
+  plan_id: { type: String, required: true },
+  created_at: { type: Date, default: Date.now },
+});
+pendingPaymentSchema.index({ created_at: 1 }, { expireAfterSeconds: 30 * 60 }); // TTL 30 phút
+const PendingPayment = mongoose.model('PendingPayment', pendingPaymentSchema, 'pending_payments');
+
+
 
 const User = mongoose.model('User', userSchema, 'users');
 const UserSession = mongoose.model('UserSession', userSessionSchema, 'user_sessions');
@@ -253,4 +264,5 @@ module.exports = {
   UserSubscription,
   PaymentTransaction,
   AdminAuditLog,
+  PendingPayment,
 };

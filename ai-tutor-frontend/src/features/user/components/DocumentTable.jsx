@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { useNavigate } from "react-router-dom";
 import { deleteDocument, retryDocument } from "@/shared/services/api.service";
 import { DOCUMENT_LIBRARY_TEXTS, DOCUMENT_TABLE_TEXTS } from "@/shared/constants/texts";
@@ -162,8 +163,27 @@ function ActionIcon({ label, icon, tone = "neutral", fullMobile = false, classNa
       ? "bg-[var(--surface)] text-[var(--muted)] hover:bg-[var(--danger-soft)] hover:text-[var(--brand-rose)]"
       : "bg-[var(--surface)] text-[var(--muted)] hover:bg-[var(--card-bg-hover)] hover:text-[var(--foreground)]";
 
+  const wrapRef = useRef(null);
+  const [tip, setTip] = useState(null);
+
+  const showTip = useCallback(() => {
+    const rect = wrapRef.current?.getBoundingClientRect();
+    if (!rect || !label) return;
+    setTip({
+      left: rect.left + rect.width / 2,
+      top: rect.top,
+    });
+  }, [label]);
+
+  const hideTip = useCallback(() => setTip(null), []);
+
   return (
-    <span className={cx("action-icon-wrap relative", fullMobile && "flex flex-1 min-w-0 sm:inline-flex sm:flex-none")}>
+    <span
+      ref={wrapRef}
+      className={cx("action-icon-wrap relative", fullMobile && "flex flex-1 min-w-0 sm:inline-flex sm:flex-none")}
+      onPointerEnter={showTip}
+      onPointerLeave={hideTip}
+    >
       <Button
         variant="icon"
         size="icon"
@@ -179,7 +199,15 @@ function ActionIcon({ label, icon, tone = "neutral", fullMobile = false, classNa
       >
         {label}
       </Button>
-      <span className="action-tooltip">{label}</span>
+      {tip ? createPortal(
+        <span
+          className="action-tooltip is-portal"
+          style={{ left: `${tip.left}px`, top: `${tip.top}px` }}
+        >
+          {label}
+        </span>,
+        document.body
+      ) : null}
     </span>
   );
 }
@@ -562,7 +590,7 @@ export default function DocumentTable({
 
   return (
     <>
-      <section className={cx("doc-library-section overflow-hidden rounded-[var(--radius-panel)] border border-[var(--border-color)] bg-[var(--card-bg)] shadow-[var(--premium-shadow-sm)] relative transition-opacity duration-200", fetching && "opacity-50 pointer-events-none")}>
+      <section className={cx("doc-library-section rounded-[var(--radius-panel)] border border-[var(--border-color)] bg-[var(--card-bg)] shadow-[var(--premium-shadow-sm)] relative transition-opacity duration-200", fetching && "opacity-50 pointer-events-none")}>
         {fetching && (
           <div className="absolute inset-x-0 top-0 z-20 h-0.5 overflow-hidden rounded-t-[var(--radius-panel)] bg-[var(--border-subtle)]">
             <div className="h-full w-1/3 bg-[var(--brand-primary)]" style={{ animation: 'slideBar 1s ease-in-out infinite' }} />

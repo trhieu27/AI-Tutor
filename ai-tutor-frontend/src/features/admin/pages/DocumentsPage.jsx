@@ -210,7 +210,7 @@ export default function AdminDocumentsPage() {
                 <AdminTable
                   columns={["Tài liệu", ADMIN_TEXTS.documents.owner, ADMIN_TEXTS.documents.status, ADMIN_TEXTS.documents.pages, ADMIN_TEXTS.documents.size, ADMIN_TEXTS.common.actions]}
                   minWidth="980px"
-                  widths={["30%", "24%", "14%", "10%", "12%", "10%"]}
+                  widths={["28%", "22%", "14%", "10%", "12%", "14%"]}
                 >
                   {data.items.map((doc) => (
                     <tr key={doc.id} className="border-b border-[var(--border-subtle)] last:border-0 hover:bg-[var(--surface)]">

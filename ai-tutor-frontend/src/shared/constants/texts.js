@@ -940,7 +940,7 @@ export const APP_SHELL_TEXTS = {
     proWorkspace: "Gói Pro",
     freeWorkspace: "Gói miễn phí",
     upgradeTitle: "Nâng cấp Pro",
-    upgradeSubtitle: "mở thêm lượt dùng AI"
+    upgradeSubtitle: "Mở thêm lượt dùng AI"
   },
   header: {
     menuAria: "Menu",

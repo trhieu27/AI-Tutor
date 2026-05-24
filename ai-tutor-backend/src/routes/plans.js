@@ -2,7 +2,7 @@ const express = require('express');
 const router = express.Router();
 const { v4: uuidv4 } = require('uuid');
 const { PayOS } = require('@payos/node');
-const { User, UserSubscription, SubscriptionPlan, PaymentTransaction } = require('../db/models');
+const { User, UserSubscription, SubscriptionPlan, PaymentTransaction, PendingPayment } = require('../db/models');
 const { authMiddleware } = require('../middleware/auth');
 const { sendAdminRealtimeEvent } = require('../utils/notifications');
 
@@ -30,18 +30,7 @@ async function getPlans() {
   return _planCache;
 }
 
-// ── Pending payments (orderId -> { userId, planId }) ────────────────────────
-const pendingPayments = new Map();
-
-// Dọn dẹp pending quá 30 phút
-setInterval(() => {
-  const now = Date.now();
-  for (const [code, data] of pendingPayments) {
-    if (now - data.createdAt > 30 * 60 * 1000) {
-      pendingPayments.delete(code);
-    }
-  }
-}, 60 * 1000);
+// Pending payments: lưu trong MongoDB (PendingPayment model) với TTL 30 phút
 
 // ── Helper: activate subscription ────────────────────────────────────────────
 async function activateSubscription(userId, plan, transactionId) {
@@ -132,6 +121,21 @@ router.get('/my', authMiddleware, async (req, res) => {
     const sub = await UserSubscription.findOne({ user_id: req.userId }).lean();
     if (!sub) return res.json({ plan: freePlan, subscription: null });
 
+    // Check if subscription has expired
+    const isExpired = sub.status === 'active' && sub.expires_at && new Date(sub.expires_at) < new Date();
+    if (isExpired) {
+      await UserSubscription.updateOne(
+        { user_id: req.userId },
+        { $set: { status: 'expired', updated_at: new Date() } }
+      );
+      return res.json({ plan: freePlan, subscription: { ...sub, _id: undefined, status: 'expired' } });
+    }
+
+    // Cancelled subscription → show free plan
+    if (sub.status !== 'active') {
+      return res.json({ plan: freePlan, subscription: null });
+    }
+
     const plan = plans.find(p => p.id === sub.plan_id) || freePlan;
     const { _id, ...cleanSub } = sub;
     res.json({ plan, subscription: cleanSub });
@@ -155,7 +159,8 @@ router.post('/subscribe', authMiddleware, async (req, res) => {
     }
 
     // Tạo orderCode duy nhất (payOS yêu cầu số nguyên dương)
-    const orderCode = Number(String(Date.now()).slice(-8));
+    // Tạo orderCode duy nhất: timestamp 8 chữ số cuối + 4 random digits
+    const orderCode = Number(String(Date.now()).slice(-8) + String(Math.floor(1000 + Math.random() * 9000)));
 
     // Build return/cancel URLs từ request origin
     const origin = req.headers.origin || req.headers.referer?.replace(/\/[^/]*$/, '') || 'http://localhost:3000';
@@ -176,13 +181,12 @@ router.post('/subscribe', authMiddleware, async (req, res) => {
     // Tạo QR image URL từ VietQR API
     const qrImageUrl = `https://img.vietqr.io/image/${paymentLink.bin}-${paymentLink.accountNumber}-compact2.png?amount=${paymentLink.amount}&addInfo=${encodeURIComponent(paymentLink.description)}&accountName=${encodeURIComponent(paymentLink.accountName)}`;
 
-    // Lưu pending payment
-    pendingPayments.set(orderCode, {
-      userId: req.userId,
-      planId: plan.id,
-      amount,
-      createdAt: Date.now(),
-    });
+    // Lưu pending payment vào MongoDB (tự xóa sau 30 phút nhờ TTL index)
+    await PendingPayment.findOneAndUpdate(
+      { order_code: orderCode },
+      { order_code: orderCode, user_id: req.userId, plan_id: plan.id },
+      { upsert: true }
+    );
 
     res.json({
       checkout_url: paymentLink.checkoutUrl,
@@ -205,14 +209,14 @@ router.get('/check-payment/:code', authMiddleware, async (req, res) => {
     const paymentInfo = await payos.paymentRequests.get(String(code));
     if (paymentInfo.status === 'PAID') {
       // Nếu chưa xử lý, kích hoạt gói
-      const pending = pendingPayments.get(code);
+      // Atomic: findOneAndDelete tránh race condition với webhook
+      const pending = await PendingPayment.findOneAndDelete({ order_code: code });
       if (pending) {
         const plans = await getPlans();
-        const plan = plans.find(p => p.id === pending.planId);
+        const plan = plans.find(p => p.id === pending.plan_id);
         if (plan) {
-          await activateSubscription(pending.userId, plan, `PAYOS_${code}`);
+          await activateSubscription(pending.user_id, plan, `PAYOS_${code}`);
         }
-        pendingPayments.delete(code);
       }
       return res.json({ paid: true, message: 'Thanh toán thành công! Gói đã được kích hoạt.' });
     }
@@ -233,15 +237,15 @@ router.post('/webhook/payos', async (req, res) => {
     if (webhookData.code === '00') {
       // Thanh toán thành công
       const orderCode = webhookData.orderCode;
-      const pending = pendingPayments.get(orderCode);
+      // Atomic: findOneAndDelete tránh race condition với check-payment
+      const pending = await PendingPayment.findOneAndDelete({ order_code: orderCode });
 
       if (pending) {
         const plans = await getPlans();
-        const plan = plans.find(p => p.id === pending.planId);
+        const plan = plans.find(p => p.id === pending.plan_id);
         if (plan) {
-          await activateSubscription(pending.userId, plan, `PAYOS_${orderCode}`);
+          await activateSubscription(pending.user_id, plan, `PAYOS_${orderCode}`);
         }
-        pendingPayments.delete(orderCode);
       }
     }
 

@@ -80,10 +80,15 @@ function PaymentModal({ plan, onClose, onSuccess }) {
     return () => clearInterval(interval);
   }, [paymentInfo?.order_code, done]);
 
+  const handleClose = () => {
+    // Nếu đang chờ thanh toán, chuyển polling về parent (có timeout)
+    onClose(paymentInfo && !done ? paymentInfo.order_code : null);
+  };
+
   return (
     <div
       className="fixed inset-0 z-[70] flex items-center justify-center bg-[hsl(222_29%_8%/0.54)] p-4 backdrop-blur-sm"
-      onClick={(event) => event.target === event.currentTarget && onClose()}
+      onClick={(event) => event.target === event.currentTarget && handleClose()}
     >
       <div className="premium-card w-full max-w-xl overflow-hidden p-0 animate-dialog-enter">
         {done ? (
@@ -93,7 +98,7 @@ function PaymentModal({ plan, onClose, onSuccess }) {
             <p className="mx-auto mt-2 max-w-sm text-[13px] font-medium leading-6 text-[var(--muted)]">
               {P.successMsg(plan.display_name)}
             </p>
-            <Button onClick={() => { onSuccess(); onClose(); }} className="mt-6 w-full sm:w-auto">
+            <Button onClick={() => { onSuccess(); onClose(null); }} className="mt-6 w-full sm:w-auto">
               {P.successBtn}
             </Button>
           </div>
@@ -104,7 +109,7 @@ function PaymentModal({ plan, onClose, onSuccess }) {
                 <h2 className="text-[17px] font-bold text-[var(--foreground)]">{P.title}</h2>
                 <p className="mt-1 text-[13px] font-medium text-[var(--muted)]">{P.subtitle(plan.display_name)}</p>
               </div>
-              <IconButton icon="close" label={P.close} onClick={onClose} />
+              <IconButton icon="close" label={P.close} onClick={handleClose} />
             </div>
 
             <div className="p-5">
@@ -137,7 +142,7 @@ function PaymentModal({ plan, onClose, onSuccess }) {
                   <div className="py-6">
                     <span className="material-symbols-outlined text-[40px] text-[var(--brand-rose)]" aria-hidden="true">error</span>
                     <p className="mt-2 text-[13px] font-semibold text-[var(--brand-rose)]">{err}</p>
-                    <Button variant="secondary" onClick={onClose} className="mt-4">Đóng</Button>
+                    <Button variant="secondary" onClick={() => onClose(null)} className="mt-4">Đóng</Button>
                   </div>
                 ) : paymentInfo ? (
                   <>
@@ -182,7 +187,7 @@ function PaymentModal({ plan, onClose, onSuccess }) {
               {/* Cancel */}
               {!loading && !err && (
                 <div className="mt-5 flex justify-center">
-                  <Button variant="secondary" onClick={onClose} className="w-full sm:w-auto">{P.cancelBtn}</Button>
+                  <Button variant="secondary" onClick={handleClose} className="w-full sm:w-auto">{P.cancelBtn}</Button>
                 </div>
               )}
             </div>
@@ -369,13 +374,14 @@ function BillingToggle({ billingAnnual, onChange, annualDiscount = 0 }) {
 }
 
 export default function PricingPage() {
-  const { updateUser } = useAuth();
+  const { refreshUser } = useAuth();
   const navigate = useNavigate();
   const [plans, setPlans] = useState([]);
   const [myPlan, setMyPlan] = useState(null);
   const [loading, setLoading] = useState(true);
   const [billingAnnual, setBillingAnnual] = useState(false);
   const [selectedPlan, setSelectedPlan] = useState(null);
+  const [bgOrderCode, setBgOrderCode] = useState(null);
 
 
   const load = useCallback(async () => {
@@ -398,6 +404,28 @@ export default function PricingPage() {
     load();
   }, [load]);
 
+  // Background polling khi user đóng dialog mà chưa thanh toán xong (tối đa 2 phút)
+  useEffect(() => {
+    if (!bgOrderCode) return;
+    const timeout = setTimeout(() => setBgOrderCode(null), 2 * 60 * 1000);
+    const interval = setInterval(async () => {
+      try {
+        const res = await authFetch(`${API}/plans/check-payment/${bgOrderCode}`);
+        if (res.ok) {
+          const data = await safeJson(res);
+          if (data?.paid) {
+            setBgOrderCode(null);
+            clearInterval(interval);
+            clearTimeout(timeout);
+            refreshUser();
+            load();
+          }
+        }
+      } catch { /* ignore */ }
+    }, 5000);
+    return () => { clearInterval(interval); clearTimeout(timeout); };
+  }, [bgOrderCode, refreshUser, load]);
+
 
 
   const visiblePlans = useMemo(
@@ -411,8 +439,16 @@ export default function PricingPage() {
   );
 
   const handleSuccess = () => {
-    updateUser({});
+    setBgOrderCode(null);
+    refreshUser();
     load();
+  };
+
+  const handleModalClose = (pendingOrderCode) => {
+    setSelectedPlan(null);
+    if (pendingOrderCode) {
+      setBgOrderCode(pendingOrderCode);
+    }
   };
 
   return (
@@ -464,7 +500,14 @@ export default function PricingPage() {
       )}
 
       {selectedPlan && (
-        <PaymentModal plan={selectedPlan} onClose={() => setSelectedPlan(null)} onSuccess={handleSuccess} />
+        <PaymentModal plan={selectedPlan} onClose={handleModalClose} onSuccess={handleSuccess} />
+      )}
+
+      {bgOrderCode && (
+        <div className="fixed bottom-6 right-6 z-50 flex items-center gap-2 rounded-[var(--radius-panel)] border border-[var(--border-color)] bg-[var(--card-bg)] px-4 py-3 shadow-[var(--premium-shadow-md)]">
+          <span className="h-2 w-2 animate-pulse rounded-full bg-[var(--brand-primary)]" />
+          <span className="text-[12px] font-semibold text-[var(--muted)]">Đang chờ xác nhận thanh toán...</span>
+        </div>
       )}
     </PageFrame>
   );

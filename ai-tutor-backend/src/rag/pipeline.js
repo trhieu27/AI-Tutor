@@ -37,10 +37,14 @@ function throwIfAborted(signal) {
  *
  * @returns { collection_name: string, page_count: number }
  */
-async function ingest(filePath, documentId) {
+async function ingest(filePath, documentId, options = {}) {
+  const { signal } = options;
   const ext = path.extname(filePath).toLowerCase();
   const buffer = require('fs').readFileSync(filePath);
+  throwIfAborted(signal);
+
   const { text, pageCount, pages } = await extractText(filePath);
+  throwIfAborted(signal);
 
   if (!text || text.trim().length < 10) {
     throw new Error('Không thể đọc nội dung tài liệu. File có thể bị hỏng hoặc chỉ chứa ảnh.');
@@ -60,10 +64,12 @@ async function ingest(filePath, documentId) {
 
   // ── Vision: mô tả hình ảnh/biểu đồ trong tài liệu ──
   try {
+    throwIfAborted(signal);
     if (ext === '.pdf') {
       const imagePages = await detectImagePages(buffer);
       if (imagePages.length > 0) {
         console.log(`[Ingest] Phát hiện ${imagePages.length} trang có hình: ${imagePages.join(', ')}`);
+        throwIfAborted(signal);
         const descriptions = await describeDocumentImages(buffer, pageCount, imagePages);
         for (const desc of descriptions) {
           chunkRecords.push({
@@ -81,6 +87,7 @@ async function ingest(filePath, documentId) {
       const images = await extractDocxImages(buffer);
       if (images.length > 0) {
         console.log(`[Ingest] Phát hiện ${images.length} hình trong DOCX`);
+        throwIfAborted(signal);
         const descriptions = await describeDocxImages(images);
         for (const desc of descriptions) {
           chunkRecords.push({
@@ -96,6 +103,7 @@ async function ingest(filePath, documentId) {
       }
     }
   } catch (visionErr) {
+    if (visionErr.name === 'AbortError') throw visionErr;
     console.warn('[Ingest] Vision processing failed (non-blocking):', visionErr.message);
     // Vision lỗi không chặn ingest — text vẫn được lưu bình thường
   }
@@ -105,7 +113,10 @@ async function ingest(filePath, documentId) {
     throw new Error('Tài liệu không có nội dung văn bản.');
   }
 
+  throwIfAborted(signal);
   const embeddings = await embedTexts(chunks);
+  throwIfAborted(signal);
+
   const ids = chunks.map((_, i) => `${documentId}_chunk_${i}`);
   const collectionName = `doc_${documentId}`.replace(/-/g, '_');
 

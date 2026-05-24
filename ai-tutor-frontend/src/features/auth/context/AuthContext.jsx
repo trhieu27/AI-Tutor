@@ -142,6 +142,15 @@ export function AuthProvider({
       return updated;
     });
   }, []);
+  const refreshUser = useCallback(async () => {
+    try {
+      const freshUser = await authService.getCurrentUser();
+      if (freshUser) {
+        setUser(freshUser);
+        setAccessToken(localStorage.getItem('access_token'));
+      }
+    } catch {}
+  }, []);
   const googleLogin = async token => {
     setIsLoading(true);
     setError(null);
@@ -193,8 +202,9 @@ export function AuthProvider({
     register,
     logout,
     updateUser,
+    refreshUser,
     isAuthenticated: !!user
-  }), [user, accessToken, isLoading, isInitialLoading, error, logout, updateUser]);
+  }), [user, accessToken, isLoading, isInitialLoading, error, logout, updateUser, refreshUser]);
   return /*#__PURE__*/_jsx(AuthContext.Provider, {
     value: contextValue,
     children: children
