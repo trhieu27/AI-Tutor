@@ -29,6 +29,14 @@ module.exports = {
   uploadDir: process.env.UPLOAD_DIR || './storage/uploads',
   maxFileSizeMb: parseInt(process.env.MAX_FILE_SIZE_MB || '50'),
 
+  // AWS S3
+  s3: {
+    accessKeyId: process.env.AWS_ACCESS_KEY_ID || '',
+    secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY || '',
+    bucket: process.env.AWS_S3_BUCKET || '',
+    region: process.env.AWS_S3_REGION || 'ap-southeast-1',
+  },
+
   corsOrigins: (process.env.CORS_ORIGINS || 'http://localhost:3000,http://localhost:3001').split(',').map(s => s.trim()),
 
   freeLimits: {

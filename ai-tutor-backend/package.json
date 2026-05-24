@@ -11,6 +11,7 @@
     "test:load:user": "k6 run scripts/load/user-docs-scenario.js"
   },
   "dependencies": {
+    "@aws-sdk/client-s3": "^3.1053.0",
     "@google/generative-ai": "^0.24.1",
     "@payos/node": "^2.0.5",
     "axios": "^1.7.9",

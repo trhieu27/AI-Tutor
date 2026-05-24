@@ -12,6 +12,8 @@ const { buildPagination, parsePagination, sendPaginated } = require('../utils/pa
 const config = require('../config');
 const rag = require('../rag/pipeline');
 const { extractText } = require('../rag/extractor');
+const s3 = require('../utils/s3');
+const { ensureLocalFile } = require('../utils/documentOps');
 
 const ALLOWED_EXTENSIONS = new Set(['.pdf', '.doc', '.docx']);
 
@@ -165,6 +167,11 @@ router.post('/upload', authMiddleware, requireDocQuota(), handleUpload, async(re
 
         sendAdminRealtimeEvent('document_status_changed', { id: documentId, status: 'UPLOADING', file_name: document.file_name }).catch(console.error);
 
+        // Upload to S3 (non-blocking, don't wait)
+        s3.uploadFile(req.file.path, req.file.filename).catch(err =>
+            console.error('S3 upload error (file kept locally):', err.message)
+        );
+
         // Start background processing (non-blocking)
         processDocumentBackground(documentId, req.file.path, req.userId).catch(console.error);
 
@@ -264,17 +271,29 @@ router.get('/:documentId/file', authMiddleware, async(req, res) => {
         const doc = await Document.findOne({ id: req.params.documentId, owner_id: req.userId }).lean();
         if (!doc) return res.status(404).json({ detail: 'Tài liệu không tồn tại.' });
 
+        // Try local file first
         const storedFile = findStoredFile(req.params.documentId);
-        if (!storedFile) return res.status(404).json({ detail: 'Không tìm thấy file tài liệu.' });
+        if (storedFile) {
+            const contentTypes = {
+                '.pdf': 'application/pdf',
+                '.docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+                '.doc': 'application/msword',
+            };
+            res.setHeader('Content-Type', contentTypes[storedFile.ext] || 'application/octet-stream');
+            res.setHeader('Content-Disposition', `inline; filename="${encodeURIComponent(doc.file_name)}"`);
+            return res.sendFile(path.resolve(storedFile.filePath));
+        }
 
-        const contentTypes = {
-            '.pdf': 'application/pdf',
-            '.docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-            '.doc': 'application/msword',
-        };
-        res.setHeader('Content-Type', contentTypes[storedFile.ext] || 'application/octet-stream');
-        res.setHeader('Content-Disposition', `inline; filename="${encodeURIComponent(doc.file_name)}"`);
-        res.sendFile(path.resolve(storedFile.filePath));
+        // Try S3
+        if (s3.s3Enabled) {
+            const s3File = await s3.findFile(req.params.documentId);
+            if (s3File) {
+                const streamed = await s3.streamToResponse(s3File.filename, res, doc.file_name);
+                if (streamed) return;
+            }
+        }
+
+        return res.status(404).json({ detail: 'Không tìm thấy file tài liệu.' });
     } catch (err) {
         console.error('Document file error:', err);
         res.status(500).json({ detail: 'Lỗi server' });
@@ -290,7 +309,8 @@ router.post('/:documentId/locate', authMiddleware, async(req, res) => {
         const snippet = String((req.body && req.body.text) || '').trim();
         if (snippet.length < 12) return res.status(400).json({ detail: 'Đoạn trích dẫn quá ngắn.' });
 
-        const storedFile = findStoredFile(req.params.documentId);
+        // Try local first, then S3
+        const storedFile = await ensureLocalFile(req.params.documentId);
         if (!storedFile) return res.status(404).json({ detail: 'Không tìm thấy file tài liệu.' });
 
         const { pages = [] } = await extractText(storedFile.filePath);
@@ -346,6 +366,12 @@ router.delete('/:documentId', authMiddleware, async(req, res) => {
         for (const ext of['.pdf', '.doc', '.docx']) {
             const fp = path.join(config.uploadDir, `${req.params.documentId}${ext}`);
             if (fs.existsSync(fp)) { fs.unlinkSync(fp); break; }
+        }
+
+        // Delete from S3
+        if (s3.s3Enabled) {
+            const s3File = await s3.findFile(req.params.documentId);
+            if (s3File) await s3.deleteFile(s3File.filename);
         }
 
         const { ChatSession } = require('../db/models');

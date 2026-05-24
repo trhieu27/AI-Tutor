@@ -4,12 +4,41 @@ const { Document, ChatSession } = require('../db/models');
 const { sendNotification, sendAdminRealtimeEvent } = require('./notifications');
 const config = require('../config');
 const rag = require('../rag/pipeline');
+const s3 = require('./s3');
 
+/**
+ * Find a stored file — checks local filesystem first, then S3.
+ * Returns { filePath, ext } if found locally, or null.
+ */
 function findStoredFile(documentId) {
   for (const ext of ['.pdf', '.docx', '.doc']) {
     const filePath = path.join(config.uploadDir, `${documentId}${ext}`);
     if (fs.existsSync(filePath)) return { filePath, ext };
   }
+  return null;
+}
+
+/**
+ * Ensure a file is available locally for processing.
+ * If not on disk, downloads from S3.
+ * @returns {{ filePath: string, ext: string } | null}
+ */
+async function ensureLocalFile(documentId) {
+  // 1. Check local first
+  const local = findStoredFile(documentId);
+  if (local) return local;
+
+  // 2. Try downloading from S3
+  if (s3.s3Enabled) {
+    const s3File = await s3.findFile(documentId);
+    if (s3File) {
+      const localPath = await s3.downloadToLocal(s3File.filename, config.uploadDir);
+      if (localPath) {
+        return { filePath: localPath, ext: s3File.ext };
+      }
+    }
+  }
+
   return null;
 }
 
@@ -59,9 +88,10 @@ async function retryDocumentProcessing(documentId) {
     throw err;
   }
 
-  const storedFile = findStoredFile(documentId);
+  // Try local first, then S3
+  const storedFile = await ensureLocalFile(documentId);
   if (!storedFile) {
-    const err = new Error('Không tìm thấy file tài liệu trên server');
+    const err = new Error('Không tìm thấy file tài liệu');
     err.statusCode = 400;
     throw err;
   }
@@ -88,11 +118,20 @@ async function deleteDocumentResources(documentId) {
     }
   }
 
+  // Delete from local disk
   for (const ext of ['.pdf', '.doc', '.docx']) {
     const filePath = path.join(config.uploadDir, `${documentId}${ext}`);
     if (fs.existsSync(filePath)) {
       fs.unlinkSync(filePath);
       break;
+    }
+  }
+
+  // Delete from S3
+  if (s3.s3Enabled) {
+    const s3File = await s3.findFile(documentId);
+    if (s3File) {
+      await s3.deleteFile(s3File.filename);
     }
   }
 
@@ -104,6 +143,7 @@ async function deleteDocumentResources(documentId) {
 
 module.exports = {
   findStoredFile,
+  ensureLocalFile,
   processDocumentBackground,
   retryDocumentProcessing,
   deleteDocumentResources,
