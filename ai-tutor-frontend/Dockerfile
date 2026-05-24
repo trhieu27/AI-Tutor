@@ -32,9 +32,30 @@ RUN printf 'server {\n\
     listen 3000;\n\
     root /usr/share/nginx/html;\n\
     index index.html;\n\
+    \n\
+    # Fix .mjs MIME type for PDF.js worker\n\
+    types {\n\
+        application/javascript mjs js;\n\
+        text/css css;\n\
+        text/html html htm;\n\
+        application/json json;\n\
+        image/svg+xml svg;\n\
+        image/png png;\n\
+        image/jpeg jpg jpeg;\n\
+        font/woff2 woff2;\n\
+        font/woff woff;\n\
+        application/octet-stream bin;\n\
+    }\n\
+    \n\
     location / {\n\
         try_files $uri $uri/ /index.html;\n\
     }\n\
+    \n\
+    location ~* \\.(js|mjs|css|png|jpg|jpeg|gif|ico|svg|woff|woff2)$ {\n\
+        expires 30d;\n\
+        add_header Cache-Control "public, immutable";\n\
+    }\n\
+    \n\
     gzip on;\n\
     gzip_types text/plain text/css application/json application/javascript text/xml application/xml application/xml+rss text/javascript;\n\
 }\n' > /etc/nginx/conf.d/default.conf
