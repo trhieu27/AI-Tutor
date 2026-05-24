@@ -102,14 +102,14 @@ const offlineTimers = new Map();
 const OFFLINE_GRACE_MS = 30_000; // 30s grace before marking offline
 
 wss.on('connection', (ws, userId) => {
-  // Check if this is the first connection for this user (was offline → now online)
-  const wasPreviouslyOffline = !notificationManager._connections.has(userId) ||
-    notificationManager._connections.get(userId).size === 0;
+  const hadConnections = notificationManager._connections.has(userId) &&
+    notificationManager._connections.get(userId).size > 0;
 
   notificationManager.connect(userId, ws);
 
-  // Cancel any pending offline timer — user reconnected
-  if (offlineTimers.has(userId)) {
+  // Cancel any pending offline timer — user reconnected within grace period
+  const hadPendingOffline = offlineTimers.has(userId);
+  if (hadPendingOffline) {
     clearTimeout(offlineTimers.get(userId));
     offlineTimers.delete(userId);
   }
@@ -117,8 +117,10 @@ wss.on('connection', (ws, userId) => {
   const cachedUser = getCachedAuthUserById(userId);
   const isAdmin = cachedUser?.role === 'ADMIN';
 
-  // Only fire online event on first connection (0→1), not on reconnect/new tab
-  if (!isAdmin && wasPreviouslyOffline) {
+  // Send online event ONLY when user truly transitions from offline → online
+  // Skip if: already had connections (new tab), or had pending grace timer (reconnect)
+  const isNewOnline = !hadConnections && !hadPendingOffline;
+  if (!isAdmin && isNewOnline) {
     sendAdminRealtimeEvent('presence_changed', {
       user_id: userId,
       is_online: true,
