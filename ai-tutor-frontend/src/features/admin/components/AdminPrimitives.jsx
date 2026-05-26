@@ -705,22 +705,28 @@ function AdminMetricLoadingGrid({ count = 6 }) {
   );
 }
 
-function AdminChartLoading({ bars = 14 }) {
+function AdminChartLoading() {
+  const ticks = ["T1/26", "T2/26", "T3/26", "T4/26", "T5/26"];
   return (
     <AdminSection title={<Skeleton className="h-5 w-44" />}>
-      <div
-        className="grid h-72 min-w-0 items-end gap-2 px-4 py-5 sm:px-5"
-        style={{ gridTemplateColumns: `repeat(${bars}, minmax(0, 1fr))` }}
-      >
-        {Array.from({ length: bars }).map((_, index) => (
-          <div key={index} className="flex h-full min-w-0 flex-col justify-end gap-2">
-            <Skeleton
-              className="rounded-t-[var(--radius-chip)]"
-              style={{ height: `${18 + ((index * 17) % 74)}%` }}
-            />
-            <Skeleton className="h-3 w-full" />
-          </div>
-        ))}
+      <div className="admin-chart-loading px-4 py-5 sm:px-5">
+        <div className="admin-chart-loading-plot">
+          <div className="admin-chart-loading-grid" />
+          <svg className="admin-chart-loading-svg" viewBox="0 0 1000 260" preserveAspectRatio="none" aria-hidden="true">
+            <defs>
+              <linearGradient id="admin-chart-loading-area" x1="0" x2="0" y1="0" y2="1">
+                <stop offset="0%" stopColor="var(--admin-skeleton-shine)" stopOpacity="0.42" />
+                <stop offset="58%" stopColor="var(--admin-skeleton-shine)" stopOpacity="0.16" />
+                <stop offset="100%" stopColor="var(--admin-skeleton-shine)" stopOpacity="0" />
+              </linearGradient>
+            </defs>
+            <path className="admin-chart-loading-area" d="M0 238 C120 238 150 216 220 180 C325 126 365 78 470 116 C590 160 615 80 730 58 C850 35 900 86 1000 42 L1000 260 L0 260 Z" />
+            <path className="admin-chart-loading-line" d="M0 238 C120 238 150 216 220 180 C325 126 365 78 470 116 C590 160 615 80 730 58 C850 35 900 86 1000 42" />
+          </svg>
+        </div>
+        <div className="admin-chart-loading-labels">
+          {ticks.map((tick) => <span key={tick}>{tick}</span>)}
+        </div>
       </div>
     </AdminSection>
   );

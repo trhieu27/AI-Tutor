@@ -238,6 +238,32 @@ async function countActiveProSubscriptions(extra = {}) {
   });
 }
 
+async function countConvertedLearners(extra = {}) {
+  const userIds = await PaymentTransaction.distinct('user_id', {
+    status: 'paid',
+    plan_id: { $ne: 'free' },
+    amount_vnd: { $gt: 0 },
+    ...extra,
+  });
+  return userIds.filter(Boolean).length;
+}
+
+function percentage(numerator, denominator) {
+  return denominator ? Math.round((numerator / denominator) * 1000) / 10 : 0;
+}
+
+function learnerUserFilter(extra = {}) {
+  return {
+    role: 'STUDENT',
+    status: { $ne: 'deleted' },
+    ...extra,
+  };
+}
+
+async function getLearnerIds(extra = {}) {
+  return User.distinct('id', learnerUserFilter(extra));
+}
+
 async function getPlanMap() {
   const plans = await SubscriptionPlan.find({}).lean();
   return new Map(plans.map((plan) => [plan.id, plan]));
@@ -610,6 +636,7 @@ function buildFallbackOverview() {
     monthlyRevenue: 0,
     yearlyRevenue: 0,
     revenueToday: 0,
+    convertedUsers: 0,
     freeToProConversionRate: 0,
     topUsedFeature: null,
     featureUsage: [],
@@ -636,6 +663,8 @@ function isMongoUnavailableError(err) {
 async function buildOverviewResponse(req, now, today) {
   // Get admin user IDs to exclude from counts
   const adminIds = await User.distinct('id', { role: 'ADMIN' });
+  const learnerIds = await getLearnerIds();
+  const learnerSubscriptionFilter = { user_id: { $in: learnerIds } };
 
   // 1. Real-time active users from WS connections (exclude admins)
   const onlineIds = getOnlineUserIds().filter((id) => !adminIds.includes(id));
@@ -661,6 +690,7 @@ async function buildOverviewResponse(req, now, today) {
       chatMessagesToday,
       aiGenerationsToday,
       activeProCount,
+      convertedUsers,
       revenueTotals,
       featureUsage,
       heavyRows,
@@ -668,10 +698,10 @@ async function buildOverviewResponse(req, now, today) {
       recentSubscriptions,
       revenueSeries,
     ] = await Promise.all([
-      User.countDocuments({ id: { $nin: adminIds }, status: { $ne: 'deleted' } }),
-      User.countDocuments({ id: { $nin: adminIds }, created_at: { $gte: today }, status: { $ne: 'deleted' } }),
-      User.countDocuments({ id: { $nin: adminIds }, created_at: { $gte: monthStart }, status: { $ne: 'deleted' } }),
-      User.countDocuments({ status: 'blocked', role: { $ne: 'ADMIN' } }),
+      User.countDocuments(learnerUserFilter()),
+      User.countDocuments(learnerUserFilter({ created_at: { $gte: today } })),
+      User.countDocuments(learnerUserFilter({ created_at: { $gte: monthStart } })),
+      User.countDocuments(learnerUserFilter({ status: 'blocked' })),
       Document.countDocuments({}),
       Document.countDocuments({ status: 'READY' }),
       Document.countDocuments({ status: { $in: ['PROCESSING', 'UPLOADING'] } }),
@@ -680,7 +710,8 @@ async function buildOverviewResponse(req, now, today) {
       ChatSession.countDocuments({}),
       countChatMessagesSince(today, 'user'),
       UsageLog.countDocuments({ feature: 'ai_features', date: todayUTC() }),
-      countActiveProSubscriptions({ user_id: { $nin: adminIds } }),
+      countActiveProSubscriptions(learnerSubscriptionFilter),
+      countConvertedLearners(learnerSubscriptionFilter),
       getRevenueTotals(),
       buildFeatureUsage(),
       chatMessagesByUserSince(today, 8),
@@ -732,7 +763,8 @@ async function buildOverviewResponse(req, now, today) {
       monthlyRevenue: revenueTotals.monthlyRevenue,
       yearlyRevenue: revenueTotals.yearlyRevenue,
       revenueToday: revenueTotals.revenueToday,
-      freeToProConversionRate: totalUsers ? Math.round((activeProCount / totalUsers) * 1000) / 10 : 0,
+      convertedUsers,
+      freeToProConversionRate: percentage(convertedUsers, totalUsers),
       topUsedFeature,
       featureUsage,
       revenueSeries,
@@ -1014,11 +1046,13 @@ router.post('/users/:id/subscription', async (req, res) => {
 // GET /api/v1/admin/revenue
 router.get('/revenue', async (req, res) => {
   try {
+    res.set('Cache-Control', 'no-store');
     const now = new Date();
     const from = parseDate(req.query.from, startOfYear(now));
     const to = parseDate(req.query.to, now);
     to.setHours(23, 59, 59, 999);
     const groupBy = ['day', 'month', 'year'].includes(req.query.groupBy) ? req.query.groupBy : 'month';
+    const learnerIds = await getLearnerIds();
 
     const filter = {
       status: 'paid',
@@ -1044,10 +1078,13 @@ router.get('/revenue', async (req, res) => {
       .filter((row) => planMap.get(row._id)?.billing_cycle === 'annual')
       .reduce((sum, row) => sum + formatCurrencyAmount(row.revenue), 0);
 
-    const [totalUsers, activeProCount, upgradedThisMonth] = await Promise.all([
-      User.countDocuments({ status: { $ne: 'deleted' } }),
-      countActiveProSubscriptions(),
-      UserSubscription.countDocuments({ plan_id: { $ne: 'free' }, started_at: { $gte: startOfMonth(now) } }),
+    const conversionUserFilter = { user_id: { $in: learnerIds } };
+    const [totalUsers, adminUsers, activeProCount, convertedUsers, upgradedThisMonth] = await Promise.all([
+      User.countDocuments(learnerUserFilter()),
+      User.countDocuments({ role: 'ADMIN', status: { $ne: 'deleted' } }),
+      countActiveProSubscriptions(conversionUserFilter),
+      countConvertedLearners(conversionUserFilter),
+      countConvertedLearners({ ...conversionUserFilter, paid_at: { $gte: startOfMonth(now) } }),
     ]);
 
     const revenueTotals = await getRevenueTotals();
@@ -1072,10 +1109,13 @@ router.get('/revenue', async (req, res) => {
       })),
       conversionStats: {
         totalUsers,
+        learnerUsers: totalUsers,
+        adminUsers,
         proUsers: activeProCount,
         freeUsers: Math.max(totalUsers - activeProCount, 0),
+        convertedUsers,
         upgradedThisMonth,
-        freeToProConversionRate: totalUsers ? Math.round((activeProCount / totalUsers) * 1000) / 10 : 0,
+        freeToProConversionRate: percentage(convertedUsers, totalUsers),
       },
     });
   } catch (err) {

@@ -116,18 +116,22 @@ export default function AdminRevenuePage() {
   const [data, setData] = useState(() => readCachedAdminRevenue(INITIAL_FILTERS));
   const [loading, setLoading] = useState(() => !readCachedAdminRevenue(INITIAL_FILTERS));
   const [error, setError] = useState("");
+  const hasLoaded = useRef(!!data);
 
   const load = useCallback(async () => {
     const cached = readCachedAdminRevenue(filters);
     if (cached) {
       setData(cached);
       setLoading(false);
-    } else if (!data) {
+      hasLoaded.current = true;
+    } else if (!hasLoaded.current) {
       setLoading(true);
     }
     setError("");
     try {
-      setData(await fetchAdminRevenue(filters));
+      const result = await fetchAdminRevenue(filters);
+      setData(result);
+      hasLoaded.current = true;
     } catch (err) {
       if (!cached) setError(err.message);
       else console.error(err.message);
@@ -190,6 +194,17 @@ export default function AdminRevenuePage() {
     label: item.plan?.display_name || item.plan_id,
     count: item.revenue,
   })), [data]);
+  const conversionStats = data?.conversionStats || {};
+  const hasLearnerScopedStats = Object.prototype.hasOwnProperty.call(conversionStats, "learnerUsers");
+  const proUsers = hasLearnerScopedStats ? Number(conversionStats.proUsers || 0) : 0;
+  const totalUsers = hasLearnerScopedStats ? Number(conversionStats.learnerUsers || 0) : 0;
+  const freeUsers = hasLearnerScopedStats
+    ? Math.max(Number(conversionStats.freeUsers ?? totalUsers - proUsers), 0)
+    : 0;
+  const proUserRate = totalUsers ? Math.round((proUsers / totalUsers) * 1000) / 10 : 0;
+  const conversionSubtitle = hasLearnerScopedStats
+    ? `${formatNumber(proUsers)} / ${formatNumber(totalUsers)} người học đang dùng Pro`
+    : "Đang đồng bộ số học viên";
 
   return (
     <div>
@@ -235,10 +250,13 @@ export default function AdminRevenuePage() {
               <AdminSection title={ADMIN_TEXTS.revenue.chart}>
                 <RevenueAreaChart series={data.revenueSeries || []} height={380} />
               </AdminSection>
-              <AdminSection title={ADMIN_TEXTS.revenue.breakdown} subtitle={`${formatNumber(data.conversionStats?.proUsers)} Pro hiện tại`}>
+              <AdminSection
+                title={ADMIN_TEXTS.revenue.breakdown}
+                subtitle={conversionSubtitle}
+              >
                 <BarList items={breakdownItems} valueKey="count" formatValue={formatVnd} />
-                <div className="border-t border-[var(--border-subtle)] flex items-center justify-center py-2">
-                  <ConversionGauge value={data.conversionStats?.freeToProConversionRate || 0} label={ADMIN_TEXTS.revenue.conversion} />
+                <div className="border-t border-[var(--border-subtle)]">
+                  <ConversionGauge value={proUserRate} label={ADMIN_TEXTS.revenue.conversion} proUsers={proUsers} freeUsers={freeUsers} />
                 </div>
               </AdminSection>
             </div>

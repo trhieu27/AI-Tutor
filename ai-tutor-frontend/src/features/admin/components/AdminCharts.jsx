@@ -1,6 +1,5 @@
-import { useMemo } from "react";
+import { useId, useMemo } from "react";
 import { LineChart } from "@mui/x-charts/LineChart";
-import { Gauge, gaugeClasses } from "@mui/x-charts/Gauge";
 import { AdminEmpty } from "./AdminPrimitives";
 
 /* ── Helpers ────────────────────────────────────────────────────────────── */
@@ -15,18 +14,35 @@ function fmtVndFull(v) {
   return new Intl.NumberFormat("vi-VN").format(v) + " ₫";
 }
 
+function fmtNumber(v) {
+  return new Intl.NumberFormat("vi-VN").format(Number(v || 0));
+}
+
+function fmtPercent(v) {
+  return `${new Intl.NumberFormat("vi-VN", { maximumFractionDigits: 1 }).format(Number(v || 0))}%`;
+}
+
 function cssVar(name, fallback = "") {
   if (typeof window === "undefined") return fallback;
   return getComputedStyle(document.documentElement).getPropertyValue(name)?.trim() || fallback;
 }
 
+function formatPeriodLabel(value) {
+  const parts = String(value || "").split("-");
+  if (parts.length === 3) return `${parts[2]}/${parts[1]}`;
+  if (parts.length === 2) return `T${Number(parts[1])}/${parts[0].slice(2)}`;
+  return String(value || "");
+}
+
 /* ═════════════════════════════════════════════════════════════════════════
-   1. RevenueAreaChart — Area chart with gradient fill
-      Doanh thu là dòng chảy liên tục → area fill diễn tả tích lũy tốt hơn bar.
-      Gradient mờ từ brand-green xuống transparent → premium feel.
+   1. RevenueAreaChart — gradient stroke with a soft fading area
    ═════════════════════════════════════════════════════════════════════════ */
 
 export function RevenueAreaChart({ series = [], height = 340 }) {
+  const rawId = useId();
+  const gradientKey = rawId.replace(/:/g, "");
+  const lineGradientId = `admin-revenue-stroke-${gradientKey}`;
+  const areaGradientId = `admin-revenue-area-${gradientKey}`;
   const hasData = series.length > 0 && series.some((d) => d.revenue > 0);
 
   const { xLabels, revenueData } = useMemo(() => ({
@@ -39,6 +55,8 @@ export function RevenueAreaChart({ series = [], height = 340 }) {
   }
 
   const brandPrimary = cssVar("--brand-primary", "#16a34a");
+  const brandSecondary = cssVar("--brand-secondary-strong", "#2563eb");
+  const brandWarm = cssVar("--brand-warm", "#f59e0b");
   const muted = cssVar("--muted", "#6b7280");
   const borderSubtle = cssVar("--border-subtle", "#e5e7eb");
 
@@ -61,13 +79,7 @@ export function RevenueAreaChart({ series = [], height = 340 }) {
           {
             data: xLabels,
             scaleType: "point",
-            valueFormatter: (v) => {
-              // "2026-01-01" → detect grouping by label pattern
-              const parts = v.split("-");
-              if (parts.length === 2) return parts[0]; // year grouping: "2026"
-              if (parts[2] === "01" && series.length <= 12) return `T${Number(parts[1])}`; // month: "T1"
-              return `${parts[2]}/${parts[1]}`; // day: "23/05"
-            },
+            valueFormatter: formatPeriodLabel,
             tickLabelStyle: {
               fontSize: 11,
               fontFamily: "Inter, system-ui, sans-serif",
@@ -83,6 +95,7 @@ export function RevenueAreaChart({ series = [], height = 340 }) {
         ]}
         yAxis={[
           {
+            min: 0,
             valueFormatter: fmtVnd,
             tickLabelStyle: {
               fontSize: 10,
@@ -97,56 +110,63 @@ export function RevenueAreaChart({ series = [], height = 340 }) {
           legend: { hidden: true },
         }}
         sx={{
+          "& svg": { overflow: "visible" },
           "& .MuiChartsAxis-line": { stroke: borderSubtle },
           "& .MuiChartsAxis-tick": { stroke: "transparent" },
           "& .MuiChartsGrid-line": { stroke: borderSubtle, strokeDasharray: "3 3" },
-          "& .MuiAreaElement-root": { fillOpacity: 0.15 },
-          "& .MuiLineElement-root": { strokeWidth: 2.5 },
+          "& .MuiLineChart-area": {
+            fill: `url(#${areaGradientId}) !important`,
+            fillOpacity: 1,
+            pointerEvents: "none",
+          },
+          "& .MuiLineChart-line": {
+            stroke: `url(#${lineGradientId}) !important`,
+            strokeLinecap: "round",
+            strokeLinejoin: "round",
+            strokeWidth: 3,
+            filter: "drop-shadow(0 8px 12px color-mix(in oklch, var(--brand-primary) 18%, transparent))",
+          },
         }}
-      />
+      >
+        <defs>
+          <linearGradient id={lineGradientId} x1="0%" x2="100%" y1="0%" y2="0%">
+            <stop offset="0%" stopColor={brandSecondary} />
+            <stop offset="54%" stopColor={brandPrimary} />
+            <stop offset="100%" stopColor={brandWarm} />
+          </linearGradient>
+          <linearGradient id={areaGradientId} x1="0%" x2="0%" y1="0%" y2="100%">
+            <stop offset="0%" stopColor={brandPrimary} stopOpacity="0.3" />
+            <stop offset="38%" stopColor={brandSecondary} stopOpacity="0.14" />
+            <stop offset="72%" stopColor={brandPrimary} stopOpacity="0.045" />
+            <stop offset="100%" stopColor={brandPrimary} stopOpacity="0" />
+          </linearGradient>
+        </defs>
+      </LineChart>
     </div>
   );
 }
 
 /* ═════════════════════════════════════════════════════════════════════════
-   2. ConversionGauge — half-circle gauge for Free→Pro conversion rate
+   2. ConversionGauge — Pro adoption meter
    ═════════════════════════════════════════════════════════════════════════ */
 
-export function ConversionGauge({ value = 0, label = "Chuyển đổi" }) {
-  const brandPrimary = cssVar("--brand-primary", "#16a34a");
-  const borderSubtle = cssVar("--border-subtle", "#e5e7eb");
-  const foreground = cssVar("--foreground", "#1f2937");
-
+export function ConversionGauge({ value = 0, label = "Tỷ lệ người dùng Pro", proUsers = 0, freeUsers = 0 }) {
+  const rate = Math.min(Math.max(Number(value || 0), 0), 100);
+  const pro = Number(proUsers || 0);
+  const free = Number(freeUsers || 0);
   return (
-    <div className="flex flex-col items-center gap-1 py-3">
-      <Gauge
-        width={140}
-        height={80}
-        value={value}
-        valueMin={0}
-        valueMax={100}
-        startAngle={-90}
-        endAngle={90}
-        innerRadius="72%"
-        outerRadius="100%"
-        cornerRadius={4}
-        text={`${value}%`}
-        sx={{
-          [`& .${gaugeClasses.valueArc}`]: {
-            fill: brandPrimary,
-          },
-          [`& .${gaugeClasses.referenceArc}`]: {
-            fill: borderSubtle,
-          },
-          [`& .${gaugeClasses.valueText}`]: {
-            fontSize: 18,
-            fontWeight: 800,
-            fontFamily: "Inter, system-ui, sans-serif",
-            fill: foreground,
-          },
-        }}
-      />
-      <span className="text-[11px] font-bold text-[var(--muted)]">{label}</span>
+    <div className="admin-pro-meter" aria-label={`${label}: ${fmtPercent(rate)}`}>
+      <div className="admin-pro-meter-head">
+        <span>{label}</span>
+        <strong>{fmtPercent(rate)}</strong>
+      </div>
+      <div className="admin-pro-meter-track" aria-hidden="true">
+        <span className="admin-pro-meter-fill" style={{ width: `${rate}%` }} />
+      </div>
+      <div className="admin-pro-meter-foot">
+        <span><strong>{fmtNumber(pro)}</strong> Pro</span>
+        <span><strong>{fmtNumber(free)}</strong> Free</span>
+      </div>
     </div>
   );
 }

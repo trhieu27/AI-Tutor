@@ -3140,6 +3140,138 @@ select:focus-visible {
   transition: width 220ms var(--ease-reveal);
 }
 
+.admin-pro-meter {
+  display: grid;
+  gap: 12px;
+  padding: 18px 20px 20px;
+}
+
+.admin-pro-meter-head {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.admin-pro-meter-head span {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 760;
+  line-height: 1.25;
+}
+
+.admin-pro-meter-head strong {
+  color: var(--foreground);
+  font-size: 28px;
+  font-variant-numeric: tabular-nums;
+  font-weight: 840;
+  letter-spacing: 0;
+  line-height: 0.95;
+}
+
+.admin-pro-meter-track {
+  height: 12px;
+  overflow: hidden;
+  border: 1px solid var(--border-subtle);
+  border-radius: 999px;
+  background: color-mix(in oklch, var(--surface) 76%, var(--border-color));
+}
+
+.admin-pro-meter-fill {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, var(--brand-secondary-strong), var(--brand-primary), var(--brand-warm));
+  box-shadow:
+    inset 0 1px 0 var(--liquid-sheen),
+    0 0 0 1px color-mix(in oklch, var(--brand-primary) 18%, transparent);
+  transition: width 220ms var(--ease-reveal);
+}
+
+.admin-pro-meter-foot {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 720;
+  line-height: 1.3;
+}
+
+.admin-pro-meter-foot span {
+  min-width: 0;
+}
+
+.admin-pro-meter-foot strong {
+  color: var(--foreground);
+  font-variant-numeric: tabular-nums;
+  font-weight: 840;
+}
+
+.admin-chart-loading {
+  display: grid;
+  gap: 12px;
+}
+
+.admin-chart-loading-plot {
+  position: relative;
+  height: 260px;
+  overflow: hidden;
+  border-bottom: 1px solid var(--border-color);
+  border-left: 1px solid var(--border-color);
+}
+
+.admin-chart-loading-grid {
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(to bottom, transparent calc(25% - 1px), var(--border-subtle) 25%, transparent calc(25% + 1px)),
+    linear-gradient(to bottom, transparent calc(50% - 1px), var(--border-subtle) 50%, transparent calc(50% + 1px)),
+    linear-gradient(to bottom, transparent calc(75% - 1px), var(--border-subtle) 75%, transparent calc(75% + 1px));
+  opacity: 0.7;
+}
+
+.admin-chart-loading-svg {
+  position: absolute;
+  inset: 0;
+  height: 100%;
+  width: 100%;
+}
+
+.admin-chart-loading-area {
+  fill: url(#admin-chart-loading-area);
+}
+
+.admin-chart-loading-line {
+  fill: none;
+  stroke: var(--admin-skeleton-shine);
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 4;
+  vector-effect: non-scaling-stroke;
+}
+
+.admin-chart-loading-plot::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, transparent, var(--admin-skeleton-shine), transparent);
+  opacity: 0.38;
+  transform: translateX(-100%);
+  animation: slideBar 1.55s var(--ease-reveal) infinite;
+}
+
+.admin-chart-loading-labels {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 10px;
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 760;
+  line-height: 1.2;
+  text-align: center;
+}
+
 .premium-skeleton {
   background: var(--admin-skeleton-base);
 }

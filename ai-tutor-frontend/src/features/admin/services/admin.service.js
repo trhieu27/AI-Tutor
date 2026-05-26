@@ -58,6 +58,14 @@ function readAdminCache(path, ttlMs = ADMIN_CACHE_TTL_MS) {
   return entry.data;
 }
 
+function hasLearnerScopedRevenue(data) {
+  return Object.prototype.hasOwnProperty.call(data?.conversionStats || {}, "learnerUsers");
+}
+
+function buildRevenuePath(params) {
+  return `/revenue${buildQuery({ ...params, scope: "learners-v2" })}`;
+}
+
 export function clearAdminCache() {
   adminCache.clear();
 }
@@ -117,12 +125,24 @@ export function updateAdminSubscription(id, payload) {
   });
 }
 
-export function fetchAdminRevenue(params) {
-  return adminJson(`/revenue${buildQuery(params)}`);
+export async function fetchAdminRevenue(params) {
+  const path = buildRevenuePath(params);
+  const data = await adminJson(path, {
+    cache: "no-store",
+    headers: { "Cache-Control": "no-cache" },
+  });
+  if (!hasLearnerScopedRevenue(data)) adminCache.delete(path);
+  return data;
 }
 
 export function readCachedAdminRevenue(params) {
-  return readAdminCache(`/revenue${buildQuery(params)}`);
+  const path = buildRevenuePath(params);
+  const cached = readAdminCache(path);
+  if (cached && !hasLearnerScopedRevenue(cached)) {
+    adminCache.delete(path);
+    return null;
+  }
+  return cached;
 }
 
 export function fetchAdminTransactions(params) {
