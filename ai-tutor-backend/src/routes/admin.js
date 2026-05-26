@@ -410,19 +410,12 @@ async function getUserIdConstraintForPlan(plan) {
 
 async function buildUserListQuery(req, { includeSearch = true } = {}) {
   const searchQuery = userMatchesSearchQuery(req.query.search);
-  const query = includeSearch ? { ...searchQuery } : {};
+  const query = {
+    ...(includeSearch ? searchQuery : {}),
+    role: { $in: ['STUDENT', null] },
+  };
   const idConstraints = [];
 
-  if (req.query.role && VALID_ROLES.has(req.query.role)) {
-    if (req.query.role === 'STUDENT') {
-      query.role = { $in: ['STUDENT', null] };
-    } else {
-      query.role = req.query.role;
-    }
-  } else {
-    // Exclude admins by default
-    query.role = { $in: ['STUDENT', null] };
-  }
   if (req.query.status && VALID_USER_STATUSES.has(req.query.status)) {
     if (req.query.status === 'active') {
       query.status = { $in: ['active', null] };

@@ -7,7 +7,6 @@ import {
   updateAdminSubscription,
   updateAdminUser,
 } from "@/features/admin/services/admin.service";
-import { useAuth } from "@/features/auth/context/AuthContext";
 import { useAdminRealtime } from "@/features/admin/hooks/useAdminRealtime";
 import { ADMIN_TEXTS } from "@/shared/constants/texts";
 import Button from "@/shared/ui/Button";
@@ -47,7 +46,7 @@ const PLAN_OPTIONS = [
   { id: "pro_monthly", label: "Pro tháng" },
   { id: "pro_annual", label: "Pro năm" },
 ];
-const INITIAL_FILTERS = { page: 1, limit: 5, search: "", role: "", status: "", plan: "", active: "" };
+const INITIAL_FILTERS = { page: 1, limit: 5, search: "", status: "", plan: "", active: "" };
 
 function parseUserAgent(ua) {
   if (!ua) return "Thiết bị không rõ";
@@ -402,7 +401,6 @@ function UserDetailDialog({ detail, loading, onClose, onPatch, onAssignPlan, sav
 }
 
 export default function AdminUsersPage() {
-  const { user: currentUser } = useAuth();
   const [filters, setFilters] = useState(INITIAL_FILTERS);
   const [data, setData] = useState(() => readCachedAdminUsers(INITIAL_FILTERS));
   const [onlinePins, setOnlinePins] = useState([]);
@@ -620,12 +618,8 @@ export default function AdminUsersPage() {
 
       <div className="space-y-5 p-4 sm:p-6">
         <AdminSection>
-          <div className="grid gap-3 p-4 sm:grid-cols-2 lg:grid-cols-[1.2fr_0.7fr_0.7fr_0.7fr_0.7fr]">
+          <div className="grid gap-3 p-4 sm:grid-cols-2 lg:grid-cols-[1.35fr_0.8fr_0.8fr_0.8fr]">
             <AdminInput icon="search" placeholder={ADMIN_TEXTS.users.searchPlaceholder} value={searchInput} onChange={(event) => handleSearch(event.target.value)} />
-            <AdminSelect value={filters.role} onChange={(event) => setFilter("role", event.target.value)}>
-              <option value="">Tất cả vai trò</option>
-              {ROLE_OPTIONS.map((role) => <option key={role.value} value={role.value}>{role.label}</option>)}
-            </AdminSelect>
             <AdminSelect value={filters.status} onChange={(event) => setFilter("status", event.target.value)}>
               <option value="">Tất cả trạng thái</option>
               {STATUS_OPTIONS.map((status) => <option key={status.value} value={status.value}>{status.label}</option>)}
@@ -657,7 +651,7 @@ export default function AdminUsersPage() {
             variant="table"
             columns={Object.values(ADMIN_TEXTS.users.columns)}
             widths={["20%", "10%", "28%", "18%", "14%", "10%"]}
-            cellTypes={["nameRole", "text", "longText", "twoLine", "pillSub", "actions"]}
+            cellTypes={["text", "text", "longText", "twoLine", "pillSub", "actions"]}
           />
         ) : error ? (
           <AdminError message={error} onRetry={load} />
@@ -674,7 +668,6 @@ export default function AdminUsersPage() {
                           <div className="min-w-0">
                             <p className="truncate text-[13px] font-[780] text-[var(--foreground)]">{user.full_name || "Người dùng"}</p>
                           </div>
-                          <AdminStatusPill tone={roleTone(user.role)}>{formatAdminRole(user.role)}</AdminStatusPill>
                         </div>
                       </td>
                       <td className="max-w-[120px] truncate px-4 py-4 text-[12px] font-bold text-[var(--foreground)]">
