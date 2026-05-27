@@ -2,26 +2,6 @@ import { cx } from "@/shared/ui/Premium";
 import { STATUS_BADGE_TEXTS } from "@/shared/constants/texts";
 
 const STATUS = {
-  ready: {
-    label: STATUS_BADGE_TEXTS.ready,
-    icon: "check_circle",
-    className: "border-[var(--success-border)] bg-[var(--success-soft)] text-[var(--brand-success)]",
-  },
-  processing: {
-    label: STATUS_BADGE_TEXTS.processing,
-    icon: "progress_activity",
-    className: "border-[var(--warning-border)] bg-[var(--warning-soft)] text-[var(--brand-warm)]",
-  },
-  uploading: {
-    label: STATUS_BADGE_TEXTS.uploading,
-    icon: "sync",
-    className: "border-[var(--info-border)] bg-[var(--info-soft)] text-[var(--brand-secondary)]",
-  },
-  failed: {
-    label: STATUS_BADGE_TEXTS.failed,
-    icon: "error",
-    className: "border-[var(--danger-border)] bg-[var(--danger-soft)] text-[var(--brand-rose)]",
-  },
   READY: {
     label: STATUS_BADGE_TEXTS.ready,
     icon: "check_circle",
@@ -45,8 +25,9 @@ const STATUS = {
 };
 
 export default function StatusBadge({ status, className = "", children }) {
-  const item = STATUS[status] || STATUS.PROCESSING;
-  const spinning = status === "PROCESSING" || status === "UPLOADING" || status === "processing" || status === "uploading";
+  const normalizedStatus = status?.toUpperCase();
+  const item = STATUS[normalizedStatus] || STATUS.PROCESSING;
+  const spinning = normalizedStatus === "PROCESSING" || normalizedStatus === "UPLOADING";
 
   return (
     <span

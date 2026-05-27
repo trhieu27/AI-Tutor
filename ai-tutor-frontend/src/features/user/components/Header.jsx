@@ -7,8 +7,7 @@ import { ThemeToggle } from '@/shared/ui/ThemeToggle';
 import { APP_SHELL_TEXTS, HEADER_TEXTS } from '@/shared/constants/texts';
 import { fetchNotifications, markAllNotificationsRead, clearAllNotifications } from '@/shared/services/api.service';
 
-// ─── All logic unchanged — only visual layer updated ───────────────────────
-
+/** Header chính của ứng dụng — chứa menu, thông báo, và user menu */
 export default function Header({ onMenuClick }) {
   const { user, logout, isInitialLoading, accessToken } = useAuth();
   const [mounted, setMounted] = useState(false);
@@ -23,13 +22,13 @@ export default function Header({ onMenuClick }) {
 
   useEffect(() => { setMounted(true); }, []);
 
-  // Load notifications from API on mount
+  // Tải thông báo từ API khi mount
   useEffect(() => {
     if (!accessToken) return;
     fetchNotifications({ limit: 30 }).then(setNotifications).catch(() => { });
   }, [accessToken]);
 
-  // Close dropdowns on outside click
+  // Đóng dropdown khi click ngoài
   useEffect(() => {
     const handler = e => {
       if (notificationRef.current && !notificationRef.current.contains(e.target)) setShowNotifications(false);
@@ -41,7 +40,7 @@ export default function Header({ onMenuClick }) {
 
   const handleNotification = useCallback(notification => {
     setNotifications(prev => [{ ...notification, is_read: false }, ...prev]);
-    // Trigger document list refresh when processing finishes
+    // Refresh danh sách tài liệu khi xử lý xong
     if (notification.type === 'document_ready' || notification.type === 'document_failed') {
       notifyDocReady();
     }
@@ -55,11 +54,11 @@ export default function Header({ onMenuClick }) {
 
   useNotifications({ token: accessToken, onNotification: handleNotification });
 
-  const unreadCount = notifications.filter(n => !n.is_read).length;
+  const unreadCount = notifications.filter(notification => !notification.is_read).length;
 
   const handleMarkAllRead = async () => {
     await markAllNotificationsRead().catch(() => { });
-    setNotifications(prev => prev.map(n => ({ ...n, is_read: true })));
+    setNotifications(prev => prev.map(notification => ({ ...notification, is_read: true })));
   };
 
   const handleClearAll = async () => {
@@ -68,7 +67,7 @@ export default function Header({ onMenuClick }) {
     setShowNotifications(false);
   };
 
-  // Icon + color per type
+  // Icon và màu theo loại thông báo
   const notifTypeIcon = {
     document_ready: 'description',
     document_failed: 'hide_source',
@@ -86,15 +85,15 @@ export default function Header({ onMenuClick }) {
 
   function timeAgo(dateStr) {
     const diff = Date.now() - new Date(dateStr).getTime();
-    const m = Math.floor(diff / 60000);
-    if (m < 1) return T.timeAgoNow;
-    if (m < 60) return T.timeAgoMinute(m);
-    const h = Math.floor(m / 60);
-    if (h < 24) return T.timeAgoHour(h);
-    return T.timeAgoDay(Math.floor(h / 24));
+    const minutes = Math.floor(diff / 60000);
+    if (minutes < 1) return T.timeAgoNow;
+    if (minutes < 60) return T.timeAgoMinute(minutes);
+    const hours = Math.floor(minutes / 60);
+    if (hours < 24) return T.timeAgoHour(hours);
+    return T.timeAgoDay(Math.floor(hours / 24));
   }
 
-  // ── Skeleton loading state ──
+  // Skeleton khi đang tải
   if (!mounted || isInitialLoading) {
     return (
       <header className="h-16 glass border-b border-[var(--border-color)] flex items-center px-4 gap-3 sticky top-0 z-40">
@@ -106,13 +105,13 @@ export default function Header({ onMenuClick }) {
   }
 
   const initials = user?.full_name
-    ? user.full_name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)
+    ? user.full_name.split(' ').map(part => part[0]).join('').toUpperCase().slice(0, 2)
     : '?';
 
   return (
     <header className="h-16 glass border-b border-[var(--border-color)] flex items-center px-4 gap-3 sticky top-0 z-40">
 
-      {/* Mobile hamburger */}
+      {/* Nút hamburger mobile */}
       <button
         onClick={onMenuClick}
         className="lg:hidden w-9 h-9 flex items-center justify-center rounded-lg text-[var(--muted)] hover:text-[var(--foreground)] hover:bg-[var(--surface)] transition-all duration-150 active:scale-90 focus-visible:outline-2 focus-visible:outline-[var(--brand-primary)] focus-visible:outline-offset-2"
@@ -123,12 +122,12 @@ export default function Header({ onMenuClick }) {
 
       <div className="min-w-0 flex-1" />
 
-      {/* ── Notification bell ── */}
+      {/* Chuông thông báo */}
       <div className="relative" ref={notificationRef}>
         <button
           id="notification-bell"
           onClick={() => {
-            setShowNotifications(p => !p);
+            setShowNotifications(prevState => !prevState);
             setShowUserMenu(false);
             if (!showNotifications && unreadCount > 0) handleMarkAllRead();
           }}
@@ -136,7 +135,7 @@ export default function Header({ onMenuClick }) {
           aria-label={T.notificationFallbackTitle}
         >
           <span className="material-symbols-outlined text-[20px]">notifications</span>
-          {/* Badge with glow pulse on unread */}
+          {/* Badge số chưa đọc */}
           {unreadCount > 0 && (
             <span className="absolute top-1 right-1 w-[18px] h-[18px] rounded-full bg-[hsl(343_72%_48%)] text-white text-[9px] font-bold flex items-center justify-center leading-none animate-glow-pulse shadow-[0_0_8px_hsl(343_72%_48%/0.5)]">
               {unreadCount > 9 ? '9+' : unreadCount}
@@ -144,7 +143,7 @@ export default function Header({ onMenuClick }) {
           )}
         </button>
 
-        {/* Notification dropdown — glass panel (floating = allowed) */}
+        {/* Dropdown thông báo */}
         {showNotifications && (
           <div className="fixed right-4 top-[4.5rem] w-[min(320px,calc(100vw-32px))] bg-[var(--card-bg)] border border-[var(--border-color)] rounded-lg shadow-[0_16px_48px_hsl(228_25%_5%/0.18)] z-50 overflow-hidden animate-fade-up">
             {/* Header */}
@@ -170,24 +169,24 @@ export default function Header({ onMenuClick }) {
                   <p className="text-[12px] font-medium">{T.notificationEmpty}</p>
                 </div>
               ) : (
-                notifications.map((n, i) => {
-                  const iconKey = n.type in notifTypeIcon ? n.type : 'system';
+                notifications.map((notification, i) => {
+                  const iconKey = notification.type in notifTypeIcon ? notification.type : 'system';
                   return (
                     <div
-                      key={n.id || i}
-                      className={`flex items-start gap-3 px-4 py-3 border-b border-[var(--border-subtle)] last:border-0 transition-colors hover:bg-[var(--surface)] ${!n.is_read ? 'bg-[hsl(166_61%_35%/0.06)]' : ''}`}
+                      key={notification.id || i}
+                      className={`flex items-start gap-3 px-4 py-3 border-b border-[var(--border-subtle)] last:border-0 transition-colors hover:bg-[var(--surface)] ${!notification.is_read ? 'bg-[hsl(166_61%_35%/0.06)]' : ''}`}
                     >
                       <div className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 mt-0.5 ${notifTypeColor[iconKey]}`}>
                         <span className="material-symbols-outlined text-[14px] icon-thin">{notifTypeIcon[iconKey]}</span>
                       </div>
                       <div className="flex-1 min-w-0">
-                        <p className="text-[12px] font-semibold text-[var(--foreground)] leading-snug">{n.title}</p>
-                        {n.message && (
-                          <p className="text-[11px] text-[var(--muted)] mt-0.5 leading-snug line-clamp-2">{n.message}</p>
+                        <p className="text-[12px] font-semibold text-[var(--foreground)] leading-snug">{notification.title}</p>
+                        {notification.message && (
+                          <p className="text-[11px] text-[var(--muted)] mt-0.5 leading-snug line-clamp-2">{notification.message}</p>
                         )}
-                        <p className="text-[10px] text-[var(--muted-light)] mt-1 font-medium">{timeAgo(n.created_at)}</p>
+                        <p className="text-[10px] text-[var(--muted-light)] mt-1 font-medium">{timeAgo(notification.created_at)}</p>
                       </div>
-                      {!n.is_read && (
+                      {!notification.is_read && (
                         <div className="w-1.5 h-1.5 rounded-full bg-[var(--brand-primary)] shrink-0 mt-1.5" />
                       )}
                     </div>
@@ -201,10 +200,10 @@ export default function Header({ onMenuClick }) {
 
       <ThemeToggle />
 
-      {/* ── User menu ── */}
+      {/* Menu người dùng */}
       <div className="relative" ref={userMenuRef}>
         <button
-          onClick={() => { setShowUserMenu(p => !p); setShowNotifications(false); }}
+          onClick={() => { setShowUserMenu(prevState => !prevState); setShowNotifications(false); }}
           className="flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-[var(--surface)] transition-all duration-150 active:scale-95 focus-visible:outline-2 focus-visible:outline-[var(--brand-primary)] focus-visible:outline-offset-2"
         >
           {/* Avatar */}
@@ -221,7 +220,7 @@ export default function Header({ onMenuClick }) {
           </span>
         </button>
 
-        {/* User dropdown — glass panel (floating = allowed) */}
+        {/* Dropdown người dùng */}
         {showUserMenu && (
           <div className="fixed right-4 top-[4.5rem] w-52 bg-[var(--card-bg)] border border-[var(--border-color)] rounded-lg shadow-[0_16px_48px_hsl(228_25%_5%/0.18)] z-50 overflow-hidden py-1 animate-fade-up">
             {/* User info */}

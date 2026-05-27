@@ -75,6 +75,7 @@ function DocumentCard({ doc, busyId, onDelete }) {
   );
 }
 
+/** Giám sát tài liệu — trạng thái xử lý, xoá, và xem chi tiết */
 export default function AdminDocumentsPage() {
   const [filters, setFilters] = useState(INITIAL_FILTERS);
   const [data, setData] = useState(() => readCachedAdminDocuments(INITIAL_FILTERS));

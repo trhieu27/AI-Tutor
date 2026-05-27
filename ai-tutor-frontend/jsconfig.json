@@ -4,9 +4,7 @@
     "module": "ESNext",
     "jsx": "react-jsx",
     "paths": {
-      "@/*": ["./src/*"],
-      "@/features/*": ["./src/features/*"],
-      "@/shared/*": ["./src/shared/*"]
+      "@/*": ["./src/*"]
     },
     "checkJs": false,
     "allowJs": true,

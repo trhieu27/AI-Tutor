@@ -30,7 +30,8 @@ function UserLine({ user, meta }) {
 }
 
 
-export default function AdminOverviewPage() {
+/** Dashboard admin — metric tổng quan, biểu đồ và danh sách gần đây */
+export default function AdminDashboardPage() {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");

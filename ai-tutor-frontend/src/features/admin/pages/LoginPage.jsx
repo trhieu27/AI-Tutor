@@ -37,8 +37,9 @@ function AdminBrandingBackdrop() {
   );
 }
 
+/** Trang đăng nhập admin — chỉ cho phép tài khoản quản trị */
 export default function AdminLoginPage() {
-  const [email, setEmail] = useState("admin01@gmail.com");
+  const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [localError, setLocalError] = useState("");

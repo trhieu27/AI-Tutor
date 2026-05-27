@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { getPaginationItems } from "@/shared/utils/paginationUtils";
 import { createPortal } from "react-dom";
 import { useNavigate } from "react-router-dom";
 import { deleteDocument, retryDocument } from "@/shared/services/api.service";
@@ -24,24 +25,6 @@ const STATUS_OPTIONS = DOCUMENT_LIBRARY_TEXTS.statusOptions;
 const SORT_OPTIONS = DOCUMENT_LIBRARY_TEXTS.sortOptions;
 const PAGE_SIZE_OPTIONS = [5, 10, 20];
 
-function getPaginationItems(currentPage, totalPages) {
-  if (totalPages <= 5) return Array.from({ length: totalPages }, (_, i) => i + 1);
-
-  const pages = new Set([1, totalPages]);
-  for (let i = Math.max(2, currentPage - 1); i <= Math.min(totalPages - 1, currentPage + 1); i++) {
-    pages.add(i);
-  }
-
-  const sorted = [...pages].sort((a, b) => a - b);
-  const result = [];
-  for (let i = 0; i < sorted.length; i++) {
-    if (i > 0 && sorted[i] - sorted[i - 1] > 1) {
-      result.push(result.includes("ellipsis-start") ? "ellipsis-end" : "ellipsis-start");
-    }
-    result.push(sorted[i]);
-  }
-  return result;
-}
 
 function getRedirectUrl(docId, defaultAction) {
   if (defaultAction === "mindmap") return `/mindmap/${docId}`;
@@ -478,10 +461,8 @@ function PaginationControls({
 }
 
 export default function DocumentTable({
-  refreshTrigger = 0,
   showActions = false,
   defaultAction = null,
-  limit = null,
   compact = false,
 }) {
   const navigate = useNavigate();
@@ -493,7 +474,7 @@ export default function DocumentTable({
   const [retryingId, setRetryingId] = useState(null);
   const [pendingDelete, setPendingDelete] = useState(null);
 
-  // Sync search query with debounce
+  // Đồng bộ search query với debounce
   useEffect(() => {
     const timer = setTimeout(() => {
       setFilters((prev) => {
@@ -504,7 +485,7 @@ export default function DocumentTable({
     return () => clearTimeout(timer);
   }, [searchTerm, setFilters]);
 
-  // Sync other props
+  // Đồng bộ các filter khác
   const statusFilter = filters.status;
   const setStatusFilter = useCallback((status) => {
     setFilters((prev) => ({ ...prev, status, page: 1 }));
@@ -532,7 +513,7 @@ export default function DocumentTable({
     return () => clearInterval(timer);
   }, [documents, refreshDocuments]);
 
-  const paginatedDocuments = documents;
+
   const totalPages = pagination.totalPages;
   const currentPage = pagination.page;
   const totalItems = pagination.total;
@@ -646,7 +627,7 @@ export default function DocumentTable({
             </div>
           </div>
         </div>
-        {/* Mobile: Cards */}
+        {/* Mobile: Dạng card */}
         <div className="doc-library-scroll p-2 sm:p-4 custom-scrollbar md:hidden">
           {loading && documents.length === 0 ? (
             <div className="space-y-2 sm:space-y-3">
@@ -656,7 +637,7 @@ export default function DocumentTable({
             </div>
           ) : documents.length > 0 ? (
             <div className="space-y-2 pb-1 sm:space-y-3">
-              {paginatedDocuments.map((doc) => (
+              {documents.map((doc) => (
                 <DocumentCard
                   key={doc.id}
                   doc={doc}
@@ -681,7 +662,7 @@ export default function DocumentTable({
           )}
         </div>
 
-        {/* Desktop: Table */}
+        {/* Desktop: Dạng bảng */}
         <div className="doc-library-scroll hidden custom-scrollbar md:block">
           <table className="document-table w-full min-w-[860px] border-collapse text-left">
             <thead className="sticky top-0 z-10 bg-[var(--card-bg)]">
@@ -698,7 +679,7 @@ export default function DocumentTable({
               {loading && documents.length === 0 ? (
                 Array.from({ length: 5 }).map((_, index) => <SkeletonRow key={index} />)
               ) : documents.length > 0 ? (
-                paginatedDocuments.map((doc, index) => (
+                documents.map((doc, index) => (
                   <tr
                     key={doc.id}
                     onClick={() => openReadyDocument(doc)}

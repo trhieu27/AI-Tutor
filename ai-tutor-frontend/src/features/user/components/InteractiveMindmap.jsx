@@ -1,7 +1,7 @@
 import React, { useState, useCallback, useRef, useEffect, useMemo, forwardRef, useImperativeHandle } from 'react';
 import { INTERACTIVE_MINDMAP_TEXTS } from '@/shared/constants/texts';
 
-// ── Palette ──────────────────────────────────────────────────────────────────
+// Bảng màu cho các node
 const NODE_COLORS = [
   { name: 'Verdant', value: 'hsl(166 61% 35%)' },
   { name: 'Rose', value: 'hsl(4 72% 52%)' },
@@ -17,7 +17,7 @@ const NODE_COLORS = [
   { name: 'Orange', value: 'hsl(27 96% 54%)' },
 ];
 
-// ── Layout constants ──────────────────────────────────────────────────────────
+// Hằng số layout
 const V_GAP = 16;   // vertical gap between consecutive nodes
 const H_INDENT = 40; // horizontal indent per depth level
 const NODE_H = 48;
@@ -26,100 +26,100 @@ const PAD = 120;
 const LAYOUT_VER = 'v17-folder';
 const RESIZE_SNAP = 20; // snap resize to grid to prevent text flickering
 
-// ── Text wrap (with cache to prevent flickering during resize) ───────────────
+// Text wrap (cache để tránh flickering khi resize)
 const _wrapCache = new Map();
-function wrapText(text, w, h, fs) {
-  // Snap dimensions to grid so small changes don't cause re-wraps
-  const sw = Math.round(w / RESIZE_SNAP) * RESIZE_SNAP;
-  const sh = Math.round(h / RESIZE_SNAP) * RESIZE_SNAP;
-  const key = `${text}|${sw}|${sh}|${fs}`;
+function wrapText(text, width, height, fontSize) {
+  // Snap dimension theo grid để thay đổi nhỏ không gây re-wrap
+  const sw = Math.round(width / RESIZE_SNAP) * RESIZE_SNAP;
+  const sh = Math.round(height / RESIZE_SNAP) * RESIZE_SNAP;
+  const key = `${text}|${sw}|${sh}|${fontSize}`;
   if (_wrapCache.has(key)) return _wrapCache.get(key);
-  // Keep cache bounded
+  // Giới hạn cache
   if (_wrapCache.size > 500) _wrapCache.clear();
 
-  const cw = fs * 0.55, pad = 24;
-  const maxCh = Math.max(8, Math.floor((sw - pad) / cw));
-  const maxLn = Math.max(2, Math.floor((sh - 10) / (fs * 1.25)));
+  const charWidth = fontSize * 0.55, padding = 24;
+  const maxCharsPerLine = Math.max(8, Math.floor((sw - padding) / charWidth));
+  const maxLines = Math.max(2, Math.floor((sh - 10) / (fontSize * 1.25)));
   const words = (text || '').split(' ');
   const lines = [];
-  let cur = '';
+  let currentLine = '';
   for (const word of words) {
-    if ((cur + word).length <= maxCh) { cur += (cur ? ' ' : '') + word; }
+    if ((currentLine + word).length <= maxCharsPerLine) { currentLine += (currentLine ? ' ' : '') + word; }
     else {
-      if (lines.length + 1 >= maxLn) {
-        const remaining = cur ? cur + ' ' + word : word;
-        lines.push(remaining.length > maxCh ? remaining.slice(0, maxCh - 1) + '…' : remaining);
+      if (lines.length + 1 >= maxLines) {
+        const remaining = currentLine ? currentLine + ' ' + word : word;
+        lines.push(remaining.length > maxCharsPerLine ? remaining.slice(0, maxCharsPerLine - 1) + '…' : remaining);
         _wrapCache.set(key, lines);
         return lines;
       }
-      if (cur) lines.push(cur);
-      cur = word;
+      if (currentLine) lines.push(currentLine);
+      currentLine = word;
     }
   }
-  if (cur) lines.push(cur);
+  if (currentLine) lines.push(currentLine);
   const result = lines.length ? lines : [text || ''];
   _wrapCache.set(key, result);
   return result;
 }
 
-// ── Estimated node width ──────────────────────────────────────────────────────
-function estW(text, fs = 13) {
-  // Must match wrapText: cw = fs * 0.55, pad = 24
-  // Add +16 buffer to ensure maxCh > text.length (no wrap/truncation)
+// Ước tính chiều rộng node từ text
+function estimateNodeWidth(text, fs = 13) {
+  // Must match wrapText: charWidth = fs * 0.55, padding = 24
+  // Add +16 buffer to ensure maxCharsPerLine > text.length (no wrap/truncation)
   return Math.max(NODE_MIN_W, Math.ceil((text || '').length * (fs * 0.55)) + 24 + 16);
 }
 
-// ── Parser ────────────────────────────────────────────────────────────────────
+// Parser: chuyển Mermaid mindmap syntax thành tree structure
 function parseMermaid(code) {
   const lines = code.split('\n').filter(l => l.trim());
-  let si = -1;
+  let startIndex = -1;
   for (let i = 0; i < lines.length; i++) {
-    if (lines[i].trim().toLowerCase() === 'mindmap') { si = i + 1; break; }
+    if (lines[i].trim().toLowerCase() === 'mindmap') { startIndex = i + 1; break; }
   }
-  if (si < 0) return null;
+  if (startIndex < 0) return null;
 
   const stack = [];
   let root = null;
-  let nid = 0;
+  let nodeIdCounter = 0;
   const seen = new Map();
-  const uid = base => {
+  const makeUniqueId = base => {
     const n = (seen.get(base) || 0) + 1;
     seen.set(base, n);
     return n === 1 ? base : `${base}-${n - 1}`;
   };
 
-  for (let i = si; i < lines.length; i++) {
+  for (let i = startIndex; i < lines.length; i++) {
     const line = lines[i];
     const indent = line.match(/^(\s*)/)[1].length;
     let raw = line.trim();
     if (!raw) continue;
 
-    // strip metadata
-    const colorM = raw.match(/:::color-(hsl\([^)]+\)|#?[a-fA-F0-9]{3,6})/);
-    const color = colorM ? (colorM[1].startsWith('hsl') ? colorM[1] : `#${colorM[1].replace('#', '')}`) : '';
-    const wM = raw.match(/:::w-(\d+)/); const width = wM ? +wM[1] : undefined;
-    const hM = raw.match(/:::h-(\d+)/); const height = hM ? +hM[1] : undefined;
+    // Loại bỏ metadata (color, width, height)
+    const colorMatch = raw.match(/:::color-(hsl\([^)]+\)|#?[a-fA-F0-9]{3,6})/);
+    const color = colorMatch ? (colorMatch[1].startsWith('hsl') ? colorMatch[1] : `#${colorMatch[1].replace('#', '')}`) : '';
+    const widthMatch = raw.match(/:::w-(\d+)/); const width = widthMatch ? +widthMatch[1] : undefined;
+    const heightMatch = raw.match(/:::h-(\d+)/); const height = heightMatch ? +heightMatch[1] : undefined;
     raw = raw.replace(/:::color-(?:hsl\([^)]+\)|#?[a-fA-F0-9]{3,6})/g, '').replace(/:::w-\d+/g, '').replace(/:::h-\d+/g, '').trim();
 
-    // strip shape brackets
+    // Loại bỏ dấu ngoặc shape
     const idM = raw.match(/^([a-zA-Z0-9_-]+)\s*[\(\[\{]/);
-    let id = idM ? idM[1] : `node-${++nid}`;
+    let id = idM ? idM[1] : `node-${++nodeIdCounter}`;
     let txt = raw.replace(/^[a-zA-Z0-9_-]+\s*(?=[\(\[\{])/, '');
-    let ch = true;
-    while (ch) {
-      ch = false;
+    let hasMoreBrackets = true;
+    while (hasMoreBrackets) {
+      hasMoreBrackets = false;
       for (const [o, c] of [['((', '))'], ['{{', '}}'], ['(', ')'], ['[', ']']]) {
         if (txt.startsWith(o) && txt.endsWith(c)) {
-          txt = txt.slice(o.length, txt.length - c.length).trim(); ch = true; break;
+          txt = txt.slice(o.length, txt.length - c.length).trim(); hasMoreBrackets = true; break;
         }
       }
     }
     txt = txt.replace(/^[\(\[\{]+/, '').replace(/[\)\]\}]+$/, '').trim() || (stack.length === 0 ? INTERACTIVE_MINDMAP_TEXTS.rootNode : INTERACTIVE_MINDMAP_TEXTS.newNode);
 
-    // unique id
+    // Tạo unique ID cho node
     const slug = txt.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/đ/g, 'd').replace(/[^a-z0-9]/g, '-').replace(/-+/g, '-').slice(0, 12);
     const parentPath = stack.length ? stack[stack.length - 1].path : '';
-    id = idM ? uid(id) : uid(`n-${parentPath ? parentPath + '-' : ''}${slug}`);
+    id = idM ? makeUniqueId(id) : makeUniqueId(`n-${parentPath ? parentPath + '-' : ''}${slug}`);
 
     const node = { id, text: txt, children: [], color, width, height };
 
@@ -144,67 +144,67 @@ function parseMermaid(code) {
 
 function toMermaid(root) {
   let out = 'mindmap\n';
-  const w = (n, d) => {
+  const writeNode = (n, depth) => {
     if (!n) return;
-    const t = n.text || (d === 1 ? INTERACTIVE_MINDMAP_TEXTS.rootNode : INTERACTIVE_MINDMAP_TEXTS.newNode);
-    const shape = d === 1 ? `((${t}))` : `(${t})`;
+    const t = n.text || (depth === 1 ? INTERACTIVE_MINDMAP_TEXTS.rootNode : INTERACTIVE_MINDMAP_TEXTS.newNode);
+    const shape = depth === 1 ? `((${t}))` : `(${t})`;
     let meta = '';
     if (n.color) meta += `:::color-${n.color.startsWith('hsl') ? n.color : n.color.replace('#', '')}`;
     if (n.width) meta += `:::w-${n.width}`;
     if (n.height) meta += `:::h-${n.height}`;
-    out += '  '.repeat(d) + `${n.id}${shape}${meta}\n`;
-    (n.children || []).forEach(c => w(c, d + 1));
+    out += '  '.repeat(depth) + `${n.id}${shape}${meta}\n`;
+    (n.children || []).forEach(child => writeNode(child, depth + 1));
   };
-  w(root, 1);
+  writeNode(root, 1);
   return out;
 }
 
-// ── Tree ops ──────────────────────────────────────────────────────────────────
-const ch = n => Array.isArray(n.children) ? n.children : [];
+// Thao tác trên tree (CRUD node)
+const getChildren = node => Array.isArray(node.children) ? node.children : [];
 function updateNode(root, id, upd) {
   if (root.id === id) return { ...root, ...upd };
-  return { ...root, children: ch(root).map(c => updateNode(c, id, upd)) };
+  return { ...root, children: getChildren(root).map(c => updateNode(c, id, upd)) };
 }
 function addChild(root, pid) {
   if (root.id === pid) {
     const id = `u-${Math.random().toString(36).slice(2, 9)}`;
-    return { ...root, children: [...ch(root), { id, text: INTERACTIVE_MINDMAP_TEXTS.newNode, children: [], color: root.color }] };
+    return { ...root, children: [...getChildren(root), { id, text: INTERACTIVE_MINDMAP_TEXTS.newNode, children: [], color: root.color }] };
   }
-  return { ...root, children: ch(root).map(c => addChild(c, pid)) };
+  return { ...root, children: getChildren(root).map(c => addChild(c, pid)) };
 }
 function removeNode(root, id) {
-  return { ...root, children: ch(root).filter(c => c.id !== id).map(c => removeNode(c, id)) };
+  return { ...root, children: getChildren(root).filter(c => c.id !== id).map(c => removeNode(c, id)) };
 }
 function findDepth(root, id, d = 0) {
   if (root.id === id) return d;
-  for (const c of ch(root)) { const r = findDepth(c, id, d + 1); if (r >= 0) return r; }
+  for (const c of getChildren(root)) { const r = findDepth(c, id, d + 1); if (r >= 0) return r; }
   return -1;
 }
 function flattenTree(node, depth = 0) {
   return [{ id: node.id, text: node.text, depth, color: node.color, width: node.width, height: node.height },
-  ...ch(node).flatMap(c => flattenTree(c, depth + 1))];
+  ...getChildren(node).flatMap(c => flattenTree(c, depth + 1))];
 }
 function findNode(root, id) {
   if (root.id === id) return root;
-  for (const c of ch(root)) { const r = findNode(c, id); if (r) return r; }
+  for (const c of getChildren(root)) { const r = findNode(c, id); if (r) return r; }
   return null;
 }
 function getDescendantIds(node) {
-  return [node.id, ...ch(node).flatMap(getDescendantIds)];
+  return [node.id, ...getChildren(node).flatMap(getDescendantIds)];
 }
 
-// ── Layout (folder-style: DFS vertical list, indented per depth) ─────────────
+// Layout: DFS dọc, mỗi node indent theo depth
 function computePositions(root, sizeMap) {
   if (!root) return {};
   const pos = {};
-  const gW = n => sizeMap?.[n.id]?.w || n.width || estW(n.text || '');
-  const gH = n => sizeMap?.[n.id]?.h || n.height || NODE_H;
+  const getNodeWidth = n => sizeMap?.[n.id]?.w || n.width || estimateNodeWidth(n.text || '');
+  const getNodeHeight = n => sizeMap?.[n.id]?.h || n.height || NODE_H;
 
-  // DFS walk: place each node sequentially top-to-bottom, indented by depth
+  // DFS: đặt mỗi node tuần tự từ trên xuống, indent theo depth
   let cursorY = 0;
   function walk(node, depth) {
-    const nw = gW(node);
-    const nh = gH(node);
+    const nw = getNodeWidth(node);
+    const nh = getNodeHeight(node);
     const x = depth * (NODE_MIN_W + H_INDENT) + nw / 2;
     pos[node.id] = { x, y: cursorY + nh / 2, w: nw, h: nh, depth, text: node.text };
     cursorY += nh + V_GAP;
@@ -214,9 +214,9 @@ function computePositions(root, sizeMap) {
   return pos;
 }
 
-// ── Connection path (L-shaped: parent right → down → child left) ─────────────
+// Đường nối dạng bezier: parent → child
 function bezierPath(x1, y1, x2, y2) {
-  // Smooth step-like path: go right, then curve down to child
+  // Đường cong mềm: đi phải rồi uốn xuống child
   const midX = (x1 + x2) / 2;
   return `M ${x1} ${y1} C ${midX} ${y1}, ${midX} ${y2}, ${x2} ${y2}`;
 }
@@ -224,23 +224,23 @@ function bezierPath(x1, y1, x2, y2) {
 const InteractiveMindmap = forwardRef(({ chart, onCodeChange, documentId, zoom = 1, onUndoRedoStateChange }, ref) => {
   const [tree, setTree] = useState(null);
   const [positions, setPositions] = useState({});
-  const [selId, setSelId] = useState(null);
+  const [selectedNodeId, setSelectedNodeId] = useState(null);
   const [menuMode, setMenuMode] = useState(null);
   const [menuPos, setMenuPos] = useState({ x: 0, y: 0 });
   const [editText, setEditText] = useState('');
   const svgRef = useRef(null), treeRef = useRef(null), posRef = useRef({});
   const dragRef = useRef(null), resizeDragRef = useRef(null), histRef = useRef([]), redoRef = useRef([]);
   const lastCodeRef = useRef(''), lastStructRef = useRef('');
-  const frozenVbRef = useRef(null); // freeze viewBox during resize to prevent all nodes jumping
-  const resizeRafRef = useRef(null); // rAF throttle for resize
-  const SK = `mindmap-pos-${documentId || 'default'}-${LAYOUT_VER}`;
+  const frozenVbRef = useRef(null);  // Đóng băng viewBox khi resize để tránh nhảy node
+  const resizeRafRef = useRef(null); // Throttle resize bằng rAF
+  const STORAGE_KEY = `mindmap-pos-${documentId || 'default'}-${LAYOUT_VER}`;
 
   const notifyUR = useCallback(() => onUndoRedoStateChange?.(histRef.current.length > 0, redoRef.current.length > 0), [onUndoRedoStateChange]);
 
   useEffect(() => {
     const pfx = `mindmap-pos-${documentId || 'default'}`;
-    Object.keys(localStorage).filter(k => k.startsWith(pfx) && k !== SK).forEach(k => localStorage.removeItem(k));
-  }, [SK]);
+    Object.keys(localStorage).filter(k => k.startsWith(pfx) && k !== STORAGE_KEY).forEach(k => localStorage.removeItem(k));
+  }, [STORAGE_KEY]);
 
   const pushSnap = useCallback(() => {
     if (!treeRef.current) return;
@@ -262,36 +262,35 @@ const InteractiveMindmap = forwardRef(({ chart, onCodeChange, documentId, zoom =
     undo: () => { if (!histRef.current.length) return; const cur = { code: toMermaid(treeRef.current), pos: { ...posRef.current } }; const prev = histRef.current.pop(); redoRef.current = [cur, ...redoRef.current.slice(0, 39)]; applySnap(prev); },
     redo: () => { if (!redoRef.current.length) return; const cur = { code: toMermaid(treeRef.current), pos: { ...posRef.current } }; const nxt = redoRef.current.shift(); histRef.current = [...histRef.current, cur]; applySnap(nxt); },
     pushSnapshot: pushSnap,
-    resetLayout: () => { localStorage.removeItem(SK); setTree(null); setPositions({}); treeRef.current = null; posRef.current = {}; lastCodeRef.current = ''; histRef.current = []; redoRef.current = []; notifyUR(); },
+    resetLayout: () => { localStorage.removeItem(STORAGE_KEY); setTree(null); setPositions({}); treeRef.current = null; posRef.current = {}; lastCodeRef.current = ''; histRef.current = []; redoRef.current = []; notifyUR(); },
     downloadImage: () => {
       if (!svgRef.current) return;
       const pv = Object.values(posRef.current);
       if (!pv.length) return;
-      const mx = Math.min(...pv.map(p => p.x - p.w / 2)) - 80, MX = Math.max(...pv.map(p => p.x + p.w / 2)) + 80;
-      const my = Math.min(...pv.map(p => p.y - p.h / 2)) - 80, MY = Math.max(...pv.map(p => p.y + p.h / 2)) + 80;
-      const W = MX - mx, H = MY - my;
+      const minX = Math.min(...pv.map(p => p.x - p.w / 2)) - 80, maxX = Math.max(...pv.map(p => p.x + p.w / 2)) + 80;
+      const minY = Math.min(...pv.map(p => p.y - p.h / 2)) - 80, maxY = Math.max(...pv.map(p => p.y + p.h / 2)) + 80;
+      const canvasWidth = maxX - minX, canvasHeight = maxY - minY;
       const scale = 2; // 2x for retina quality
       const cl = svgRef.current.cloneNode(true);
-      // ── Strip all selection UI before export ──────────────────────────────
-      // 1. Remove dashed selection ring (animate-pulse rect)
+      // Loại bỏ UI chọn node trước khi export ảnh
+      // 1. Xóa vòng chọn (animate-pulse rect)
       cl.querySelectorAll('.animate-pulse').forEach(el => el.remove());
-      // 2. Remove resize handle groups (they come after <text> and have cursor style)
+      // 2. Xóa handle resize (có cursor style)
       cl.querySelectorAll('[style*="cursor: nw-resize"], [style*="cursor: ne-resize"], [style*="cursor: sw-resize"], [style*="cursor: se-resize"]').forEach(el => el.remove());
-      // 3. Reset glow filter on selected node back to normal shadow
+      // 3. Reset glow filter về shadow thường
       cl.querySelectorAll('[filter="url(#ng)"]').forEach(el => el.setAttribute('filter', 'url(#ns)'));
-      // ─────────────────────────────────────────────────────────────────────
-      cl.setAttribute('width', W * scale); cl.setAttribute('height', H * scale);
-      cl.setAttribute('viewBox', `${mx} ${my} ${W} ${H}`);
-      // Inline a basic background rect so PNG has a background
+      cl.setAttribute('width', canvasWidth * scale); cl.setAttribute('height', canvasHeight * scale);
+      cl.setAttribute('viewBox', `${minX} ${minY} ${canvasWidth} ${canvasHeight}`);
+      // Thêm rect nền cho PNG export
       const bg = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
-      bg.setAttribute('x', mx); bg.setAttribute('y', my);
-      bg.setAttribute('width', W); bg.setAttribute('height', H);
+      bg.setAttribute('x', minX); bg.setAttribute('y', minY);
+      bg.setAttribute('width', canvasWidth); bg.setAttribute('height', canvasHeight);
       bg.setAttribute('fill', 'hsl(222 47% 8%)');
       cl.insertBefore(bg, cl.firstChild);
       const svgStr = new XMLSerializer().serializeToString(cl);
       const dataUrl = 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(svgStr)));
       const canvas = document.createElement('canvas');
-      canvas.width = W * scale; canvas.height = H * scale;
+      canvas.width = canvasWidth * scale; canvas.height = canvasHeight * scale;
       const ctx = canvas.getContext('2d');
       const img = new Image();
       img.onload = () => {
@@ -320,13 +319,13 @@ const InteractiveMindmap = forwardRef(({ chart, onCodeChange, documentId, zoom =
     const struct = flattenTree(tree).map(n => n.id).join('|');
     lastStructRef.current = struct;
     setPositions(() => {
-      // Only restore manual drag positions when the tree structure is identical
+      // Chỉ khôi phục vị trí drag khi cấu trúc tree giống hệt
       let stored = {};
       try {
-        const d = localStorage.getItem(SK);
+        const d = localStorage.getItem(STORAGE_KEY);
         if (d) {
           const j = JSON.parse(d);
-          // Hash must match exactly — prevents old positions from polluting a new diagram
+          // Hash phải khớp — tránh vị trí cũ áp vào sơ đồ mới
           if (j.hash === struct) stored = j.layout || {};
         }
       } catch (e) { }
@@ -334,15 +333,15 @@ const InteractiveMindmap = forwardRef(({ chart, onCodeChange, documentId, zoom =
       Object.keys(stored).forEach(id => { if (stored[id]) sizeMap[id] = { w: stored[id].w, h: stored[id].h }; });
       const auto = computePositions(tree, sizeMap);
       const final = {};
-      // merge: for existing nodes use stored pos; for NEW nodes, offset relative to parent's actual pos
+      // Merge: node cũ dùng vị trí đã lưu; node MỚI đặt tương đối so với parent
       const merge = (node, parentId) => {
         const a = auto[node.id]; if (!a) return;
         const s = stored[node.id];
         if (s && typeof s.x === 'number') {
-          // Existing node with manual position — restore it
+          // Node cũ có vị trí thủ công — khôi phục
           final[node.id] = { ...a, x: s.x, y: s.y, w: s.w || a.w, h: s.h || a.h };
         } else if (parentId && final[parentId] && auto[parentId]) {
-          // New node — place relative to parent's ACTUAL position using auto-layout offset
+          // Node mới — đặt tương đối so với parent thực tế
           const autoParent = auto[parentId];
           const dx = a.x - autoParent.x, dy = a.y - autoParent.y;
           final[node.id] = { ...a, x: final[parentId].x + dx, y: final[parentId].y + dy };
@@ -354,24 +353,23 @@ const InteractiveMindmap = forwardRef(({ chart, onCodeChange, documentId, zoom =
       merge(tree, null);
       const save = {};
       flattenTree(tree).forEach(n => { if (final[n.id]) save[n.id] = { ...final[n.id], text: n.text }; });
-      localStorage.setItem(SK, JSON.stringify({ layout: save, hash: struct }));
+      localStorage.setItem(STORAGE_KEY, JSON.stringify({ layout: save, hash: struct }));
       posRef.current = final;
       return final;
     });
-  }, [tree, SK]);
+  }, [tree, STORAGE_KEY]);
 
-  // Persist dragged positions. Intentionally omits 'tree' from deps:
-  // If 'tree' were included, this would fire with old positions + new tree on the same
-  // commit cycle as the layout effect — writing stale positions under the new hash.
-  // Using treeRef.current gives us the current tree without making it a trigger.
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+  // Lưu vị trí sau drag. KHÔNG thêm 'tree' vào deps:
+  // Nếu có, effect sẽ chạy với positions cũ + tree mới trong cùng commit cycle —
+  // ghi vị trí cũ dưới hash mới. Dùng treeRef.current thay thế.
+  // eslint-disable-next-line react-hooks/exhaustive-deps — cố ý bỏ 'tree' khỏi deps (xem giải thích trên)
   useEffect(() => {
     const t = treeRef.current;
     if (!t || !Object.keys(positions).length || !lastStructRef.current) return;
     const save = {};
     flattenTree(t).forEach(n => { if (positions[n.id]) save[n.id] = { ...positions[n.id], text: n.text }; });
-    localStorage.setItem(SK, JSON.stringify({ layout: save, hash: lastStructRef.current }));
-  }, [positions, SK]);
+    localStorage.setItem(STORAGE_KEY, JSON.stringify({ layout: save, hash: lastStructRef.current }));
+  }, [positions, STORAGE_KEY]);
 
   const toSvg = useCallback((cx, cy) => {
     if (!svgRef.current) return { x: 0, y: 0 };
@@ -428,7 +426,7 @@ const InteractiveMindmap = forwardRef(({ chart, onCodeChange, documentId, zoom =
       if (dx > 5 || dy > 5) { const snap = { code: toMermaid(treeRef.current), pos: ds.snap }; histRef.current = [...histRef.current.slice(-39), snap]; redoRef.current = []; notifyUR(); }
       if (dx < 6 && dy < 6) {
         const p = posRef.current[ds.id];
-        if (p && svgRef.current) { const vb = svgRef.current.viewBox.baseVal; setSelId(ds.id); setMenuPos({ x: p.x - vb.x, y: p.y - p.h / 2 - vb.y }); setMenuMode('main'); }
+        if (p && svgRef.current) { const vb = svgRef.current.viewBox.baseVal; setSelectedNodeId(ds.id); setMenuPos({ x: p.x - vb.x, y: p.y - p.h / 2 - vb.y }); setMenuMode('main'); }
       }
       dragRef.current = null; document.body.classList.remove('select-none');
     };
@@ -445,11 +443,11 @@ const InteractiveMindmap = forwardRef(({ chart, onCodeChange, documentId, zoom =
   }, [toSvg, notifyUR]);
 
   useEffect(() => {
-    if (!selId) return;
-    const h = () => { setSelId(null); setMenuMode(null); };
+    if (!selectedNodeId) return;
+    const h = () => { setSelectedNodeId(null); setMenuMode(null); };
     const t = setTimeout(() => window.addEventListener('click', h), 100);
     return () => { clearTimeout(t); window.removeEventListener('click', h); };
-  }, [selId]);
+  }, [selectedNodeId]);
 
   const startDrag = useCallback((e, id) => {
     if (e.type === 'mousedown' && e.button !== 0) return;
@@ -463,9 +461,8 @@ const InteractiveMindmap = forwardRef(({ chart, onCodeChange, documentId, zoom =
     document.body.classList.add('select-none');
   }, [toSvg]);
 
-  // applyUpdate: mutate tree while preserving current positions.
-  // Pre-saves current posRef positions under the NEW tree's hash so that
-  // useEffect([tree,SK]) restores them instead of resetting to auto-layout.
+  // applyUpdate: cập nhật tree nhưng giữ nguyên vị trí hiện tại.
+  // Lưu trước posRef dưới hash mới để useEffect([tree]) khôi phục đúng vị trí.
   const applyUpdate = useCallback((newTree, skipSnap = false) => {
     if (!skipSnap) pushSnap();
     // Build new struct hash and pre-save live positions for existing nodes
@@ -475,18 +472,18 @@ const InteractiveMindmap = forwardRef(({ chart, onCodeChange, documentId, zoom =
       const lp = posRef.current[n.id];
       if (lp) save[n.id] = { ...lp, text: n.text };
     });
-    localStorage.setItem(SK, JSON.stringify({ layout: save, hash: newStruct }));
+    localStorage.setItem(STORAGE_KEY, JSON.stringify({ layout: save, hash: newStruct }));
     setTree(newTree);
     treeRef.current = newTree;
     const code = toMermaid(newTree);
     lastCodeRef.current = code;
     if (typeof onCodeChange === 'function') onCodeChange(code);
-  }, [pushSnap, SK, onCodeChange]);
+  }, [pushSnap, STORAGE_KEY, onCodeChange]);
 
-  const doEdit = () => { const n = findNode(treeRef.current, selId); if (n) { setEditText(n.text); setMenuMode('edit'); } };
-  const doSave = () => { if (treeRef.current && selId && editText.trim()) { applyUpdate(updateNode(treeRef.current, selId, { text: editText.trim() })); } setMenuMode(null); setSelId(null); };
+  const doEdit = () => { const n = findNode(treeRef.current, selectedNodeId); if (n) { setEditText(n.text); setMenuMode('edit'); } };
+  const doSave = () => { if (treeRef.current && selectedNodeId && editText.trim()) { applyUpdate(updateNode(treeRef.current, selectedNodeId, { text: editText.trim() })); } setMenuMode(null); setSelectedNodeId(null); };
   const doAdd = () => {
-    if (!treeRef.current || !selId) return;
+    if (!treeRef.current || !selectedNodeId) return;
     const newId = `u-${Math.random().toString(36).slice(2, 9)}`;
     const addChildWithId = (root, pid) => {
       if (root.id === pid) {
@@ -494,22 +491,22 @@ const InteractiveMindmap = forwardRef(({ chart, onCodeChange, documentId, zoom =
       }
       return { ...root, children: (root.children || []).map(c => addChildWithId(c, pid)) };
     };
-    applyUpdate(addChildWithId(treeRef.current, selId));
-    // Select the new node so it renders on top and user can edit it immediately
-    setSelId(newId);
+    applyUpdate(addChildWithId(treeRef.current, selectedNodeId));
+    // Chọn node mới để user có thể sửa ngay
+    setSelectedNodeId(newId);
     setMenuMode(null);
   };
-  const doDel = () => { if (treeRef.current && selId && selId !== treeRef.current.id) applyUpdate(removeNode(treeRef.current, selId)); };
-  const doColor = c => { if (treeRef.current && selId) applyUpdate(updateNode(treeRef.current, selId, { color: c })); };
+  const doDel = () => { if (treeRef.current && selectedNodeId && selectedNodeId !== treeRef.current.id) applyUpdate(removeNode(treeRef.current, selectedNodeId)); };
+  const doColor = c => { if (treeRef.current && selectedNodeId) applyUpdate(updateNode(treeRef.current, selectedNodeId, { color: c })); };
 
   const vbComputed = useMemo(() => {
     const ids = Object.keys(positions);
     if (!ids.length) return { x: -600, y: -400, w: 1200, h: 800 };
-    let x0 = Infinity, x1 = -Infinity, y0 = Infinity, y1 = -Infinity;
-    ids.forEach(id => { const p = positions[id]; x0 = Math.min(x0, p.x - p.w / 2); x1 = Math.max(x1, p.x + p.w / 2); y0 = Math.min(y0, p.y - p.h / 2); y1 = Math.max(y1, p.y + p.h / 2); });
-    return { x: x0 - PAD, y: y0 - PAD, w: Math.max(x1 - x0 + PAD * 2, 1200), h: Math.max(y1 - y0 + PAD * 2, 800) };
+    let boundsMinX = Infinity, boundsMaxX = -Infinity, boundsMinY = Infinity, boundsMaxY = -Infinity;
+    ids.forEach(id => { const p = positions[id]; boundsMinX = Math.min(boundsMinX, p.x - p.w / 2); boundsMaxX = Math.max(boundsMaxX, p.x + p.w / 2); boundsMinY = Math.min(boundsMinY, p.y - p.h / 2); boundsMaxY = Math.max(boundsMaxY, p.y + p.h / 2); });
+    return { x: boundsMinX - PAD, y: boundsMinY - PAD, w: Math.max(boundsMaxX - boundsMinX + PAD * 2, 1200), h: Math.max(boundsMaxY - boundsMinY + PAD * 2, 800) };
   }, [positions]);
-  // Freeze viewBox during resize to prevent all nodes from jumping
+  // Đóng băng viewBox khi resize để node khác không nhảy
   const vb = frozenVbRef.current || vbComputed;
 
   const conns = useMemo(() => {
@@ -533,14 +530,13 @@ const InteractiveMindmap = forwardRef(({ chart, onCodeChange, documentId, zoom =
     );
   }
 
-  // Sort: deeper nodes render above shallower ones (standard);
-  // selected node always renders last so it sits on top of all others in SVG.
+  // Sắp xếp: node sâu hơn render trên; node đang chọn luôn render cuối cùng (trên cùng SVG)
   const allNodes = flattenTree(tree).sort((a, b) => {
-    if (a.id === selId) return 1;
-    if (b.id === selId) return -1;
+    if (a.id === selectedNodeId) return 1;
+    if (b.id === selectedNodeId) return -1;
     return a.depth - b.depth;
   });
-  const selNode = selId ? findNode(tree, selId) : null;
+  const selNode = selectedNodeId ? findNode(tree, selectedNodeId) : null;
 
   return (
     <div className="relative" style={{ width: vb.w, height: vb.h, touchAction: 'none' }}>
@@ -574,7 +570,7 @@ const InteractiveMindmap = forwardRef(({ chart, onCodeChange, documentId, zoom =
 
         {allNodes.map(n => {
           const p = positions[n.id]; if (!p) return null;
-          const isRoot = p.depth === 0, isSel = n.id === selId;
+          const isRoot = p.depth === 0, isSel = n.id === selectedNodeId;
           const fs = isRoot ? 20 : 13, rx = p.h / 2;
           const flt = isSel ? 'url(#ng)' : isRoot ? 'url(#nr)' : 'url(#ns)';
           const lines = wrapText(n.text || '', p.w, p.h, fs);
@@ -595,19 +591,19 @@ const InteractiveMindmap = forwardRef(({ chart, onCodeChange, documentId, zoom =
                 const hx=p.x+sx*(p.w/2+8), hy=p.y+sy*(p.h/2+8), s=8;
                 const startResize = e => {
                   e.stopPropagation(); e.preventDefault();
-                  // Freeze viewBox so other nodes don't jump
+                  // Đóng băng viewBox khi bắt đầu resize
                   frozenVbRef.current = { ...vb };
                   resizeDragRef.current = { id: n.id, snap: { ...posRef.current } };
                   document.body.classList.add('select-none');
                 };
                 return(<g key={corner} style={{cursor:cur}} onMouseDown={startResize} onTouchStart={startResize}>
-                  {/* hit area */}
+                  {/* Vùng bấm (hit area) */}
                   <rect x={hx-s-4} y={hy-s-4} width={(s+4)*2} height={(s+4)*2} fill="transparent"/>
-                  {/* shadow */}
+                  {/* Bóng đổ */}
                   <rect x={hx-s/2} y={hy-s/2} width={s} height={s} rx={2} fill="hsl(222 47% 10%)" opacity={0.5} transform="translate(1,1)" className="pointer-events-none"/>
-                  {/* white fill */}
+                  {/* Nền trắng */}
                   <rect x={hx-s/2} y={hy-s/2} width={s} height={s} rx={2} fill="white" className="pointer-events-none"/>
-                  {/* selection border */}
+                  {/* Viền chọn */}
                   <rect x={hx-s/2} y={hy-s/2} width={s} height={s} rx={2} fill="none" stroke="hsl(166 61% 48%)" strokeWidth={1.5} className="pointer-events-none"/>
                 </g>);
               })}
@@ -616,7 +612,7 @@ const InteractiveMindmap = forwardRef(({ chart, onCodeChange, documentId, zoom =
         })}
       </svg>
 
-      {selId && menuMode && selNode && (() => {
+      {selectedNodeId && menuMode && selNode && (() => {
         const isRoot = selNode.depth === 0;
         const ms = { left: menuPos.x, top: menuPos.y, transform: `translate(-50%,calc(-100% - 14px)) scale(${Math.sqrt(1 / zoom)})`, transformOrigin: 'bottom center' };
         const arrow = <div className="w-3 h-1.5 bg-[var(--card-bg)] border-x border-b border-[var(--border-color)]" style={{ clipPath: 'polygon(0 0,100% 0,50% 100%)' }} />;
@@ -626,7 +622,7 @@ const InteractiveMindmap = forwardRef(({ chart, onCodeChange, documentId, zoom =
               <div className="w-[280px] rounded-lg shadow-xl border border-[var(--border-color)] bg-[var(--card-bg)] p-4">
                 <p className="text-[10px] font-bold text-[var(--muted-light)] font-mono mb-3">{INTERACTIVE_MINDMAP_TEXTS.nodeEditor.title}</p>
                 <input autoFocus value={editText} onChange={e => setEditText(e.target.value)}
-                  onKeyDown={e => { if (e.key === 'Enter') doSave(); if (e.key === 'Escape') { setMenuMode(null); setSelId(null); } e.stopPropagation(); }}
+                  onKeyDown={e => { if (e.key === 'Enter') doSave(); if (e.key === 'Escape') { setMenuMode(null); setSelectedNodeId(null); } e.stopPropagation(); }}
                   className="w-full px-3 py-2 rounded-xl bg-[var(--surface)] border border-[var(--border-color)] text-[13px] text-[var(--foreground)] outline-none focus:ring-2 focus:ring-[hsl(166_61%_35%/0.35)]"
                   placeholder={INTERACTIVE_MINDMAP_TEXTS.nodeEditor.placeholder} />
                 <div className="flex gap-2 mt-3">

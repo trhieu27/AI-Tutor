@@ -51,6 +51,7 @@ function ActivityCard({ item }) {
 
 const INITIAL_FILTERS = { page: 1, limit: 5, activeWithinMinutes: 15 };
 
+/** Theo dõi phiên chat real-time — bảng hoạt động người dùng */
 export default function AdminActivityPage() {
   const [filters, setFilters] = useState(INITIAL_FILTERS);
   const [data, setData] = useState(() => readCachedAdminActivity(INITIAL_FILTERS));

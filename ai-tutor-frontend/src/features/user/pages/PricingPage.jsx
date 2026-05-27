@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/features/auth/context/AuthContext";
-import { authFetch, safeJson } from "@/shared/services/api.service";
+import { authFetch } from "@/shared/services/api.service";
+import { safeJson } from "@/shared/utils/httpUtils";
 import { PRICING_PAGE_TEXTS as T } from "@/shared/constants/texts";
 import { Button, IconButton, PageFrame, SegmentedControl, Skeleton, cx } from "@/shared/ui/Premium";
 import Lottie from "lottie-react";
@@ -14,7 +15,7 @@ function SuccessAnimation() {
 
 const API = import.meta.env.VITE_API_URL || "http://localhost:8081/api/v1";
 
-const fmt = (value) => {
+const formatCurrency = (value) => {
   const amount = Number(value || 0);
   return amount === 0 ? T.price.zeroDong : `${new Intl.NumberFormat("vi-VN").format(amount)}${T.price.dongSuffix}`;
 };
@@ -32,7 +33,7 @@ function visibleFeatures(plan) {
 function PaymentModal({ plan, onClose, onSuccess }) {
   const P = T.payment;
   const [loading, setLoading] = useState(true);
-  const [err, setErr] = useState("");
+  const [error, setError] = useState("");
   const [done, setDone] = useState(false);
   const [paymentInfo, setPaymentInfo] = useState(null);
   const price = plan.discounted_price_vnd;
@@ -54,7 +55,7 @@ function PaymentModal({ plan, onClose, onSuccess }) {
         const data = await safeJson(res);
         if (!cancelled) setPaymentInfo(data);
       } catch (error) {
-        if (!cancelled) setErr(error.message);
+        if (!cancelled) setError(error.message);
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -126,7 +127,7 @@ function PaymentModal({ plan, onClose, onSuccess }) {
                   </div>
                   <div className="text-right">
                     <span className="text-[11px] font-bold text-[var(--muted)]">{P.total}</span>
-                    <p className="mt-1 text-[20px] font-[820] leading-none text-[var(--brand-primary)]">{fmt(price)}</p>
+                    <p className="mt-1 text-[20px] font-[820] leading-none text-[var(--brand-primary)]">{formatCurrency(price)}</p>
                   </div>
                 </div>
               </section>
@@ -138,10 +139,10 @@ function PaymentModal({ plan, onClose, onSuccess }) {
                     <div className="h-[220px] w-[220px] animate-pulse rounded-2xl bg-[var(--surface-raised)]" />
                     <p className="text-[13px] font-medium text-[var(--muted)]">Đang tạo mã thanh toán...</p>
                   </div>
-                ) : err ? (
+                ) : error ? (
                   <div className="py-6">
                     <span className="material-symbols-outlined text-[40px] text-[var(--brand-rose)]" aria-hidden="true">error</span>
-                    <p className="mt-2 text-[13px] font-semibold text-[var(--brand-rose)]">{err}</p>
+                    <p className="mt-2 text-[13px] font-semibold text-[var(--brand-rose)]">{error}</p>
                     <Button variant="secondary" onClick={() => onClose(null)} className="mt-4">Đóng</Button>
                   </div>
                 ) : paymentInfo ? (
@@ -185,7 +186,7 @@ function PaymentModal({ plan, onClose, onSuccess }) {
               </div>
 
               {/* Cancel */}
-              {!loading && !err && (
+              {!loading && !error && (
                 <div className="mt-5 flex justify-center">
                   <Button variant="secondary" onClick={handleClose} className="w-full sm:w-auto">{P.cancelBtn}</Button>
                 </div>
@@ -250,7 +251,7 @@ function PlanCard({ plan, isActive, featured, onSelect }) {
   const texts = T.plans[plan.name] || {};
   const isFree = Number(plan.price_vnd || 0) === 0;
   const features = visibleFeatures(plan);
-  const price = isFree ? fmt(0) : fmt(plan.discounted_price_vnd);
+  const price = isFree ? formatCurrency(0) : formatCurrency(plan.discounted_price_vnd);
   const unit = T.price.vndByCycle(plan.billing_cycle);
 
   return (
@@ -288,7 +289,7 @@ function PlanCard({ plan, isActive, featured, onSelect }) {
       <div className="mt-6">
         {!isFree && plan.discount_percent > 0 && (
           <div className="mb-2 flex flex-wrap items-center gap-2 text-[12px] font-semibold">
-            <span className="text-[var(--muted)] line-through">{fmt(plan.price_vnd)}</span>
+            <span className="text-[var(--muted)] line-through">{formatCurrency(plan.price_vnd)}</span>
             <span className="rounded-[var(--radius-chip)] border border-[var(--danger-border)] bg-[var(--danger-soft)] px-2 py-0.5 text-[10px] font-bold text-[var(--brand-rose)]">
               -{plan.discount_percent}%
             </span>
@@ -373,6 +374,7 @@ function BillingToggle({ billingAnnual, onChange, annualDiscount = 0 }) {
   );
 }
 
+/** Trang bảng giá — so sánh gói Free/Pro, thanh toán QR qua payOS */
 export default function PricingPage() {
   const { refreshUser } = useAuth();
   const navigate = useNavigate();

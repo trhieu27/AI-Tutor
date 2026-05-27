@@ -1,8 +1,7 @@
-export let UserRole = /*#__PURE__*/function (UserRole) {
-  UserRole["STUDENT"] = "STUDENT";
-  UserRole["ADMIN"] = "ADMIN";
-  return UserRole;
-}({});
+export const UserRole = Object.freeze({
+  STUDENT: 'STUDENT',
+  ADMIN: 'ADMIN',
+});
 export class User {
   constructor(id, full_name, email, role, isPro = false, student_id = null, createdAt = new Date()) {
     this.id = id;
@@ -23,9 +22,9 @@ export class User {
   }
 }
 export class Student extends User {
-  constructor(id, full_name, email, student_id, isPro_flag = false, totalDocumentsUploaded = 0, totalQuizzesTaken = 0, lastActive = new Date()) {
-    super(id, full_name, email, UserRole.STUDENT, isPro_flag, student_id);
-    this.isPro_flag = isPro_flag;
+  constructor(id, full_name, email, student_id, isProUser = false, totalDocumentsUploaded = 0, totalQuizzesTaken = 0, lastActive = new Date()) {
+    super(id, full_name, email, UserRole.STUDENT, isProUser, student_id);
+    this.isProUser = isProUser;
     this.totalDocumentsUploaded = totalDocumentsUploaded;
     this.totalQuizzesTaken = totalQuizzesTaken;
     this.lastActive = lastActive;

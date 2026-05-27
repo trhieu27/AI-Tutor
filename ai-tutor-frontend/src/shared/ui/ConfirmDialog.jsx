@@ -2,13 +2,6 @@ import { useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
 import { COMMON_ACTION_TEXTS } from "@/shared/constants/texts";
 
-// ─── All logic unchanged — only visual layer updated ───────────────────────
-// Anti-patterns fixed:
-//   - #FEF2F2, #B91C1C, #FFFBEB, #111827 hex → HSL + CSS vars
-//   - rgba(185,28,28,0.25) shadow → hsl() with alpha
-//   - bg-white hardcoded → var(--card-bg)
-//   - border-[var(--border-color)] → var(--border-color)
-
 const VARIANT_CONFIG = {
   danger: {
     icon: "delete_forever",
@@ -43,8 +36,8 @@ export default function ConfirmDialog({
   /* Auto-focus confirm button */
   useEffect(() => {
     if (open) {
-      const t = setTimeout(() => confirmRef.current?.focus(), 60);
-      return () => clearTimeout(t);
+      const focusTimerId = setTimeout(() => confirmRef.current?.focus(), 60);
+      return () => clearTimeout(focusTimerId);
     }
   }, [open]);
 

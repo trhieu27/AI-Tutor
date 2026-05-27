@@ -110,8 +110,7 @@ function ToastItem({ toast, onDismiss, stackIndex }) {
     };
     rafRef.current = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(rafRef.current);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, []); // Chỉ chạy 1 lần khi mount — countdown bắt đầu từ startRef cố định
 
   const dismiss = useCallback(() => {
     setExiting(true);

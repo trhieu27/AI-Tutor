@@ -112,11 +112,11 @@ export default function Aurora(props) {
   const propsRef = useRef(props);
   propsRef.current = props;
 
-  const ctnDom = useRef(null);
+  const containerRef = useRef(null);
 
   useEffect(() => {
-    const ctn = ctnDom.current;
-    if (!ctn) return;
+    const container = containerRef.current;
+    if (!container) return;
 
     const renderer = new Renderer({
       alpha: true,
@@ -132,9 +132,9 @@ export default function Aurora(props) {
     let program;
 
     function resize() {
-      if (!ctn) return;
-      const width = ctn.offsetWidth;
-      const height = ctn.offsetHeight;
+      if (!container) return;
+      const width = container.offsetWidth;
+      const height = container.offsetHeight;
       renderer.setSize(width, height);
       if (program) {
         program.uniforms.uResolution.value = [width, height];
@@ -159,18 +159,18 @@ export default function Aurora(props) {
         uTime: { value: 0 },
         uAmplitude: { value: amplitude },
         uColorStops: { value: colorStopsArray },
-        uResolution: { value: [ctn.offsetWidth, ctn.offsetHeight] },
+        uResolution: { value: [container.offsetWidth, container.offsetHeight] },
         uBlend: { value: blend }
       }
     });
 
     const mesh = new Mesh(gl, { geometry, program });
-    ctn.appendChild(gl.canvas);
+    container.appendChild(gl.canvas);
 
-    let animateId = 0;
-    const update = t => {
-      animateId = requestAnimationFrame(update);
-      const { time = t * 0.01, speed = 1.0 } = propsRef.current;
+    let animationFrameId = 0;
+    const update = timestamp => {
+      animationFrameId = requestAnimationFrame(update);
+      const { time = timestamp * 0.01, speed = 1.0 } = propsRef.current;
       program.uniforms.uTime.value = time * speed * 0.1;
       program.uniforms.uAmplitude.value = propsRef.current.amplitude ?? 1.0;
       program.uniforms.uBlend.value = propsRef.current.blend ?? blend;
@@ -181,20 +181,19 @@ export default function Aurora(props) {
       });
       renderer.render({ scene: mesh });
     };
-    animateId = requestAnimationFrame(update);
+    animationFrameId = requestAnimationFrame(update);
 
     resize();
 
     return () => {
-      cancelAnimationFrame(animateId);
+      cancelAnimationFrame(animationFrameId);
       window.removeEventListener('resize', resize);
-      if (ctn && gl.canvas.parentNode === ctn) {
-        ctn.removeChild(gl.canvas);
+      if (container && gl.canvas.parentNode === container) {
+        container.removeChild(gl.canvas);
       }
       gl.getExtension('WEBGL_lose_context')?.loseContext();
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [amplitude]);
+  }, [amplitude]); // Chỉ tái tạo WebGL context khi amplitude thay đổi — các prop khác đọc qua propsRef
 
-  return <div ref={ctnDom} style={{ width: '100%', height: '100%', position: 'absolute', inset: 0 }} />;
+  return <div ref={containerRef} style={{ width: '100%', height: '100%', position: 'absolute', inset: 0 }} />;
 }

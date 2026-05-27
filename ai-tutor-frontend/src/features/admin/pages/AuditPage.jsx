@@ -109,6 +109,7 @@ function formatAuditMetadata(log) {
 
 const INITIAL_FILTERS = { page: 1, limit: 5, admin_id: "", action: "", target_type: "", from: "", to: "" };
 
+/** Nhật ký admin — ghi lại mọi thao tác quản trị */
 export default function AdminAuditPage() {
   const [filters, setFilters] = useState(INITIAL_FILTERS);
   const [data, setData] = useState(() => readCachedAdminAudit(INITIAL_FILTERS));

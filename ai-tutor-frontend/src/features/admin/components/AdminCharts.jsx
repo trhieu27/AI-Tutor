@@ -2,7 +2,7 @@ import { useId, useMemo } from "react";
 import { LineChart } from "@mui/x-charts/LineChart";
 import { AdminEmpty } from "./AdminPrimitives";
 
-/* ── Helpers ────────────────────────────────────────────────────────────── */
+// Formatting helpers
 
 function fmtVnd(v) {
   if (v >= 1_000_000) return `${(v / 1_000_000).toFixed(v % 1_000_000 === 0 ? 0 : 1)}tr`;
@@ -34,10 +34,7 @@ function formatPeriodLabel(value) {
   return String(value || "");
 }
 
-/* ═════════════════════════════════════════════════════════════════════════
-   1. RevenueAreaChart — gradient stroke with a soft fading area
-   ═════════════════════════════════════════════════════════════════════════ */
-
+/** Biểu đồ doanh thu dạng area — gradient stroke với vùng tô mờ */
 export function RevenueAreaChart({ series = [], height = 340 }) {
   const rawId = useId();
   const gradientKey = rawId.replace(/:/g, "");
@@ -146,10 +143,7 @@ export function RevenueAreaChart({ series = [], height = 340 }) {
   );
 }
 
-/* ═════════════════════════════════════════════════════════════════════════
-   2. ConversionGauge — Pro adoption meter
-   ═════════════════════════════════════════════════════════════════════════ */
-
+/** Đồng hồ tỷ lệ chuyển đổi Free → Pro */
 export function ConversionGauge({ value = 0, label = "Tỷ lệ người dùng Pro", proUsers = 0, freeUsers = 0 }) {
   const rate = Math.min(Math.max(Number(value || 0), 0), 100);
   const pro = Number(proUsers || 0);

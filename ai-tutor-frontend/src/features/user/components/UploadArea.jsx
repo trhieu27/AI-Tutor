@@ -1,6 +1,7 @@
 import { useRef, useState } from "react";
 import { useUpload } from "@/features/user/context/UploadContext";
 import { UPLOAD_AREA_TEXTS, UPLOAD_DROPZONE_TEXTS } from "@/shared/constants/texts";
+import { ALLOWED_UPLOAD_TYPES } from "@/shared/constants/uploadConstants";
 import { cx } from "@/shared/ui/Premium";
 
 export default function UploadArea({ onUploadSuccess }) {
@@ -11,11 +12,7 @@ export default function UploadArea({ onUploadSuccess }) {
 
   const processFiles = async (files) => {
     if (!files || files.length === 0) return;
-    const allowedTypes = [
-      "application/pdf",
-      "application/msword",
-      "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-    ];
+    const allowedTypes = [...ALLOWED_UPLOAD_TYPES, "application/msword"];
     const allowedExt = [".pdf", ".doc", ".docx"];
     const hasInvalid = Array.from(files).some((file) => {
       const name = file.name.toLowerCase();

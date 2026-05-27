@@ -1,6 +1,6 @@
 import { authService } from './auth.service';
+import { safeJson } from '@/shared/utils/httpUtils';
 import { Document } from '@/shared/models/Document';
-import { Quiz } from '@/shared/models/Quiz';
 import { ChatSession } from '@/shared/models/Chat';
 import { Notification, Quota } from '@/shared/models/Notification';
 const API_BASE = '/api/v1';
@@ -30,19 +30,7 @@ function buildQueryParams(params = {}) {
   }
   return queryParts.length ? `?${queryParts.join('&')}` : '';
 }
-/**
- * Safely parse response body as JSON.
- * Prevents "Unexpected end of JSON input" when proxy returns empty/non-JSON body.
- */
-export async function safeJson(res, fallback = null) {
-  try {
-    const text = await res.text();
-    if (!text || !text.trim()) return fallback;
-    return JSON.parse(text);
-  } catch {
-    return fallback;
-  }
-}
+
 export async function authFetch(url, options = {}) {
   const headers = {
     ...options.headers,
@@ -77,6 +65,7 @@ export async function authFetch(url, options = {}) {
   }
   return response;
 }
+/** Normalise curly quotes, replace non-ASCII chars and whitespace with underscores */
 const sanitizeFileName = fileName => fileName.replace(/[''\"]/g, "'").replace(/[^\x00-\x7F]/g, '_').replace(/\s+/g, '_');
 export async function uploadDocument(file) {
   const sanitizedName = sanitizeFileName(file.name);
@@ -124,13 +113,13 @@ export async function fetchDocuments(params = {}) {
 
   if (wantsPaginated && data && data.items) {
     return {
-      items: data.items.map(d => Document.fromJSON(d)),
+      items: data.items.map(rawDocument => Document.fromJSON(rawDocument)),
       pagination: data.pagination
     };
   }
 
   const list = Array.isArray(data) ? data : (data?.items || []);
-  return list.map(d => Document.fromJSON(d));
+  return list.map(rawDocument => Document.fromJSON(rawDocument));
 }
 export async function fetchDocument(documentId) {
   const res = await authFetch(`${API_BASE}/documents/${documentId}`);
@@ -170,7 +159,7 @@ export async function retryDocument(documentId) {
 }
 export async function askQuestion(documentId, request, signal) {
   const headers = { 'Content-Type': 'application/json' };
-  // Pass debug header for advanced mode
+  // Gửi header debug nếu bật chế độ nâng cao
   if (request.debug) headers['X-Debug'] = 'true';
 
   const res = await authFetch(`${API_BASE}/chat/${documentId}/ask`, {
@@ -181,8 +170,8 @@ export async function askQuestion(documentId, request, signal) {
   });
   if (!res.ok) {
     if (res.status === 429) {
-      const err = await safeJson(res, {});
-      throw new QuotaError(err.detail || 'Quota exceeded');
+      const errorData = await safeJson(res, {});
+      throw new QuotaError(errorData.detail || 'Quota exceeded');
     }
     const error = await safeJson(res, { detail: 'Hỏi thất bại' });
     throw new Error(error.detail || 'Hỏi thất bại');
@@ -215,8 +204,8 @@ export async function askQuestionStream(documentId, request, onChunk, signal) {
 
   if (!res.ok) {
     if (res.status === 429) {
-      const err = await safeJson(res, {});
-      throw new QuotaError(err.detail || 'Quota exceeded');
+      const errorData = await safeJson(res, {});
+      throw new QuotaError(errorData.detail || 'Quota exceeded');
     }
     const error = await safeJson(res, { detail: 'Hỏi thất bại' });
     throw new Error(error.detail || 'Hỏi thất bại');
@@ -282,13 +271,13 @@ export async function fetchChatSessions(documentId, params = {}) {
 
   if (wantsPaginated && data && data.items) {
     return {
-      items: data.items.map(s => ChatSession.fromJSON(s)),
+      items: data.items.map(rawSession => ChatSession.fromJSON(rawSession)),
       pagination: data.pagination
     };
   }
 
   const list = Array.isArray(data) ? data : (data?.items || []);
-  return list.map(s => ChatSession.fromJSON(s));
+  return list.map(rawSession => ChatSession.fromJSON(rawSession));
 }
 export async function fetchRecentChatSessions(params = {}) {
   const actualParams = typeof params === 'number' ? { limit: params } : params;
@@ -300,19 +289,19 @@ export async function fetchRecentChatSessions(params = {}) {
 
   if (wantsPaginated && data && data.items) {
     return {
-      items: data.items.map(s => ChatSession.fromJSON(s)),
+      items: data.items.map(rawSession => ChatSession.fromJSON(rawSession)),
       pagination: data.pagination
     };
   }
 
   const list = Array.isArray(data) ? data : (data?.items || []);
-  return list.map(s => ChatSession.fromJSON(s));
+  return list.map(rawSession => ChatSession.fromJSON(rawSession));
 }
 export async function fetchSessionDetail(sessionId) {
   const res = await authFetch(`${API_BASE}/chat/sessions/${sessionId}`);
   if (!res.ok) {
-    const e = await safeJson(res, {});
-    throw new Error(`[${res.status}] ${e.detail || 'Không tìm thấy phiên chat'}`);
+    const errorData = await safeJson(res, {});
+    throw new Error(`[${res.status}] ${errorData.detail || 'Không tìm thấy phiên chat'}`);
   }
   return safeJson(res, {});
 }
@@ -350,8 +339,8 @@ export async function fetchDocumentSummaryStream(documentId, onChunk, signal) {
   });
   if (!res.ok) {
     if (res.status === 429) {
-      const e = await safeJson(res, {});
-      throw new QuotaError(e.detail || 'Quota exceeded');
+      const errorData = await safeJson(res, {});
+      throw new QuotaError(errorData.detail || 'Quota exceeded');
     }
     throw new Error('Không thể tạo bản tóm tắt');
   }
@@ -370,8 +359,8 @@ export async function fetchDocumentQuizStream(documentId, onChunk, force = false
   });
   if (!res.ok) {
     if (res.status === 429) {
-      const e = await safeJson(res, {});
-      throw new QuotaError(e.detail || 'Quota exceeded');
+      const errorData = await safeJson(res, {});
+      throw new QuotaError(errorData.detail || 'Quota exceeded');
     }
     throw new Error('Không thể tạo bài kiểm tra');
   }
@@ -393,8 +382,8 @@ export async function fetchDocumentMindmapStream(documentId, onChunk, signal, fo
   });
   if (!res.ok) {
     if (res.status === 429) {
-      const e = await safeJson(res, {});
-      throw new QuotaError(e.detail || 'Quota exceeded');
+      const errorData = await safeJson(res, {});
+      throw new QuotaError(errorData.detail || 'Quota exceeded');
     }
     throw new Error('Không thể tạo sơ đồ tư duy');
   }
@@ -418,8 +407,8 @@ export async function updateDocumentMindmap(documentId, mindmapCode) {
     })
   });
   if (!res.ok) {
-    const e = await safeJson(res, {});
-    throw new Error(e.detail || 'Không thể cập nhật sơ đồ tư duy');
+    const errorData = await safeJson(res, {});
+    throw new Error(errorData.detail || 'Không thể cập nhật sơ đồ tư duy');
   }
 }
 export async function fetchDocumentStudyQuestionsStream(documentId, onChunk, signal) {
@@ -428,8 +417,8 @@ export async function fetchDocumentStudyQuestionsStream(documentId, onChunk, sig
   });
   if (!res.ok) {
     if (res.status === 429) {
-      const e = await safeJson(res, {});
-      throw new QuotaError(e.detail || 'Quota exceeded');
+      const errorData = await safeJson(res, {});
+      throw new QuotaError(errorData.detail || 'Quota exceeded');
     }
     throw new Error('Không thể tạo câu hỏi ôn tập');
   }
@@ -440,7 +429,7 @@ export async function fetchDocumentStudyQuestions(documentId, signal) {
     signal
   });
   if (!res.ok) throw new Error('Không thể tải câu hỏi ôn tập');
-  return (await res.text()).split('\n').map(l => l.replace(/^\d+\.\s*/, '').trim()).filter(l => l.length > 5);
+  return (await res.text()).split('\n').map(line => line.replace(/^\d+\.\s*/, '').trim()).filter(line => line.length > 5);
 }
 export async function fetchQuota() {
   const res = await authFetch(`${API_BASE}/quota/me`);
@@ -461,13 +450,13 @@ export async function fetchNotifications(params = {}) {
 
   if (wantsPaginated && data && data.items) {
     return {
-      items: data.items.map(n => Notification.fromJSON(n)),
+      items: data.items.map(rawNotification => Notification.fromJSON(rawNotification)),
       pagination: data.pagination
     };
   }
 
   const list = Array.isArray(data) ? data : (data?.items || []);
-  return list.map(n => Notification.fromJSON(n));
+  return list.map(rawNotification => Notification.fromJSON(rawNotification));
 }
 export async function markNotificationRead(notifId) {
   await authFetch(`${API_BASE}/notifications/${notifId}/read`, {

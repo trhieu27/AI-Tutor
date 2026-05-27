@@ -2,6 +2,9 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { PREMIUM_COMPONENT_TEXTS } from "@/shared/constants/texts";
 
+// Re-export shared state components from States.jsx (single source of truth)
+export { EmptyState, Skeleton } from "@/shared/ui/States";
+
 export function cx(...classes) {
   return classes.filter(Boolean).join(" ");
 }
@@ -313,21 +316,3 @@ export function SegmentedControl({ options, value, onChange, className = "" }) {
   );
 }
 
-export function EmptyState({ icon = "folder_open", title, subtitle, action }) {
-  return (
-    <div className="premium-empty-state">
-      <span className="premium-empty-icon">
-        <span className="material-symbols-outlined text-[28px]">{icon}</span>
-      </span>
-      <div>
-        <h3 className="text-[15px] font-bold text-[var(--foreground)]">{title}</h3>
-        {subtitle && <p className="mt-1 text-[12px] font-medium leading-6 text-[var(--muted)]">{subtitle}</p>}
-      </div>
-      {action}
-    </div>
-  );
-}
-
-export function Skeleton({ className = "" }) {
-  return <div className={cx("premium-skeleton", className)} />;
-}

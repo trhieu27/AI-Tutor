@@ -1,5 +1,6 @@
 import { Admin, Student } from '@/shared/models/User';
 import { sendWsLogout } from '@/shared/hooks/useNotifications';
+import { safeJson } from '@/shared/utils/httpUtils';
 
 const AUTH_BASE = '/api/v1';
 
@@ -11,20 +12,20 @@ function createUserInstance(userData) {
   return new Student(userData.id, userData.full_name, userData.email, userData.student_id, userData.is_pro ?? false);
 }
 
-async function safeJson(res, fallback = null) {
-  try {
-    const text = await res.text();
-    if (!text || !text.trim()) return fallback;
-    return JSON.parse(text);
-  } catch {
-    return fallback;
-  }
-}
+
 
 class AuthService {
-  constructor() {}
   _refreshPromise = null;
   _lastRefreshErrorStatus = null;
+
+  _persistAuthData(data) {
+    this._refreshPromise = null;
+    localStorage.setItem('access_token', data.access_token);
+    localStorage.setItem('refresh_token', data.refresh_token);
+    this.persistUser(data.user);
+    this.setCookie('access_token', data.access_token, 7);
+    this.setCookie('refresh_token', data.refresh_token, 7);
+  }
 
   setCookie(name, value, days) {
     const expires = new Date(Date.now() + days * 86400000).toUTCString();
@@ -54,16 +55,11 @@ class AuthService {
       })
     });
     if (!response.ok) {
-      const e = await safeJson(response, {});
-      throw new Error(e.detail || 'Login failed');
+      const errorBody = await safeJson(response, {});
+      throw new Error(errorBody.detail || 'Login failed');
     }
     const data = await safeJson(response, {});
-    this._refreshPromise = null;
-    localStorage.setItem('access_token', data.access_token);
-    localStorage.setItem('refresh_token', data.refresh_token);
-    this.persistUser(data.user);
-    this.setCookie('access_token', data.access_token, 7);
-    this.setCookie('refresh_token', data.refresh_token, 7);
+    this._persistAuthData(data);
     return {
       user: createUserInstance(data.user),
       accessToken: data.access_token,
@@ -82,16 +78,11 @@ class AuthService {
       })
     });
     if (!response.ok) {
-      const e = await safeJson(response, {});
-      throw new Error(e.detail || 'Admin login failed');
+      const errorBody = await safeJson(response, {});
+      throw new Error(errorBody.detail || 'Admin login failed');
     }
     const data = await safeJson(response, {});
-    this._refreshPromise = null;
-    localStorage.setItem('access_token', data.access_token);
-    localStorage.setItem('refresh_token', data.refresh_token);
-    this.persistUser(data.user);
-    this.setCookie('access_token', data.access_token, 7);
-    this.setCookie('refresh_token', data.refresh_token, 7);
+    this._persistAuthData(data);
     return {
       user: createUserInstance(data.user),
       accessToken: data.access_token,
@@ -109,16 +100,11 @@ class AuthService {
       })
     });
     if (!response.ok) {
-      const e = await safeJson(response, {});
-      throw new Error(e.detail || 'Google login failed');
+      const errorBody = await safeJson(response, {});
+      throw new Error(errorBody.detail || 'Google login failed');
     }
     const data = await safeJson(response, {});
-    this._refreshPromise = null;
-    localStorage.setItem('access_token', data.access_token);
-    localStorage.setItem('refresh_token', data.refresh_token);
-    this.persistUser(data.user);
-    this.setCookie('access_token', data.access_token, 7);
-    this.setCookie('refresh_token', data.refresh_token, 7);
+    this._persistAuthData(data);
     return {
       user: createUserInstance(data.user),
       accessToken: data.access_token,
@@ -140,16 +126,11 @@ class AuthService {
       })
     });
     if (!response.ok) {
-      const e = await safeJson(response, {});
-      throw new Error(e.detail || 'Registration failed');
+      const errorBody = await safeJson(response, {});
+      throw new Error(errorBody.detail || 'Registration failed');
     }
     const data = await safeJson(response, {});
-    this._refreshPromise = null;
-    localStorage.setItem('access_token', data.access_token);
-    localStorage.setItem('refresh_token', data.refresh_token);
-    this.persistUser(data.user);
-    this.setCookie('access_token', data.access_token, 7);
-    this.setCookie('refresh_token', data.refresh_token, 7);
+    this._persistAuthData(data);
     return {
       user: createUserInstance(data.user),
       accessToken: data.access_token,
@@ -222,8 +203,8 @@ class AuthService {
       })
     });
     if (!response.ok) {
-      const e = await safeJson(response, {});
-      throw new Error(e.detail || 'Không thể gửi yêu cầu khôi phục');
+      const errorBody = await safeJson(response, {});
+      throw new Error(errorBody.detail || 'Không thể gửi yêu cầu khôi phục');
     }
   }
   async verifyOtp(email, otp) {
@@ -238,8 +219,8 @@ class AuthService {
       })
     });
     if (!response.ok) {
-      const e = await safeJson(response, {});
-      throw new Error(e.detail || 'Mã xác nhận không hợp lệ');
+      const errorBody = await safeJson(response, {});
+      throw new Error(errorBody.detail || 'Mã xác nhận không hợp lệ');
     }
   }
   async resetPassword(email, otp, password) {
@@ -255,8 +236,8 @@ class AuthService {
       })
     });
     if (!response.ok) {
-      const e = await safeJson(response, {});
-      throw new Error(e.detail || 'Không thể đặt lại mật khẩu');
+      const errorBody = await safeJson(response, {});
+      throw new Error(errorBody.detail || 'Không thể đặt lại mật khẩu');
     }
   }
   async getCurrentUser(shouldRetry = true) {

@@ -8,13 +8,13 @@ const PALETTE = {
 
 // ── Inject <style> rule for color-scheme (CSS path, different from inline) ────
 function injectColorSchemeRule(scheme) {
-  let s = document.getElementById("__ai_cs__");
-  if (!s) {
-    s = document.createElement("style");
-    s.id = "__ai_cs__";
-    document.head.prepend(s);
+  let styleElement = document.getElementById("__ai_cs__");
+  if (!styleElement) {
+    styleElement = document.createElement("style");
+    styleElement.id = "__ai_cs__";
+    document.head.prepend(styleElement);
   }
-  s.textContent = `:root { color-scheme: ${scheme} !important; }`;
+  styleElement.textContent = `:root { color-scheme: ${scheme} !important; }`;
 }
 
 // ── Recreate a single meta tag (destroy old → insert fresh) ───────────────────
@@ -22,11 +22,11 @@ function forceMetaTag(name, content, media) {
   document.querySelectorAll(
     media ? `meta[name="${name}"][media]` : `meta[name="${name}"]:not([media])`
   ).forEach(el => el.remove());
-  const m = document.createElement("meta");
-  m.setAttribute("name", name);
-  m.setAttribute("content", content);
-  if (media) m.setAttribute("media", media);
-  document.head.prepend(m);
+  const metaElement = document.createElement("meta");
+  metaElement.setAttribute("name", name);
+  metaElement.setAttribute("content", content);
+  if (media) metaElement.setAttribute("media", media);
+  document.head.prepend(metaElement);
 }
 
 // ── Force Safari Liquid Glass compositor to re-sample page background ─────────
@@ -122,11 +122,11 @@ export function ThemeProvider({ children }) {
     localStorage.setItem("theme", theme);
   }, [theme]);
 
-  const setTheme = (t) => {
-    if (t === theme) return;
-    localStorage.setItem("theme", t);
-    applyTheme(t);
-    setThemeState(t);
+  const setTheme = (newTheme) => {
+    if (newTheme === theme) return;
+    localStorage.setItem("theme", newTheme);
+    applyTheme(newTheme);
+    setThemeState(newTheme);
   };
 
   return (

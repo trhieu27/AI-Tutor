@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { getPaginationItems } from "@/shared/utils/paginationUtils";
 import { Link } from "react-router-dom";
 import { useDocuments } from "@/features/user/context/DocumentContext";
 import { DOCUMENT_PICKER_TEXTS } from "@/shared/constants/texts";
@@ -19,24 +20,6 @@ import {
 
 const PAGE_SIZE_OPTIONS = [5, 10, 20];
 
-function getPaginationItems(currentPage, totalPages) {
-  if (totalPages <= 5) return Array.from({ length: totalPages }, (_, i) => i + 1);
-
-  const pages = new Set([1, totalPages]);
-  for (let i = Math.max(2, currentPage - 1); i <= Math.min(totalPages - 1, currentPage + 1); i++) {
-    pages.add(i);
-  }
-
-  const sorted = [...pages].sort((a, b) => a - b);
-  const result = [];
-  for (let i = 0; i < sorted.length; i++) {
-    if (i > 0 && sorted[i] - sorted[i - 1] > 1) {
-      result.push(result.includes("ellipsis-start") ? "ellipsis-end" : "ellipsis-start");
-    }
-    result.push(sorted[i]);
-  }
-  return result;
-}
 
 function PickerPageSizeSelect({ value, onChange }) {
   const [open, setOpen] = useState(false);
@@ -137,7 +120,7 @@ export default function DocumentPicker({
   const [query, setQuery] = useState(pickerFilters.search || "");
   const [localSelectedId, setLocalSelectedId] = useState(selectedId || null);
 
-  // Sync showOnlyReady prop with context
+  // Đồng bộ prop showOnlyReady với context
   useEffect(() => {
     setPickerFilters((prev) => {
       if (prev.showOnlyReady === showOnlyReady) return prev;
@@ -145,7 +128,7 @@ export default function DocumentPicker({
     });
   }, [showOnlyReady, setPickerFilters]);
 
-  // Debounce search query
+  // Debounce tìm kiếm
   useEffect(() => {
     const timer = setTimeout(() => {
       setPickerFilters((prev) => {
@@ -164,8 +147,7 @@ export default function DocumentPicker({
     setPickerFilters((prev) => ({ ...prev, limit: newSize, page: 1 }));
   };
 
-  const visibleDocuments = pickerDocuments;
-  const paginatedDocuments = pickerDocuments;
+
   const totalPages = pickerPagination.totalPages;
   const currentPage = pickerPagination.page;
   const pageSize = pickerFilters.limit;
@@ -174,7 +156,7 @@ export default function DocumentPicker({
   const pageItems = getPaginationItems(currentPage, totalPages);
 
   const activeId = selectedId || localSelectedId;
-  const activeDocument = visibleDocuments.find((doc) => String(doc.id) === String(activeId));
+  const activeDocument = pickerDocuments.find((doc) => String(doc.id) === String(activeId));
   const ActionComponent = liquidAction ? LiquidGlassButton : Button;
 
   if (pickerLoading && pickerDocuments.length === 0) {
@@ -224,7 +206,7 @@ export default function DocumentPicker({
             <div className="flex flex-wrap items-center gap-2">
               <h2 className="text-[18px] font-semibold text-[var(--foreground)]">{title}</h2>
               <span className="rounded-[var(--radius-chip)] border border-[var(--border-subtle)] bg-[var(--surface)] px-2 py-1 text-[10px] font-bold text-[var(--muted)]">
-                {DOCUMENT_PICKER_TEXTS.count(visibleDocuments.length)}
+                {DOCUMENT_PICKER_TEXTS.count(pickerDocuments.length)}
               </span>
             </div>
             {subtitle && <p className="mt-1 max-w-2xl text-[13px] font-medium leading-6 text-[var(--muted)]">{subtitle}</p>}
@@ -243,7 +225,7 @@ export default function DocumentPicker({
         </div>
       </div>
 
-      {visibleDocuments.length === 0 ? (
+      {pickerDocuments.length === 0 ? (
         <EmptyState
           icon="library_add"
           title={query ? DOCUMENT_PICKER_TEXTS.empty.filteredTitle : DOCUMENT_PICKER_TEXTS.empty.readyTitle}
@@ -257,7 +239,7 @@ export default function DocumentPicker({
       ) : (
         <div>
           <div className="document-picker-list space-y-3 p-3 md:space-y-0 md:divide-y md:divide-[var(--border-subtle)] md:p-0">
-            {paginatedDocuments.map((doc) => {
+            {pickerDocuments.map((doc) => {
               const isSelected = String(activeId) === String(doc.id);
               const actionTarget = actionForDocument?.(doc);
               const rowClassName = cx(
@@ -345,7 +327,7 @@ export default function DocumentPicker({
           <div className="pagination-bar">
             <div className="flex items-center justify-between gap-2">
               <div className="pagination-info">
-                <span>{DOCUMENT_PICKER_TEXTS.pagination.range(rangeStart, rangeEnd, visibleDocuments.length)}</span>
+                <span>{DOCUMENT_PICKER_TEXTS.pagination.range(rangeStart, rangeEnd, pickerDocuments.length)}</span>
                 <span className="separator">·</span>
                 <span>{DOCUMENT_PICKER_TEXTS.pagination.page(currentPage, totalPages)}</span>
               </div>

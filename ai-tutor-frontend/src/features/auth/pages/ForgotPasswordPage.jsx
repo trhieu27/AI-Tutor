@@ -6,7 +6,11 @@ import { Button } from "@/shared/ui/Premium";
 import { FORGOT_PASSWORD_FLOW_TEXTS } from "@/shared/constants/texts";
 
 
-const T = FORGOT_PASSWORD_FLOW_TEXTS;
+const TEXTS = FORGOT_PASSWORD_FLOW_TEXTS;
+
+const MAX_OTP_ATTEMPTS = 3;
+const RESEND_TIMER_SECONDS = 60;
+const LOCKOUT_DURATION_MS = 60000;
 
 export default function ForgotPasswordPage() {
   const [step, setStep] = useState("email");
@@ -40,7 +44,7 @@ export default function ForgotPasswordPage() {
     const remaining = Math.ceil((parseInt(storedLockout) - Date.now()) / 1000);
     if (remaining > 0) {
       setOtpLockoutTimer(remaining);
-      setFailedOtpAttempts(3);
+      setFailedOtpAttempts(MAX_OTP_ATTEMPTS);
     } else {
       setOtpLockoutTimer(0);
       localStorage.removeItem(`otp_lockout_${checkEmail}`);
@@ -80,7 +84,7 @@ export default function ForgotPasswordPage() {
   const handleSendOtp = async (event = null) => {
     event?.preventDefault();
     if (resendTimer > 0 && email === lastEmailSent) {
-      setError(T.errors.waitBeforeResend(resendTimer));
+      setError(TEXTS.errors.waitBeforeResend(resendTimer));
       return;
     }
     setError("");
@@ -90,9 +94,9 @@ export default function ForgotPasswordPage() {
       setLastEmailSent(email);
       setOtpValues(["", "", "", "", "", ""]);
       setStep("otp");
-      setResendTimer(60);
+      setResendTimer(RESEND_TIMER_SECONDS);
     } catch (err) {
-      setError(err.message || T.errors.emailNotFound);
+      setError(err.message || TEXTS.errors.emailNotFound);
     } finally {
       setIsLoading(false);
     }
@@ -103,7 +107,7 @@ export default function ForgotPasswordPage() {
     if (otpLockoutTimer > 0) return;
     const otpString = otpValues.join("");
     if (otpString.length < 6) {
-      setError(T.errors.otpIncomplete);
+      setError(TEXTS.errors.otpIncomplete);
       return;
     }
     setError("");
@@ -117,12 +121,12 @@ export default function ForgotPasswordPage() {
     } catch (err) {
       const newAttempts = failedOtpAttempts + 1;
       setFailedOtpAttempts(newAttempts);
-      if (newAttempts >= 3) {
-        const lockoutUntil = Date.now() + 60000;
+      if (newAttempts >= MAX_OTP_ATTEMPTS) {
+        const lockoutUntil = Date.now() + LOCKOUT_DURATION_MS;
         localStorage.setItem(`otp_lockout_${lastEmailSent}`, lockoutUntil.toString());
-        setOtpLockoutTimer(60);
+        setOtpLockoutTimer(LOCKOUT_DURATION_MS / 1000);
       } else {
-        setError(err.message || T.errors.otpWrong(3 - newAttempts));
+        setError(err.message || TEXTS.errors.otpWrong(MAX_OTP_ATTEMPTS - newAttempts));
       }
     } finally {
       setIsLoading(false);
@@ -133,11 +137,11 @@ export default function ForgotPasswordPage() {
     event.preventDefault();
     setError("");
     if (newPassword.length < 8) {
-      setError(T.errors.passwordTooShort);
+      setError(TEXTS.errors.passwordTooShort);
       return;
     }
     if (newPassword !== confirmPassword) {
-      setError(T.errors.passwordMismatch);
+      setError(TEXTS.errors.passwordMismatch);
       return;
     }
     setIsLoading(true);
@@ -145,15 +149,15 @@ export default function ForgotPasswordPage() {
       await authService.resetPassword(lastEmailSent, otpValues.join(""), newPassword);
       setStep("success");
     } catch (err) {
-      setError(err.message || T.errors.resetFailed);
+      setError(err.message || TEXTS.errors.resetFailed);
     } finally {
       setIsLoading(false);
     }
   };
 
   const header = {
-    ...T.header[step],
-    subtitle: step === "otp" ? T.header.otp.subtitle(lastEmailSent) : T.header[step].subtitle,
+    ...TEXTS.header[step],
+    subtitle: step === "otp" ? TEXTS.header.otp.subtitle(lastEmailSent) : TEXTS.header[step].subtitle,
   };
 
   const inputClass = "premium-input h-12 px-4 pr-11";
@@ -163,7 +167,7 @@ export default function ForgotPasswordPage() {
       return (
         <form onSubmit={handleSendOtp} className="space-y-5">
           <label className="block">
-            <span className="mb-1.5 block text-[12px] font-bold text-[var(--muted)]">{T.emailLabel}</span>
+            <span className="mb-1.5 block text-[12px] font-bold text-[var(--muted)]">{TEXTS.emailLabel}</span>
             <span className="relative block">
               <input
                 type="email"
@@ -172,7 +176,7 @@ export default function ForgotPasswordPage() {
                   setEmail(event.target.value);
                   setError("");
                 }}
-                placeholder={T.emailPlaceholder}
+                placeholder={TEXTS.emailPlaceholder}
                 className={inputClass}
                 required
                 disabled={isLoading}
@@ -183,7 +187,7 @@ export default function ForgotPasswordPage() {
             </span>
           </label>
           <Button type="submit" disabled={isLoading || (resendTimer > 0 && email === lastEmailSent)} className="w-full">
-            {isLoading ? T.processing : resendTimer > 0 && email === lastEmailSent ? T.retryAfter(resendTimer) : T.continue}
+            {isLoading ? TEXTS.processing : resendTimer > 0 && email === lastEmailSent ? TEXTS.retryAfter(resendTimer) : TEXTS.continue}
           </Button>
         </form>
       );
@@ -213,12 +217,12 @@ export default function ForgotPasswordPage() {
           </div>
           <div className="space-y-4">
             <Button type="submit" disabled={isLoading || otpLockoutTimer > 0} className="w-full">
-              {isLoading ? T.checking : otpLockoutTimer > 0 ? T.locked : T.verifyOtp}
+              {isLoading ? TEXTS.checking : otpLockoutTimer > 0 ? TEXTS.locked : TEXTS.verifyOtp}
             </Button>
             <p className="text-center text-[13px] font-medium text-[var(--muted)]">
-              {T.noCode}{" "}
+              {TEXTS.noCode}{" "}
               {resendTimer > 0 ? (
-                <span className="text-[var(--muted-light)]">{T.retryAfter(resendTimer)}</span>
+                <span className="text-[var(--muted-light)]">{TEXTS.retryAfter(resendTimer)}</span>
               ) : (
                 <button
                   type="button"
@@ -226,7 +230,7 @@ export default function ForgotPasswordPage() {
                   className="font-bold text-[var(--brand-primary)] hover:text-[var(--brand-primary-strong)]"
                   disabled={otpLockoutTimer > 0}
                 >
-                  {T.resendNow}
+                  {TEXTS.resendNow}
                 </button>
               )}
             </p>
@@ -244,14 +248,14 @@ export default function ForgotPasswordPage() {
               setValue: setNewPassword,
               show: showPassword,
               setShow: setShowPassword,
-              placeholder: T.passwordFields[0].placeholder,
+              placeholder: TEXTS.passwordFields[0].placeholder,
             },
             {
               value: confirmPassword,
               setValue: setConfirmPassword,
               show: showConfirmPassword,
               setShow: setShowConfirmPassword,
-              placeholder: T.passwordFields[1].placeholder,
+              placeholder: TEXTS.passwordFields[1].placeholder,
             },
           ].map((field) => (
             <span key={field.placeholder} className="relative block">
@@ -269,7 +273,7 @@ export default function ForgotPasswordPage() {
                 tabIndex={-1}
                 onClick={() => field.setShow(!field.show)}
                 className="absolute right-3.5 top-1/2 -translate-y-1/2 text-[var(--muted-light)] hover:text-[var(--brand-primary)]"
-                aria-label={field.show ? T.hidePassword : T.showPassword}
+                aria-label={field.show ? TEXTS.hidePassword : TEXTS.showPassword}
               >
                 <span className="material-symbols-outlined text-[18px]">
                   {field.show ? "visibility_off" : "visibility"}
@@ -278,7 +282,7 @@ export default function ForgotPasswordPage() {
             </span>
           ))}
           <Button type="submit" disabled={isLoading} className="w-full">
-            {isLoading ? T.updating : T.updatePassword}
+            {isLoading ? TEXTS.updating : TEXTS.updatePassword}
           </Button>
         </form>
       );
@@ -286,12 +290,12 @@ export default function ForgotPasswordPage() {
 
     return (
       <div className="premium-reveal py-5 text-center">
-        <h2 className="text-[24px] font-bold text-[var(--foreground)]">{T.successTitle}</h2>
+        <h2 className="text-[24px] font-bold text-[var(--foreground)]">{TEXTS.successTitle}</h2>
         <p className="mt-3 text-[14px] font-medium leading-6 text-[var(--muted)]">
-          {T.successSubtitle}
+          {TEXTS.successSubtitle}
         </p>
         <Button onClick={() => navigate("/login", { replace: true })} className="mt-7 w-full">
-          {T.loginNow}
+          {TEXTS.loginNow}
         </Button>
       </div>
     );
@@ -318,7 +322,7 @@ export default function ForgotPasswordPage() {
             className="absolute left-5 top-5 z-20 inline-flex items-center gap-2 rounded-lg px-3 py-2 text-[13px] font-bold text-[var(--muted)] transition-all hover:bg-[var(--surface)] hover:text-[var(--foreground)] sm:left-8 sm:top-8"
           >
             <span className="material-symbols-outlined text-[18px]">arrow_back</span>
-            {step === "email" ? T.back : T.return}
+            {step === "email" ? TEXTS.back : TEXTS.return}
           </button>
         )}
 
@@ -342,7 +346,7 @@ export default function ForgotPasswordPage() {
               </span>
               <p className="text-[13px] font-semibold text-[var(--brand-rose)]">
                 {step === "otp" && otpLockoutTimer > 0
-                  ? T.errors.otpLockout(otpLockoutTimer)
+                  ? TEXTS.errors.otpLockout(otpLockoutTimer)
                   : error}
               </p>
             </div>

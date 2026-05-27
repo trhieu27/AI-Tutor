@@ -53,6 +53,7 @@ function AdminSidebar({ onNavigate }) {
 
 
 
+/** Shell layout admin — sidebar, header và outlet cho các trang con */
 export default function AdminLayout() {
   const [open, setOpen] = useState(false);
   const [showUserMenu, setShowUserMenu] = useState(false);

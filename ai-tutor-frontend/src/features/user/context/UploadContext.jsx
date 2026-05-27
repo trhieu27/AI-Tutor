@@ -1,9 +1,16 @@
-// @refresh reset
+// @refresh reset — Vite HMR: reset context state to avoid stale upload queue
 
-import React, { createContext, useContext, useState, useCallback } from 'react';
+import { createContext, useContext, useState, useCallback } from 'react';
 import { uploadDocument } from '@/shared/services/api.service';
-import { jsx as _jsx } from "react/jsx-runtime";
-const UploadContext = /*#__PURE__*/createContext(undefined);
+import { ALLOWED_UPLOAD_TYPES } from '@/shared/constants/uploadConstants';
+import { generateUniqueId } from '@/shared/utils/idUtils';
+
+const UploadContext = createContext(undefined);
+
+/**
+ * Provider quản lý hàng đợi upload tài liệu.
+ * Tự động xóa file đã upload thành công sau 5 giây.
+ */
 export const UploadProvider = ({
   children
 }) => {
@@ -35,7 +42,7 @@ export const UploadProvider = ({
       });
       setLastUploadTime(Date.now());
 
-      // Auto-remove success items after 5 seconds instead of 3 to give more time to see success
+      // Xóa file thành công khỏi queue sau 5s (đủ thời gian hiển thị trạng thái)
       setTimeout(() => {
         setQueue(prev => prev.filter(item => item.id !== id));
       }, 5000);
@@ -53,13 +60,12 @@ export const UploadProvider = ({
     }
   }, []);
   const addToQueue = useCallback(async files => {
-    const allowedTypes = ["application/pdf", "application/vnd.openxmlformats-officedocument.wordprocessingml.document"];
     const newItems = [];
     const fileArray = Array.from(files);
     for (const file of fileArray) {
-      if (allowedTypes.includes(file.type)) {
+      if (ALLOWED_UPLOAD_TYPES.includes(file.type)) {
         newItems.push({
-          id: Math.random().toString(36).substr(2, 9) + Date.now(),
+          id: generateUniqueId(),
           file,
           status: "waiting",
           progress: 0
@@ -69,8 +75,7 @@ export const UploadProvider = ({
     if (newItems.length === 0) return;
     setQueue(prev => [...prev, ...newItems]);
 
-    // We don't await the whole loop here because we want them to start in background
-    // and let the context stay responsive
+    // Khởi động upload tuần tự trong background, không chặn UI
     const startUploads = async () => {
       for (const item of newItems) {
         await uploadFile(item.id, item.file);
@@ -78,8 +83,8 @@ export const UploadProvider = ({
     };
     startUploads();
   }, [uploadFile]);
-  return /*#__PURE__*/_jsx(UploadContext.Provider, {
-    value: {
+  return (
+    <UploadContext.Provider value={{
       queue,
       addToQueue,
       removeFromQueue,
@@ -88,10 +93,13 @@ export const UploadProvider = ({
       lastUploadTime,
       lastDocReadyTime,
       notifyDocReady: () => setLastDocReadyTime(Date.now()),
-    },
-    children: children
-  });
+    }}>
+      {children}
+    </UploadContext.Provider>
+  );
 };
+
+/** Hook truy cập UploadContext — phải dùng bên trong UploadProvider */
 export const useUpload = () => {
   const context = useContext(UploadContext);
   if (context === undefined) {

@@ -7,6 +7,9 @@ import AuthBranding from "@/features/auth/components/AuthBranding";
 import GoogleIcon from "@/shared/ui/GoogleIcon";
 import { Button } from "@/shared/ui/Premium";
 
+const MAX_LOGIN_ATTEMPTS = 5;
+const LOCKOUT_DURATION_MS = 60000;
+
 
 export default function LoginPage() {
   const [email, setEmail] = useState("");
@@ -24,7 +27,7 @@ export default function LoginPage() {
     const remaining = Math.ceil((parseInt(storedLockoutUntil) - Date.now()) / 1000);
     if (remaining > 0) {
       setLockoutTimer(remaining);
-      setFailedAttempts(5);
+      setFailedAttempts(MAX_LOGIN_ATTEMPTS);
     } else {
       localStorage.removeItem("login_lockout_until");
     }
@@ -56,13 +59,13 @@ export default function LoginPage() {
     } catch (err) {
       const newAttempts = failedAttempts + 1;
       setFailedAttempts(newAttempts);
-      if (newAttempts >= 5) {
-        const lockoutUntil = Date.now() + 60000;
+      if (newAttempts >= MAX_LOGIN_ATTEMPTS) {
+        const lockoutUntil = Date.now() + LOCKOUT_DURATION_MS;
         localStorage.setItem("login_lockout_until", lockoutUntil.toString());
-        setLockoutTimer(60);
+        setLockoutTimer(LOCKOUT_DURATION_MS / 1000);
       } else {
-        const msg = err.message || AUTH_TEXTS.LOGIN.LOGIN_ERROR;
-        setLocalError(msg === "Failed to fetch" ? AUTH_TEXTS.COMMON.networkError : msg);
+        const errorMessage = err.message || AUTH_TEXTS.LOGIN.LOGIN_ERROR;
+        setLocalError(errorMessage === "Failed to fetch" ? AUTH_TEXTS.COMMON.networkError : errorMessage);
       }
     }
   };

@@ -111,6 +111,7 @@ function TransactionsSection({ from, to }) {
   );
 }
 
+/** Doanh thu — metric, biểu đồ, phân bổ AI và lịch sử giao dịch */
 export default function AdminRevenuePage() {
   const [filters, setFilters] = useState(INITIAL_FILTERS);
   const [data, setData] = useState(() => readCachedAdminRevenue(INITIAL_FILTERS));

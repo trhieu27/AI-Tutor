@@ -400,6 +400,7 @@ function UserDetailDialog({ detail, loading, onClose, onPatch, onAssignPlan, sav
   ), document.body);
 }
 
+/** Quản lý người dùng — danh sách, chi tiết, khoá/mở và thay đổi gói */
 export default function AdminUsersPage() {
   const [filters, setFilters] = useState(INITIAL_FILTERS);
   const [data, setData] = useState(() => readCachedAdminUsers(INITIAL_FILTERS));
@@ -476,10 +477,6 @@ export default function AdminUsersPage() {
   useEffect(() => {
     load();
   }, [load]);
-
-
-
-
   useEffect(() => {
     const handleVisibility = () => {
       if (document.visibilityState === "visible") refreshUsers();
@@ -499,14 +496,14 @@ export default function AdminUsersPage() {
       if (!user_id) return;
       // Optimistic: update user online status in-place, no refetch
       const patchPresence = (items) =>
-        items?.map((u) =>
-          u.id === user_id ? { ...u, is_online, last_active: last_active || u.last_active, online_until: online_until || u.online_until } : u
+        items?.map((user) =>
+          user.id === user_id ? { ...user, is_online, last_active: last_active || user.last_active, online_until: online_until || user.online_until } : user
         );
       setData((prev) => prev ? { ...prev, items: patchPresence(prev.items) } : prev);
       setOnlinePins((prev) => {
         if (is_online) {
           // Add to pins if not already there
-          const exists = prev.some((u) => u.id === user_id);
+          const exists = prev.some((user) => user.id === user_id);
           if (!exists) {
             // Refetch to get full user data for the pin
             refreshUsers();
@@ -515,7 +512,7 @@ export default function AdminUsersPage() {
           return patchPresence(prev);
         }
         // Remove from pins when offline
-        return prev.filter((u) => u.id !== user_id);
+        return prev.filter((user) => user.id !== user_id);
       });
       if (detailUserId === user_id) {
         fetchAdminUserDetail(user_id).then(setDetail).catch(console.error);
@@ -565,7 +562,7 @@ export default function AdminUsersPage() {
     }
     setData((prev) => {
       if (!prev?.items) return prev;
-      return { ...prev, items: prev.items.map((u) => u.id === id ? { ...u, ...patch } : u) };
+      return { ...prev, items: prev.items.map((user) => user.id === id ? { ...user, ...patch } : user) };
     });
     try {
       await updateAdminUser(id, patch);
@@ -592,11 +589,11 @@ export default function AdminUsersPage() {
   const visibleUsers = useMemo(() => {
     const pageLimit = Number(data?.pagination?.limit || filters.limit || 20);
     const pinItems = filters.page === 1 && filters.active !== "false"
-      ? onlinePins.map((u) => ({ ...u, _online: true }))
+      ? onlinePins.map((user) => ({ ...user, _online: true }))
       : [];
-    const onlineIds = new Set(pinItems.map((u) => u.id));
+    const onlineIds = new Set(pinItems.map((user) => user.id));
     const seen = new Set();
-    return [...pinItems, ...(data?.items || []).map((u) => onlineIds.has(u.id) ? { ...u, _online: true } : u)]
+    return [...pinItems, ...(data?.items || []).map((user) => onlineIds.has(user.id) ? { ...user, _online: true } : user)]
       .filter((item) => {
         if (seen.has(item.id)) return false;
         seen.add(item.id);

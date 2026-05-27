@@ -23,6 +23,7 @@ function Toast({ message, onClose }) {
   );
 }
 
+/** Trang hướng dẫn — hướng dẫn sử dụng, FAQ và form liên hệ hỗ trợ */
 export default function HelpPage() {
   const [tab, setTab] = useState("guide");
   const [openFaq, setOpenFaq] = useState(0);

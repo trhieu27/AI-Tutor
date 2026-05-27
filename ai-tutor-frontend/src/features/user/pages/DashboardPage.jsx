@@ -219,7 +219,8 @@ function QuickAction({ icon, title, meta, to, tone = "green" }) {
   );
 }
 
-export default function Dashboard() {
+/** Trang chính — tổng quan tài liệu, phiên gần đây và hành động nhanh */
+export default function DashboardPage() {
   const navigate = useNavigate();
   const { documents, loading } = useDocuments();
   const [recentSessions, setRecentSessions] = useState(sessionCache.data);

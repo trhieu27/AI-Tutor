@@ -40,6 +40,7 @@ function DecorativeCircles() {
   );
 }
 
+/** Panel branding b\u00ean tr\u00e1i trang x\u00e1c th\u1ef1c (ch\u1ec9 hi\u1ec3n th\u1ecb tr\u00ean desktop) */
 export default function AuthBranding() {
   return (
     <div className="hidden lg:flex lg:w-1/2 flex-col items-start justify-between overflow-hidden border-r border-white/10 p-12 text-white relative">

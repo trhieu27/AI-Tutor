@@ -30,21 +30,21 @@ import { getDocumentName } from "@/features/user/components/documents/documentUt
 import { cx } from "@/shared/ui/Premium";
 import { CHAT_WORKSPACE_TEXTS } from "@/shared/constants/texts";
 
-const T = CHAT_WORKSPACE_TEXTS;
+const TEXTS = CHAT_WORKSPACE_TEXTS;
 const CHAT_LAYOUT_STORAGE_KEYS = {
   historyCollapsed: "aiTutor.chat.historyCollapsed",
   contextOpen: "aiTutor.chat.contextOpen",
 };
-let pdfjsLoader = null;
+let pdfJsLibrary = null;
 
 function loadPdfjs() {
-  if (!pdfjsLoader) {
-    pdfjsLoader = import("pdfjs-dist/legacy/build/pdf.mjs").then((pdfjsLib) => {
+  if (!pdfJsLibrary) {
+    pdfJsLibrary = import("pdfjs-dist/legacy/build/pdf.mjs").then((pdfjsLib) => {
       pdfjsLib.GlobalWorkerOptions.workerSrc = pdfWorkerUrl;
       return pdfjsLib;
     });
   }
-  return pdfjsLoader;
+  return pdfJsLibrary;
 }
 
 function readStoredBoolean(key, fallback = false) {
@@ -198,7 +198,7 @@ async function downloadDocx(filename, content) {
 function StudyModalSkeleton({ type }) {
   const rows = type === "summary" ? 6 : 4;
   return (
-    <div className="space-y-4" role="status" aria-label={type === "summary" ? T.modal.summaryLoading : T.modal.questionsLoading} aria-busy="true">
+    <div className="space-y-4" role="status" aria-label={type === "summary" ? TEXTS.modal.summaryLoading : TEXTS.modal.questionsLoading} aria-busy="true">
       {Array.from({ length: rows }).map((_, index) => (
         <div key={index} className={cx("space-y-2", type !== "summary" && "rounded-[var(--radius-panel)] border border-[var(--border-subtle)] bg-[var(--surface)] p-4")}>
           <Skeleton className={cx("h-3.5", index % 3 === 0 ? "w-3/5" : "w-4/5")} />
@@ -211,7 +211,7 @@ function StudyModalSkeleton({ type }) {
 }
 
 function StudyModal({ type, loading, summary, questions, documentName, onClose, onAskQuestion }) {
-  const title = type === "summary" ? T.modal.summaryTitle : T.modal.questionsTitle;
+  const title = type === "summary" ? TEXTS.modal.summaryTitle : TEXTS.modal.questionsTitle;
   const icon = type === "summary" ? "summarize" : "help";
   const canDownloadSummary = type === "summary" && !loading && summary?.trim();
 
@@ -223,14 +223,14 @@ function StudyModal({ type, loading, summary, questions, documentName, onClose, 
             <span className="material-symbols-outlined icon-thin text-[18px] text-[var(--brand-primary)]">{icon}</span>
             {title}
           </h2>
-          <IconButton label={T.modal.close} icon="close" onClick={onClose} />
+          <IconButton label={TEXTS.modal.close} icon="close" onClick={onClose} />
         </header>
         <div className="min-h-0 flex-1 overflow-y-auto px-5 py-5 custom-scrollbar">
           {loading ? (
             <StudyModalSkeleton type={type} />
           ) : type === "summary" ? (
             <div className="prose-saas max-w-none text-[13px] leading-7">
-              <ReactMarkdown remarkPlugins={[remarkGfm]}>{summary || T.modal.noSummary}</ReactMarkdown>
+              <ReactMarkdown remarkPlugins={[remarkGfm]}>{summary || TEXTS.modal.noSummary}</ReactMarkdown>
             </div>
           ) : questions.length > 0 ? (
             <div className="space-y-3">
@@ -247,13 +247,13 @@ function StudyModal({ type, loading, summary, questions, documentName, onClose, 
                       onClose();
                     }}
                   >
-                    {T.modal.askAI}
+                    {TEXTS.modal.askAI}
                   </Button>
                 </article>
               ))}
             </div>
           ) : (
-            <EmptyState title={T.modal.noQuestionsTitle} subtitle={T.modal.noQuestionsSubtitle} />
+            <EmptyState title={TEXTS.modal.noQuestionsTitle} subtitle={TEXTS.modal.noQuestionsSubtitle} />
           )}
         </div>
         <footer
@@ -272,14 +272,14 @@ function StudyModal({ type, loading, summary, questions, documentName, onClose, 
               disabled={!canDownloadSummary}
               onClick={() => downloadDocx(`${documentName || "tai-lieu"}-tom-tat`, summary)}
             >
-              <span className="sm:hidden">{T.modal.downloadShort}</span>
-              <span className="hidden sm:inline">{T.modal.downloadSummary}</span>
+              <span className="sm:hidden">{TEXTS.modal.downloadShort}</span>
+              <span className="hidden sm:inline">{TEXTS.modal.downloadSummary}</span>
             </Button>
           ) : (
             <span />
           )}
           <Button variant="secondary" className={type === "summary" ? "min-w-[84px] px-4" : ""} onClick={onClose}>
-            {T.modal.close}
+            {TEXTS.modal.close}
           </Button>
         </footer>
       </section>
@@ -295,16 +295,16 @@ function QuotaModal({ type, onClose }) {
         <span className="mx-auto flex h-12 w-12 items-center justify-center rounded-[var(--radius-panel)] border border-[var(--warning-border)] bg-[var(--warning-soft)] text-[var(--brand-warm)]">
           <span className="material-symbols-outlined text-[24px]">bolt</span>
         </span>
-        <h2 className="mt-4 text-[18px] font-bold text-[var(--foreground)]">{T.quota.title}</h2>
+        <h2 className="mt-4 text-[18px] font-bold text-[var(--foreground)]">{TEXTS.quota.title}</h2>
         <p className="mt-2 text-[13px] font-medium leading-6 text-[var(--muted)]">
-          {type === "chat" ? T.quota.chat : T.quota.ai}
+          {type === "chat" ? TEXTS.quota.chat : TEXTS.quota.ai}
         </p>
         <div className="mt-5 flex justify-center gap-2">
           <Button to="/pricing" icon="workspace_premium">
-            {T.quota.viewPlan}
+            {TEXTS.quota.viewPlan}
           </Button>
           <Button variant="secondary" onClick={onClose}>
-            {T.quota.later}
+            {TEXTS.quota.later}
           </Button>
         </div>
       </section>
@@ -343,7 +343,7 @@ function inferCitationPage(source) {
 
 function PdfPreviewSkeleton() {
   return (
-    <div className="min-h-0 flex-1 bg-[var(--surface)] p-5" role="status" aria-label={T.sources.pdfLoading} aria-busy="true">
+    <div className="min-h-0 flex-1 bg-[var(--surface)] p-5" role="status" aria-label={TEXTS.sources.pdfLoading} aria-busy="true">
       <div className="mx-auto h-full max-w-3xl rounded-[var(--radius-panel)] border border-[var(--border-subtle)] bg-[var(--card-bg)] p-6">
         <div className="space-y-3">
           <Skeleton className="h-5 w-2/5" />
@@ -412,7 +412,7 @@ function PdfCanvasViewer({ objectUrl, page, onPageChange, onTotalPagesChange }) 
         if (page > doc.numPages) onPageChange(doc.numPages || 1);
       })
       .catch(() => {
-        if (active) setError(T.sources.pdfError);
+        if (active) setError(TEXTS.sources.pdfError);
       });
 
     return () => {
@@ -466,7 +466,7 @@ function PdfCanvasViewer({ objectUrl, page, onPageChange, onTotalPagesChange }) 
       })
       .catch((err) => {
         if (!active || err?.name === "RenderingCancelledException") return;
-        setError(T.sources.pdfError);
+        setError(TEXTS.sources.pdfError);
         setRendering(false);
       });
 
@@ -531,15 +531,15 @@ function PdfCanvasViewer({ objectUrl, page, onPageChange, onTotalPagesChange }) 
     <div className="flex min-h-0 flex-1 flex-col bg-[var(--surface)]">
       <div className="flex shrink-0 flex-wrap items-center gap-2 border-b border-[var(--border-subtle)] bg-[var(--card-bg)] px-3 py-2">
         <div className="inline-flex items-center gap-1 rounded-[var(--radius-control)] border border-[var(--border-subtle)] bg-[var(--surface)] p-1">
-          <PdfToolbarButton label={T.sources.previousPage} icon="chevron_left" disabled={page <= 1} onClick={() => onPageChange(Math.max(1, page - 1))} />
+          <PdfToolbarButton label={TEXTS.sources.previousPage} icon="chevron_left" disabled={page <= 1} onClick={() => onPageChange(Math.max(1, page - 1))} />
           <span className="min-w-[72px] px-2 text-center text-[11px] font-bold text-[var(--muted)]">
-            {totalPages ? `${page}/${totalPages}` : T.sources.page(page)}
+            {totalPages ? `${page}/${totalPages}` : TEXTS.sources.page(page)}
           </span>
-          <PdfToolbarButton label={T.sources.nextPage} icon="chevron_right" disabled={!totalPages || page >= totalPages} onClick={() => onPageChange(Math.min(totalPages, page + 1))} />
+          <PdfToolbarButton label={TEXTS.sources.nextPage} icon="chevron_right" disabled={!totalPages || page >= totalPages} onClick={() => onPageChange(Math.min(totalPages, page + 1))} />
         </div>
 
         <div className="ml-auto inline-flex items-center gap-1 rounded-[var(--radius-control)] border border-[var(--border-subtle)] bg-[var(--surface)] p-1">
-          <PdfToolbarButton label={T.sources.zoomOut} icon="remove" disabled={zoom <= 0.15} onClick={() => setZoom((value) => Math.max(0.1, Number((value - 0.10).toFixed(2))))} />
+          <PdfToolbarButton label={TEXTS.sources.zoomOut} icon="remove" disabled={zoom <= 0.15} onClick={() => setZoom((value) => Math.max(0.1, Number((value - 0.10).toFixed(2))))} />
           <button
             type="button"
             className="h-8 rounded-lg px-2 text-[11px] font-bold text-[var(--muted)] transition hover:bg-[var(--card-bg-hover)] hover:text-[var(--foreground)]"
@@ -547,7 +547,7 @@ function PdfCanvasViewer({ objectUrl, page, onPageChange, onTotalPagesChange }) 
           >
             {Math.round(zoom * 100)}%
           </button>
-          <PdfToolbarButton label={T.sources.zoomIn} icon="add" disabled={zoom >= 2.8} onClick={() => setZoom((value) => Math.min(3, Number((value + 0.10).toFixed(2))))} />
+          <PdfToolbarButton label={TEXTS.sources.zoomIn} icon="add" disabled={zoom >= 2.8} onClick={() => setZoom((value) => Math.min(3, Number((value + 0.10).toFixed(2))))} />
         </div>
       </div>
 
@@ -563,7 +563,7 @@ function PdfCanvasViewer({ objectUrl, page, onPageChange, onTotalPagesChange }) 
         )}
         {(!pdfDoc || rendering) && !error && (
           <div className="pointer-events-none absolute left-1/2 top-4 -translate-x-1/2 rounded-full border border-[var(--border-subtle)] bg-[var(--card-bg)] px-3 py-1 text-[11px] font-bold text-[var(--muted)] shadow-[var(--premium-shadow-sm)]">
-            {T.sources.pdfLoading}
+            {TEXTS.sources.pdfLoading}
           </div>
         )}
       </div>
@@ -577,7 +577,7 @@ function PdfPreviewModal({ source, fallbackDocumentId, documentName, onClose }) 
   const [resolvedPage, setResolvedPage] = useState(() => getExplicitCitationPage(source));
   const [totalPages, setTotalPages] = useState(0);
   const sourceDocumentId = source?.documentId || fallbackDocumentId;
-  const displayTitle = documentName || T.sources.pdfTitle;
+  const displayTitle = documentName || TEXTS.sources.pdfTitle;
 
   useEffect(() => {
     let active = true;
@@ -589,7 +589,7 @@ function PdfPreviewModal({ source, fallbackDocumentId, documentName, onClose }) 
     setTotalPages(0);
 
     if (!sourceDocumentId) {
-      setError(T.sources.pdfError);
+      setError(TEXTS.sources.pdfError);
       return undefined;
     }
 
@@ -600,7 +600,7 @@ function PdfPreviewModal({ source, fallbackDocumentId, documentName, onClose }) 
         setObjectUrl(url);
       })
       .catch(() => {
-        if (active) setError(T.sources.pdfError);
+        if (active) setError(TEXTS.sources.pdfError);
       });
 
     const shouldLocatePage = !initialPage && source?.text;
@@ -629,9 +629,9 @@ function PdfPreviewModal({ source, fallbackDocumentId, documentName, onClose }) 
       <section className="flex h-[min(88dvh,820px)] w-[calc(100vw-16px)] max-w-5xl flex-col overflow-hidden rounded-[var(--radius-panel)] border border-[var(--border-color)] bg-[var(--card-bg)] shadow-[0_24px_64px_oklch(12%_0.018_238/0.38)] sm:h-[min(88dvh,820px)] sm:w-full">
         <header className="flex h-12 shrink-0 items-center justify-between gap-3 border-b border-[var(--border-subtle)] px-4">
           <h2 className="truncate text-[13px] font-semibold text-[var(--foreground)]">
-            {displayTitle}{resolvedPage ? ` · ${totalPages ? `${resolvedPage}/${totalPages}` : T.sources.page(resolvedPage)}` : ""}
+            {displayTitle}{resolvedPage ? ` · ${totalPages ? `${resolvedPage}/${totalPages}` : TEXTS.sources.page(resolvedPage)}` : ""}
           </h2>
-          <IconButton label={T.modal.close} icon="close" onClick={onClose} />
+          <IconButton label={TEXTS.modal.close} icon="close" onClick={onClose} />
         </header>
         {error ? (
           <div className="grid flex-1 place-items-center p-6 text-center text-[13px] font-semibold text-[var(--muted)]">
@@ -655,7 +655,7 @@ function PdfPreviewModal({ source, fallbackDocumentId, documentName, onClose }) 
 
 function ChatWorkspaceSkeleton() {
   return (
-    <div className="grid h-full min-h-0 grid-cols-1 bg-[var(--background)] lg:grid-cols-[220px_minmax(0,1fr)_260px]" role="status" aria-label={T.page.loadingTitle} aria-busy="true">
+    <div className="grid h-full min-h-0 grid-cols-1 bg-[var(--background)] lg:grid-cols-[220px_minmax(0,1fr)_260px]" role="status" aria-label={TEXTS.page.loadingTitle} aria-busy="true">
       <aside className="hidden border-r border-[var(--border-color)] bg-[var(--sidebar-bg)] p-3 lg:block">
         <Skeleton className="h-9 w-24" />
         <Skeleton className="mt-4 h-11 w-full rounded-[10px]" />
@@ -719,6 +719,7 @@ function PipelineLoadingIndicator() {
   );
 }
 
+/** Trang chat AI — giao diện hỏi-đáp chính với document context và PDF preview */
 export default function ChatPage() {
   const { documentId } = useParams();
   const navigate = useNavigate();
@@ -818,7 +819,7 @@ export default function ChatPage() {
       } catch (err) {
         if (!active) return;
         console.error(err);
-        setError(T.page.loadError);
+        setError(TEXTS.page.loadError);
       } finally {
         if (active) setPageLoading(false);
       }
@@ -845,7 +846,7 @@ export default function ChatPage() {
         return;
       }
       if (action === "explain") {
-        setInput(T.page.explainPrompt);
+        setInput(TEXTS.page.explainPrompt);
         return;
       }
       if (action === "summary") {
@@ -869,7 +870,7 @@ export default function ChatPage() {
             setModalType(null);
             setQuotaExceeded("ai");
           } else {
-            setSummary((prev) => `${prev}\n\n${T.page.summaryError}`);
+            setSummary((prev) => `${prev}\n\n${TEXTS.page.summaryError}`);
           }
         } finally {
           setModalLoading(false);
@@ -916,13 +917,13 @@ export default function ChatPage() {
     if (initialAction === "questions") handleQuickAction("questions");
     if (initialAction === "quiz") handleQuickAction("quiz");
     if (initialAction === "mindmap") handleQuickAction("mindmap");
-    if (initialAction === "explain") setInput(T.page.initialExplainPrompt);
+    if (initialAction === "explain") setInput(TEXTS.page.initialExplainPrompt);
   }, [handleQuickAction, initialAction, pageLoading]);
 
   const filteredSessions = useMemo(() => {
     const query = normalizeSearchText(sessionSearch);
     return sessions
-      .filter((session) => !query || normalizeSearchText(session.title || T.threads.fallbackTitle).includes(query))
+      .filter((session) => !query || normalizeSearchText(session.title || TEXTS.threads.fallbackTitle).includes(query))
       .sort((a, b) => new Date(b.updated_at || b.updatedAt) - new Date(a.updated_at || a.updatedAt));
   }, [sessionSearch, sessions]);
 
@@ -1027,7 +1028,7 @@ export default function ChatPage() {
       setMessages((prev) =>
         prev.map((msg) =>
           msg.id === aiMsgId
-            ? { ...msg, content: msg.content || (err.message || T.page.assistantError), _streaming: false }
+            ? { ...msg, content: msg.content || (err.message || TEXTS.page.assistantError), _streaming: false }
             : msg
         )
       );
@@ -1091,8 +1092,8 @@ export default function ChatPage() {
       <div className="h-full overflow-y-auto">
         <ErrorState
           title={error}
-          subtitle={T.page.errorSubtitle}
-          action={<Button to="/learning" icon="library_books">{T.page.openLibrary}</Button>}
+          subtitle={TEXTS.page.errorSubtitle}
+          action={<Button to="/learning" icon="library_books">{TEXTS.page.openLibrary}</Button>}
           className="min-h-full"
         />
       </div>
@@ -1113,8 +1114,8 @@ export default function ChatPage() {
             <aside className="flex h-full flex-col items-center border-r border-[var(--border-color)] bg-[var(--sidebar-bg)] py-3 text-[var(--foreground)]">
               <div className="flex flex-col items-center gap-2">
                 {[
-                  { label: T.page.openHistory, icon: "dock_to_right", onClick: () => setHistoryCollapsed(false) },
-                  { label: T.threads?.newSession || "Mới", icon: "edit_square", onClick: startNewChat },
+                  { label: TEXTS.page.openHistory, icon: "dock_to_right", onClick: () => setHistoryCollapsed(false) },
+                  { label: TEXTS.threads?.newSession || "Mới", icon: "edit_square", onClick: startNewChat },
                   { label: "Tìm kiếm", icon: "search", onClick: () => setHistoryCollapsed(false) },
                 ].map((item) => (
                   <button
@@ -1149,14 +1150,14 @@ export default function ChatPage() {
         <section className="flex min-h-0 flex-col">
           <header className="flex h-14 shrink-0 items-center justify-between gap-3 border-b border-[var(--border-color)] bg-[var(--header-bg)] px-3 backdrop-blur-md sm:px-4">
             <div className="flex min-w-0 items-center gap-2">
-              <IconButton label={T.page.openHistory} icon="history" className="lg:hidden" onClick={() => setHistoryOpen(true)} />
+              <IconButton label={TEXTS.page.openHistory} icon="history" className="lg:hidden" onClick={() => setHistoryOpen(true)} />
               <div className="min-w-0">
-                <h1 className="truncate text-[13px] font-semibold text-[var(--foreground)]">{docData ? getDocumentName(docData) : T.page.titleFallback}</h1>
+                <h1 className="truncate text-[13px] font-semibold text-[var(--foreground)]">{docData ? getDocumentName(docData) : TEXTS.page.titleFallback}</h1>
               </div>
             </div>
             <div className="flex items-center gap-2">
               <IconButton
-                label={contextOpen ? T.page.closeContext : T.page.openContext}
+                label={contextOpen ? TEXTS.page.closeContext : TEXTS.page.openContext}
                 icon="more_vert"
                 aria-expanded={contextOpen}
                 className={cx(contextOpen && "bg-[var(--surface)] text-[var(--foreground)]")}
@@ -1170,14 +1171,14 @@ export default function ChatPage() {
               <div className="mx-auto flex min-h-full max-w-3xl flex-col justify-center py-8">
                 <EmptyState
                   icon="forum"
-                  title={T.page.emptyTitle}
-                  subtitle={T.page.emptySubtitle}
+                  title={TEXTS.page.emptyTitle}
+                  subtitle={TEXTS.page.emptySubtitle}
                   action={
                     <LiquidGlassButton icon="summarize" onClick={() => handleQuickAction("summary")}>
-                      {T.page.emptySummaryAction}
+                      {TEXTS.page.emptySummaryAction}
                     </LiquidGlassButton>
                   }
-                  secondaryAction={<Button to="/chat" variant="secondary" icon="swap_horiz">{T.page.chooseDocument}</Button>}
+                  secondaryAction={<Button to="/chat" variant="secondary" icon="swap_horiz">{TEXTS.page.chooseDocument}</Button>}
                 />
               </div>
             ) : (
@@ -1204,7 +1205,7 @@ export default function ChatPage() {
                 onCancel={handleCancel}
                 loading={isSending}
                 disabled={!docData || docData.status !== "READY"}
-                placeholder={T.composer.placeholder}
+                placeholder={TEXTS.composer.placeholder}
               />
             </div>
           </div>
@@ -1224,7 +1225,7 @@ export default function ChatPage() {
               type="button"
               className="absolute inset-0 bg-[oklch(12%_0.018_238/0.55)] backdrop-blur-sm"
               onClick={() => setHistoryOpen(false)}
-              aria-label={T.page.closeHistory}
+              aria-label={TEXTS.page.closeHistory}
             />
             <div className="absolute inset-y-0 left-0 w-[min(86vw,320px)] bg-[var(--sidebar-bg)] shadow-2xl">
               <ChatThreadList
@@ -1249,7 +1250,7 @@ export default function ChatPage() {
               type="button"
               className="absolute inset-0 bg-[oklch(12%_0.018_238/0.55)] backdrop-blur-sm"
               onClick={() => setContextOpen(false)}
-              aria-label={T.page.closeContext}
+              aria-label={TEXTS.page.closeContext}
             />
             <div className="absolute inset-y-0 right-0 w-[min(88vw,360px)] bg-[var(--card-bg)] shadow-2xl">
               <DocumentContextPanel document={docData} sources={lastSources} quota={quota} onQuickAction={handleQuickAction} lastPipeline={lastPipeline} />
@@ -1269,14 +1270,14 @@ export default function ChatPage() {
             setModalType(null);
             abortRef.current?.abort();
           }}
-          onAskQuestion={(question) => setInput(T.page.askStudyQuestion(question))}
+          onAskQuestion={(question) => setInput(TEXTS.page.askStudyQuestion(question))}
         />
       )}
 
       {quotaExceeded && <QuotaModal type={quotaExceeded} onClose={() => setQuotaExceeded(null)} />}
       <ConfirmDialog
         open={!!deleteSessionId}
-        title={T.page.deleteConfirm}
+        title={TEXTS.page.deleteConfirm}
         message="Cuộc trò chuyện và toàn bộ tin nhắn sẽ bị xóa vĩnh viễn."
         confirmLabel="Xóa"
         cancelLabel="Huỷ"

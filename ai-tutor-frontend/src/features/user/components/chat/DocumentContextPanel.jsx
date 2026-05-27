@@ -1,4 +1,4 @@
-import { useState } from "react";
+
 import Button from "@/shared/ui/Button";
 import StatusBadge from "@/shared/ui/StatusBadge";
 import QuickActionBar from "@/features/user/components/chat/QuickActionBar";
@@ -35,7 +35,7 @@ function PipelineDebugPanel({ pipeline }) {
     { label: "Thời gian", value: pipeline.totalTimeMs ? `${pipeline.totalTimeMs}ms` : "—", icon: "timer" },
   ];
 
-  // Extended debug info
+  // Thông tin debug mở rộng
   const debugRows = pipeline.rewrittenQuery ? [
     { label: "Truy vấn gốc", value: pipeline.originalQuery },
     { label: "Truy vấn đã viết lại", value: pipeline.rewrittenQuery },
@@ -68,7 +68,7 @@ function PipelineDebugPanel({ pipeline }) {
         </div>
       </div>
 
-      {/* Extended debug details */}
+      {/* Chi tiết debug mở rộng */}
       {debugRows.length > 0 && (
         <details className="rounded-[var(--radius-panel)] border border-[var(--border-subtle)] bg-[var(--surface)]">
           <summary className="cursor-pointer px-2.5 py-2 text-[10.5px] font-bold text-[var(--foreground)]">
@@ -85,7 +85,7 @@ function PipelineDebugPanel({ pipeline }) {
         </details>
       )}
 
-      {/* Timing breakdown */}
+      {/* Thời gian từng bước */}
       {timingRows.length > 0 && (
         <details className="rounded-[var(--radius-panel)] border border-[var(--border-subtle)] bg-[var(--surface)]">
           <summary className="cursor-pointer px-2.5 py-2 text-[10.5px] font-bold text-[var(--foreground)]">
@@ -105,8 +105,7 @@ function PipelineDebugPanel({ pipeline }) {
   );
 }
 
-export default function DocumentContextPanel({ document, sources = [], quota, onQuickAction, lastPipeline }) {
-  const [debugMode, setDebugMode] = useState(false);
+export default function DocumentContextPanel({ document, quota, onQuickAction, lastPipeline }) {
   const quotaRows = quota && !quota.isPro
     ? [
         { label: T.chatMessages, remaining: quota.chatRemaining?.() },

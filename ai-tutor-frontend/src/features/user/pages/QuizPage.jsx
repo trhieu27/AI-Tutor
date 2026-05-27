@@ -34,7 +34,7 @@ function parseStreamedQuiz(text) {
   // Try direct parse first
   try {
     return JSON.parse(jsonStr);
-  } catch (_) {
+  } catch {
     // Attempt repair: close unclosed brackets/braces
     let repaired = jsonStr;
 
@@ -46,7 +46,7 @@ function parseStreamedQuiz(text) {
 
     try {
       return JSON.parse(repaired);
-    } catch (__) {
+    } catch {
       // Last resort: close all open brackets
       let open = 0, close = 0;
       for (const ch of repaired) {
@@ -79,7 +79,8 @@ function QuizLoadingState() {
   );
 }
 
-export default function InteractiveQuizPage() {
+/** Trang trắc nghiệm — sinh quiz từ tài liệu, chấm điểm và xem đáp án */
+export default function QuizPage() {
   const { documentId } = useParams();
   const navigate = useNavigate();
   const abortRef = useRef(null);

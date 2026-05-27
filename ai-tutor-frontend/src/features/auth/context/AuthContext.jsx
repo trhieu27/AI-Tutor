@@ -1,10 +1,11 @@
-// @refresh reset
+// @refresh reset — Vite HMR: reset context state on hot reload to avoid stale auth
 import { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
 import { Admin, Student } from '@/shared/models/User';
 import { authService } from '@/shared/services/auth.service';
-import { jsx as _jsx } from "react/jsx-runtime";
-const AuthContext = /*#__PURE__*/createContext(undefined);
 
+const AuthContext = createContext(undefined);
+
+/** Tạo instance User (Admin hoặc Student) từ raw data API */
 const createUserInstance = userData => {
   if (!userData) return null;
   try {
@@ -16,6 +17,7 @@ const createUserInstance = userData => {
     return userData;
   }
 };
+/** Khôi phục user từ localStorage (nếu có) */
 const getStoredUser = () => {
   try {
     const raw = localStorage.getItem('user');
@@ -25,6 +27,10 @@ const getStoredUser = () => {
     return null;
   }
 };
+/**
+ * Provider quản lý trạng thái xác thực toàn ứng dụng.
+ * Hỗ trợ login email/password, Google OAuth, và admin login.
+ */
 export function AuthProvider({
   children
 }) {
@@ -205,11 +211,13 @@ export function AuthProvider({
     refreshUser,
     isAuthenticated: !!user
   }), [user, accessToken, isLoading, isInitialLoading, error, logout, updateUser, refreshUser]);
-  return /*#__PURE__*/_jsx(AuthContext.Provider, {
-    value: contextValue,
-    children: children
-  });
+  return (
+    <AuthContext.Provider value={contextValue}>
+      {children}
+    </AuthContext.Provider>
+  );
 }
+/** Hook truy cập AuthContext — phải dùng bên trong AuthProvider */
 export function useAuth() {
   const context = useContext(AuthContext);
   if (context === undefined) throw new Error('useAuth must be used within an AuthProvider');

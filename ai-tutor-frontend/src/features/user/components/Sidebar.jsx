@@ -75,10 +75,10 @@ export default function Sidebar({ onClose }) {
           })}
         </nav>
 
-        {/* Spacer */}
+        {/* Khoảng trống đẩy xuống */}
         <div className="flex-1" />
 
-        {/* Upgrade card — only for free users */}
+        {/* Thẻ nâng cấp — chỉ hiển với user miễn phí */}
         {!isPro && (
           <Link to="/pricing" onClick={() => onClose?.()} className="block">
             <div className="rounded-lg bg-gradient-to-r from-[hsl(166_61%_35%)] to-[hsl(218_82%_45%)] p-3 text-white transition-transform duration-200 hover:-translate-y-0.5">
@@ -95,10 +95,10 @@ export default function Sidebar({ onClose }) {
           </Link>
         )}
 
-        {/* Divider */}
+        {/* Đường kẻ ngăn cách */}
         <div className="my-3 border-t border-[var(--border-color)]" />
 
-        {/* Bottom nav — Settings & Help */}
+        {/* Nav phụ — Cài đặt & Trợ giúp */}
         <nav className="flex flex-col gap-1">
           {bottomNav.map((item) => {
             const isActive = pathname.startsWith(item.href);

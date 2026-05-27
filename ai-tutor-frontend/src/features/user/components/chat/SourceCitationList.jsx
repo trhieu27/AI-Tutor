@@ -16,7 +16,7 @@ function normalizeSource(source, index) {
   const documentId = source.document_id ?? source.documentId ?? source.metadata?.document_id ?? source.metadata?.documentId;
   const title = source.title || source.file_name || source.document_name || T.fallback(index);
   const labelParts = [title];
-  // Only append page if title doesn't already contain it (e.g. "Trang 7")
+  // Chỉ thêm trang nếu title chưa chứa thông tin trang
   if (page !== undefined && page !== null && page !== "" && !title.startsWith("Trang ")) labelParts.push(T.page(page));
 
   return {
@@ -79,7 +79,7 @@ export default function SourceCitationList({ sources = [], compact = false, inli
           </summary>
 
           <div className="mt-2 space-y-1.5">
-            {/* Section label */}
+            {/* Nhãn phần */}
             {source.section && (
               <div className="flex flex-wrap items-center gap-1.5 text-[10px] font-semibold text-[var(--muted)]">
                 <span className="inline-flex items-center gap-1">
@@ -89,7 +89,7 @@ export default function SourceCitationList({ sources = [], compact = false, inli
               </div>
             )}
 
-            {/* Content preview */}
+            {/* Xem trước nội dung */}
             {source.text && (
               <p
                 className={cx(

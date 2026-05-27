@@ -114,6 +114,7 @@ function PlanEditor({ plan, draft, saving, onChange, onSave }) {
   );
 }
 
+/** Quản lý gói đăng ký — chỉnh sửa giá, quota và tính năng */
 export default function AdminPlansPage() {
   const [plans, setPlans] = useState(() => readCachedAdminPlans() || []);
   const [drafts, setDrafts] = useState(() => {

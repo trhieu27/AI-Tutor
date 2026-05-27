@@ -3,11 +3,11 @@ import { cx } from "@/shared/ui/Premium";
 export default function QuizOption({ option, index, selected, correct, checked, disabled, multi, onSelect }) {
   const letter = String.fromCharCode(65 + index);
 
-  // Card border + bg — 4 states when checked:
-  // correct+selected = solid green (you got it right)
-  // correct+!selected = dashed outline, very light (you missed this)
-  // !correct+selected = red (you chose wrong)
-  // !correct+!selected = grey (neutral)
+  // Viền + nền card — 4 trạng thái khi đã nộp:
+  // đúng + đã chọn = xanh đậm (trả lời đúng)
+  // đúng + chưa chọn = viền đứt, nhạt (bỏ sót đáp án)
+  // sai + đã chọn = đỏ (chọn sai)
+  // sai + chưa chọn = xám (trung tính)
   const stateClass = checked
     ? correct
       ? selected
@@ -20,7 +20,7 @@ export default function QuizOption({ option, index, selected, correct, checked, 
       ? "border-[var(--brand-primary)] bg-[hsl(166_61%_35%/0.08)] text-[var(--foreground)] shadow-[0_0_0_3px_oklch(49%_0.115_175/0.10)]"
       : "border-[var(--border-color)] bg-[var(--card-bg)] text-[var(--foreground)] hover:border-[var(--border-emphasis)] hover:bg-[var(--card-bg-hover)]";
 
-  // Badge style for single-select (letter badge)
+  // Badge chữ cái (single-select)
   const badgeClass = checked && correct
     ? "border-transparent bg-[var(--brand-success)] text-white"
     : checked && selected
@@ -29,10 +29,10 @@ export default function QuizOption({ option, index, selected, correct, checked, 
         ? "border-[var(--brand-primary)] bg-[var(--brand-primary)] text-[var(--on-primary)]"
         : "border-[var(--border-color)] bg-[var(--surface)] text-[var(--muted)]";
 
-  // Icon for checked state (after submit)
+  // Icon sau khi nộp bài
   const checkedIcon = checked && correct ? "check" : checked && selected ? "close" : null;
 
-  // Multi-select: checkbox color
+  // Multi-select: màu checkbox
   const checkboxColor = checked
     ? correct
       ? "text-[var(--brand-success)]"
@@ -43,7 +43,7 @@ export default function QuizOption({ option, index, selected, correct, checked, 
       ? "text-[var(--brand-primary)]"
       : "text-[var(--muted)]";
 
-  // Tags for review mode
+  // Tag hiển thị khi xem lại kết quả
   const showSelectedTag = checked && selected;
   const showMissedTag = checked && correct && !selected;
 
