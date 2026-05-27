@@ -984,11 +984,20 @@ export default function ChatPage() {
           if (!isActiveRequest()) return;
           setMessages((prev) =>
             prev.map((msg) =>
-              msg.id === aiMsgId ? { ...msg, content: msg.content + chunk } : msg
+              msg.id === aiMsgId ? { ...msg, content: msg.content + chunk, _status: null } : msg
             )
           );
         },
-        controller.signal
+        controller.signal,
+        // onStatus: show pipeline progress
+        (step) => {
+          if (!isActiveRequest()) return;
+          setMessages((prev) =>
+            prev.map((msg) =>
+              msg.id === aiMsgId ? { ...msg, _status: step } : msg
+            )
+          );
+        }
       );
 
       if (!isActiveRequest()) return;

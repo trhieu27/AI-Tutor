@@ -191,7 +191,7 @@ export async function askQuestion(documentId, request, signal) {
  * @param {AbortSignal} signal
  * @returns {Promise<object>} final data { session_id, message, sources, pipeline }
  */
-export async function askQuestionStream(documentId, request, onChunk, signal) {
+export async function askQuestionStream(documentId, request, onChunk, signal, onStatus) {
   const headers = { 'Content-Type': 'application/json', 'Accept': 'text/event-stream' };
   if (request.debug) headers['X-Debug'] = 'true';
 
@@ -232,7 +232,12 @@ export async function askQuestionStream(documentId, request, onChunk, signal) {
         currentEvent = line.slice(7).trim();
       } else if (line.startsWith('data: ')) {
         const dataStr = line.slice(6);
-        if (currentEvent === 'chunk') {
+        if (currentEvent === 'status') {
+          try {
+            const parsed = JSON.parse(dataStr);
+            if (parsed.step) onStatus?.(parsed.step);
+          } catch (e) { /* skip */ }
+        } else if (currentEvent === 'chunk') {
           try {
             const parsed = JSON.parse(dataStr);
             if (parsed.text) onChunk(parsed.text);

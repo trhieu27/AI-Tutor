@@ -7,6 +7,27 @@ import { CHAT_WORKSPACE_TEXTS } from "@/shared/constants/texts";
 
 const T = CHAT_WORKSPACE_TEXTS.messageActions;
 
+/** Map pipeline step → Vietnamese label */
+const STEP_LABELS = {
+  analyzing: 'Đang phân tích câu hỏi...',
+  searching: 'Đang tìm tài liệu liên quan...',
+  reranking: 'Đang sắp xếp kết quả...',
+  generating: 'Đang tạo câu trả lời...',
+};
+
+function PipelineStatus({ step }) {
+  const label = STEP_LABELS[step] || 'Đang xử lý...';
+  return (
+    <div className="flex items-center gap-3 py-0.5">
+      <span className="relative flex h-2.5 w-2.5 shrink-0">
+        <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-[var(--brand-primary)] opacity-35" />
+        <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-[var(--brand-primary)]" />
+      </span>
+      <span className="text-[12px] font-semibold text-[var(--muted)]">{label}</span>
+    </div>
+  );
+}
+
 export default function ChatMessage({ message, onRetry, onOpenSource, streaming }) {
   const isUser = message.role === "user" || message.isUser;
   const content = typeof message.content === "string" ? message.content : String(message.content || "");
@@ -26,13 +47,7 @@ export default function ChatMessage({ message, onRetry, onOpenSource, streaming 
           {isUser ? (
             <p className="whitespace-pre-wrap text-[13px] font-semibold leading-6">{content}</p>
           ) : streaming && !content ? (
-            <div className="flex items-center gap-3 py-0.5">
-              <span className="relative flex h-2.5 w-2.5 shrink-0">
-                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-[var(--brand-primary)] opacity-35" />
-                <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-[var(--brand-primary)]" />
-              </span>
-              <span className="text-[12px] font-semibold text-[var(--muted)]">Đang tìm câu trả lời...</span>
-            </div>
+            <PipelineStatus step={message._status} />
           ) : (
             <div className="prose-saas max-w-none text-[13px] leading-7">
               <ReactMarkdown remarkPlugins={[remarkGfm]}>{content}</ReactMarkdown>

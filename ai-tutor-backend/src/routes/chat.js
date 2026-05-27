@@ -343,7 +343,9 @@ router.post('/:documentId/ask-stream', authMiddleware, requireChatQuota(), async
     })) {
       if (clientClosed) break;
 
-      if (event.type === 'chunk') {
+      if (event.type === 'status') {
+        sseWrite('status', { step: event.step });
+      } else if (event.type === 'chunk') {
         sseWrite('chunk', { text: event.text });
       } else if (event.type === 'done') {
         doneEvent = event;

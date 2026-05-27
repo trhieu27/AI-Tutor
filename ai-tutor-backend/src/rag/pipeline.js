@@ -624,6 +624,7 @@ async function* askStream(collectionName, question, chatHistory, options) {
   }
 
   // ── Step 1: Query Rewriting ──
+  yield { type: 'status', step: 'analyzing' };
   const rewriteStart = Date.now();
   const rewrittenQuery = await rewriteQuery(question, chatHistory, { signal });
   pipelineLog.rewrittenQuery = rewrittenQuery;
@@ -642,6 +643,7 @@ async function* askStream(collectionName, question, chatHistory, options) {
   let retrievedChunks = [];
 
   // ── Step 3: Execute retrieval based on strategy ──
+  yield { type: 'status', step: 'searching' };
   const searchStart = Date.now();
 
   if (strategy === 'cag_cached' && cacheHit && cacheHit.hit) {
@@ -690,6 +692,7 @@ async function* askStream(collectionName, question, chatHistory, options) {
   throwIfAborted(signal);
 
   // ── Step 4: Re-ranking ──
+  yield { type: 'status', step: 'reranking' };
   const rerankStart = Date.now();
   let rerankedChunks;
   if (strategy === 'cag_cached' && pipelineLog.cacheHit) {
@@ -723,6 +726,7 @@ async function* askStream(collectionName, question, chatHistory, options) {
   }
 
   // ── Step 6: Grounded Answer Generation (streaming) ──
+  yield { type: 'status', step: 'generating' };
   const generateStart = Date.now();
 
   const historyText = chatHistory
