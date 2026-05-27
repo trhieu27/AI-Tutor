@@ -366,6 +366,119 @@ export async function fetchDocumentQuizStream(documentId, onChunk, force = false
   }
   await readStream(res, onChunk);
 }
+
+/**
+ * Stream quiz generation với incremental parsing.
+ * Dùng brace-depth tracking để phát hiện từng object JSON hoàn chỉnh
+ * ngay khi dấu } cuối cùng của object đó xuất hiện trong stream.
+ * @param {string} documentId
+ * @param {object} callbacks - { onQuestion, onDone }
+ * @param {boolean} force - true để tạo lại quiz mới
+ * @param {AbortSignal} signal
+ */
+export async function streamDocumentQuiz(documentId, { onQuestion, onDone }, force = false, signal) {
+  const res = await authFetch(`${API_BASE}/chat/${documentId}/quiz${force ? '?force=true' : ''}`, {
+    signal
+  });
+  if (!res.ok) {
+    if (res.status === 429) {
+      const errorData = await safeJson(res, {});
+      throw new QuotaError(errorData.detail || 'Quota exceeded');
+    }
+    throw new Error('Không thể tạo bài kiểm tra');
+  }
+
+  const reader = res.body?.getReader();
+  if (!reader) throw new Error('Streaming not supported');
+
+  const decoder = new TextDecoder();
+  let accumulated = '';
+  const allQuestions = [];
+  let questionIndex = 0;
+
+  // Tìm tất cả object JSON hoàn chỉnh trong text bằng brace-depth
+  function extractCompleteObjects(text) {
+    // Bỏ markdown code fence
+    let str = text.trim();
+    if (str.includes('```json')) str = str.split('```json')[1]?.split('```')[0] || str;
+    else if (str.includes('```')) str = str.split('```')[1]?.split('```')[0] || str;
+    str = str.trim();
+
+    const objects = [];
+    let depth = 0;
+    let inString = false;
+    let escape = false;
+    let objStart = -1;
+
+    for (let i = 0; i < str.length; i++) {
+      const ch = str[i];
+      if (escape) { escape = false; continue; }
+      if (ch === '\\') { escape = true; continue; }
+      if (ch === '"') { inString = !inString; continue; }
+      if (inString) continue;
+
+      if (ch === '{') {
+        if (depth === 0) objStart = i;
+        depth++;
+      } else if (ch === '}') {
+        depth--;
+        if (depth === 0 && objStart >= 0) {
+          // Object hoàn chỉnh — thử parse
+          try {
+            const obj = JSON.parse(str.slice(objStart, i + 1));
+            objects.push(obj);
+          } catch { /* bỏ qua object lỗi */ }
+          objStart = -1;
+        }
+      }
+    }
+    return objects;
+  }
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+
+    const chunk = decoder.decode(value, { stream: true });
+    accumulated += chunk;
+
+    // Phát hiện lỗi mid-stream
+    if (accumulated.includes('__ERROR__:')) {
+      const errMsg = accumulated.split('__ERROR__:')[1]?.trim() || 'Đã xảy ra lỗi';
+      if (errMsg.includes('quá tải') || errMsg.includes('quota') || errMsg.includes('429')) {
+        throw new QuotaError(errMsg);
+      }
+      throw new Error(errMsg);
+    }
+
+    // Parse tất cả object hoàn chỉnh từ text tích lũy
+    const found = extractCompleteObjects(accumulated);
+    // Emit những câu mới (chưa emit)
+    for (let i = questionIndex; i < found.length; i++) {
+      const q = found[i];
+      if (q?.question && Array.isArray(q?.options) && q.options.length > 0) {
+        // Yield để React render từng câu riêng
+        if (i > questionIndex) await new Promise(r => setTimeout(r, 100));
+        allQuestions.push(q);
+        onQuestion?.(q, allQuestions.length - 1);
+      }
+    }
+    questionIndex = found.length;
+  }
+
+  // Parse cuối cùng — bắt câu hỏi còn sót
+  const finalFound = extractCompleteObjects(accumulated);
+  for (let i = questionIndex; i < finalFound.length; i++) {
+    const q = finalFound[i];
+    if (q?.question && Array.isArray(q?.options) && q.options.length > 0) {
+      if (i > questionIndex) await new Promise(r => setTimeout(r, 100));
+      allQuestions.push(q);
+      onQuestion?.(q, allQuestions.length - 1);
+    }
+  }
+
+  onDone?.(allQuestions);
+}
 export async function fetchDocumentQuiz(documentId, signal) {
   const res = await authFetch(`${API_BASE}/chat/${documentId}/quiz`, { signal });
   if (!res.ok) throw new Error('Không thể tải bài kiểm tra');

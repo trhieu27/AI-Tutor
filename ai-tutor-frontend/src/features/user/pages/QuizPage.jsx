@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { fetchDocument, fetchDocumentQuiz, fetchDocumentQuizStream, QuotaError } from "@/shared/services/api.service";
+import { fetchDocument, fetchDocumentQuiz, streamDocumentQuiz, QuotaError } from "@/shared/services/api.service";
 import ConfirmDialog from "@/shared/ui/ConfirmDialog";
 import Button from "@/shared/ui/Button";
 import LiquidGlassButton from "@/shared/ui/LiquidGlassButton";
@@ -12,53 +12,6 @@ import { getDocumentName } from "@/features/user/components/documents/documentUt
 import { QUIZ_WORKSPACE_TEXTS } from "@/shared/constants/texts";
 
 const T = QUIZ_WORKSPACE_TEXTS;
-
-function parseStreamedQuiz(text) {
-  let jsonStr = text.trim();
-
-  // Strip markdown code fences
-  if (jsonStr.includes("```json")) {
-    jsonStr = jsonStr.split("```json")[1].split("```")[0];
-  } else if (jsonStr.includes("```")) {
-    jsonStr = jsonStr.split("```")[1].split("```")[0];
-  }
-
-  jsonStr = jsonStr.trim();
-
-  // Find the outermost JSON array
-  const start = jsonStr.indexOf("[");
-  if (start !== -1) {
-    jsonStr = jsonStr.slice(start);
-  }
-
-  // Try direct parse first
-  try {
-    return JSON.parse(jsonStr);
-  } catch {
-    // Attempt repair: close unclosed brackets/braces
-    let repaired = jsonStr;
-
-    // Remove trailing incomplete object (after last complete },)
-    const lastCompleteObj = repaired.lastIndexOf("},");
-    if (lastCompleteObj > 0) {
-      repaired = repaired.slice(0, lastCompleteObj + 1) + "]";
-    }
-
-    try {
-      return JSON.parse(repaired);
-    } catch {
-      // Last resort: close all open brackets
-      let open = 0, close = 0;
-      for (const ch of repaired) {
-        if (ch === "[") open++;
-        if (ch === "]") close++;
-      }
-      repaired += "]".repeat(Math.max(0, open - close));
-
-      return JSON.parse(repaired);
-    }
-  }
-}
 
 function QuizLoadingState() {
   return (
@@ -79,6 +32,26 @@ function QuizLoadingState() {
   );
 }
 
+/** Skeleton hiển thị khi đang chờ câu hỏi tiếp theo */
+function QuestionSkeleton() {
+  return (
+    <div className="animate-pulse rounded-[var(--radius-panel)] border border-[var(--border-subtle)] bg-[var(--surface)] p-4">
+      <div className="flex items-center gap-2">
+        <div className="h-3 w-20 rounded bg-[var(--border-subtle)]" />
+      </div>
+      <div className="mt-3 h-5 w-3/4 rounded bg-[var(--border-subtle)]" />
+      <div className="mt-4 space-y-2">
+        {[0, 1, 2, 3].map(i => (
+          <div key={i} className="flex items-center gap-3 rounded-[var(--radius-panel)] border border-[var(--border-subtle)] bg-[var(--card-bg)] p-4">
+            <div className="h-7 w-7 shrink-0 rounded-lg bg-[var(--border-subtle)]" />
+            <div className="h-4 flex-1 rounded bg-[var(--border-subtle)]" style={{ width: `${55 + i * 10}%` }} />
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 /** Trang trắc nghiệm — sinh quiz từ tài liệu, chấm điểm và xem đáp án */
 export default function QuizPage() {
   const { documentId } = useParams();
@@ -87,6 +60,7 @@ export default function QuizPage() {
   const [docData, setDocData] = useState(null);
   const [quiz, setQuiz] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [isStreaming, setIsStreaming] = useState(false);
   const [error, setError] = useState(null);
   const [quotaExceeded, setQuotaExceeded] = useState(false);
   const [answers, setAnswers] = useState({});
@@ -123,6 +97,10 @@ export default function QuizPage() {
   const progress = quiz.length > 0 ? Math.round((answeredCount / quiz.length) * 100) : 0;
   const allAnswered = quiz.length > 0 && answeredCount === quiz.length;
 
+  const isValidQuestion = (item) =>
+    item?.question && Array.isArray(item?.options) && item.options.length > 0 &&
+    (Array.isArray(item.correct_indices) || typeof item.correct_index === 'number');
+
   const loadQuiz = useCallback(
     async (force = false) => {
       abortRef.current?.abort();
@@ -131,6 +109,7 @@ export default function QuizPage() {
       const isActive = () => abortRef.current === controller;
 
       setLoading(true);
+      setIsStreaming(false);
       setError(null);
       setQuotaExceeded(false);
       setQuiz([]);
@@ -141,29 +120,44 @@ export default function QuizPage() {
         const doc = await fetchDocument(documentId);
         if (isActive()) setDocData(doc);
 
+        // Thử lấy quiz cached (không stream)
         let data = [];
         if (!force) data = await fetchDocumentQuiz(documentId, controller.signal);
 
-        if (!Array.isArray(data) || data.length === 0) {
-          let accumulated = "";
-          await fetchDocumentQuizStream(
+        if (Array.isArray(data) && data.length > 0) {
+          // Có cache — hiển thị ngay
+          if (!isActive()) return;
+          const valid = data.filter(isValidQuestion);
+          if (valid.length > 0) setQuiz(valid);
+          else setError(T.errors.cannotGenerate);
+        } else {
+          // Không có cache — stream progressive
+          if (!isActive()) return;
+          setIsStreaming(true);
+          setLoading(false);
+
+          await streamDocumentQuiz(
             documentId,
-            (chunk) => {
-              accumulated += chunk;
+            {
+              onQuestion: (question) => {
+                if (!isActive()) return;
+                if (isValidQuestion(question)) {
+                  setQuiz(prev => [...prev, question]);
+                }
+              },
+              onDone: (allQuestions) => {
+                if (!isActive()) return;
+                // Đảm bảo state cuối cùng chính xác
+                const valid = (allQuestions || []).filter(isValidQuestion);
+                if (valid.length > 0) setQuiz(valid);
+                else setError(T.errors.cannotGenerate);
+                setIsStreaming(false);
+              },
             },
             force,
             controller.signal
           );
-          data = parseStreamedQuiz(accumulated);
         }
-
-        if (!isActive()) return;
-        const valid = Array.isArray(data)
-          ? data.filter((item) => item?.question && Array.isArray(item?.options) && item.options.length > 0 && (Array.isArray(item.correct_indices) || typeof item.correct_index === 'number'))
-          : [];
-
-        if (valid.length > 0) setQuiz(valid);
-        else setError(T.errors.cannotGenerate);
       } catch (err) {
         if (err?.name === "AbortError" || !isActive()) return;
         if (err instanceof QuotaError) {
@@ -172,6 +166,7 @@ export default function QuizPage() {
         }
         console.error(err);
         setError(T.errors.loadFailed);
+        setIsStreaming(false);
       } finally {
         if (isActive()) setLoading(false);
       }
@@ -185,7 +180,7 @@ export default function QuizPage() {
   }, [loadQuiz]);
 
   const handleSelect = (questionIndex, optionIndex) => {
-    if (completed) return;
+    if (completed || isStreaming) return;
     const question = quiz[questionIndex];
     if (isMulti(question)) {
       setAnswers((prev) => {
@@ -212,7 +207,15 @@ export default function QuizPage() {
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
-  if (loading) {
+  if (loading && !isStreaming) {
+    return (
+      <PageFrame narrow>
+        <QuizLoadingState />
+      </PageFrame>
+    );
+  }
+
+  if (isStreaming && quiz.length === 0) {
     return (
       <PageFrame narrow>
         <QuizLoadingState />
@@ -254,7 +257,7 @@ export default function QuizPage() {
     );
   }
 
-  if (quiz.length === 0) {
+  if (quiz.length === 0 && !isStreaming) {
     return (
       <PageFrame narrow>
         <EmptyState
@@ -351,17 +354,25 @@ export default function QuizPage() {
               <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <div>
                   <p className="font-mono text-[10px] font-bold uppercase tracking-normal text-[var(--muted)]">
-                    {T.question.answered(answeredCount, quiz.length)}
+                    {isStreaming
+                      ? `Đang tạo · ${quiz.length} câu`
+                      : T.question.answered(answeredCount, quiz.length)}
                   </p>
                   <h2 className="mt-2 text-[20px] font-bold leading-snug text-[var(--foreground)]">{T.question.listTitle}</h2>
                   <p className="mt-2 text-[13px] font-medium leading-6 text-[var(--muted)]">{T.question.listSubtitle}</p>
                 </div>
-                <span className="w-fit rounded-[var(--radius-chip)] border border-[var(--border-subtle)] bg-[var(--surface)] px-2.5 py-1 font-mono text-[10px] font-bold text-[var(--muted)]">
-                  {T.question.completion(progress)}
-                </span>
+                {!isStreaming && (
+                  <span className="w-fit rounded-[var(--radius-chip)] border border-[var(--border-subtle)] bg-[var(--surface)] px-2.5 py-1 font-mono text-[10px] font-bold text-[var(--muted)]">
+                    {T.question.completion(progress)}
+                  </span>
+                )}
               </div>
               <div className="mt-4 h-2 overflow-hidden rounded-full bg-[var(--surface)]">
-                <div className="h-full rounded-full bg-[var(--brand-primary)] transition-all duration-300" style={{ width: `${progress}%` }} />
+                {isStreaming ? (
+                  <div className="h-full w-1/3 animate-[indeterminate_1.5s_ease-in-out_infinite] rounded-full bg-[var(--brand-primary)]" />
+                ) : (
+                  <div className="h-full rounded-full bg-[var(--brand-primary)] transition-all duration-300" style={{ width: `${progress}%` }} />
+                )}
               </div>
             </div>
 
@@ -388,7 +399,7 @@ export default function QuizPage() {
                           selected={multi ? (Array.isArray(userAns) && userAns.includes(optionIndex)) : userAns === optionIndex}
                           correct={correctIndices.includes(optionIndex)}
                           checked={false}
-                          disabled={false}
+                          disabled={isStreaming}
                           multi={multi}
                           onSelect={() => handleSelect(questionIndex, optionIndex)}
                         />
@@ -399,12 +410,21 @@ export default function QuizPage() {
               })}
             </div>
 
+            {/* Skeleton cho câu hỏi tiếp theo khi đang stream */}
+            {isStreaming && (
+              <div className="space-y-4 px-4 pb-4 sm:px-5 sm:pb-5">
+                <QuestionSkeleton />
+              </div>
+            )}
+
             <div className="flex flex-col gap-3 border-t border-[var(--border-subtle)] p-4 sm:flex-row sm:items-center sm:justify-between sm:p-5">
               <p className="text-[12px] font-semibold text-[var(--muted)]">
-                {allAnswered ? T.question.answered(answeredCount, quiz.length) : T.question.unansweredHint}
+                {isStreaming
+                  ? `Đang tạo câu hỏi... (${quiz.length} câu)`
+                  : allAnswered ? T.question.answered(answeredCount, quiz.length) : T.question.unansweredHint}
               </p>
               <div className="flex flex-wrap justify-end gap-2">
-                <LiquidGlassButton icon="task_alt" onClick={handleSubmit} disabled={!allAnswered}>
+                <LiquidGlassButton icon="task_alt" onClick={handleSubmit} disabled={!allAnswered || isStreaming}>
                   {T.question.submit}
                 </LiquidGlassButton>
               </div>
