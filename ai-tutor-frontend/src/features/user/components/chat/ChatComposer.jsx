@@ -1,13 +1,28 @@
-import { useEffect, useRef } from "react";
+import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from "react";
 import Button from "@/shared/ui/Button";
 import LiquidGlassButton from "@/shared/ui/LiquidGlassButton";
 import { CHAT_WORKSPACE_TEXTS } from "@/shared/constants/texts";
 
 const T = CHAT_WORKSPACE_TEXTS.composer;
 
-export default function ChatComposer({ value, onChange, onSubmit, onCancel, loading, disabled, placeholder }) {
+/**
+ * Chat composer with internal input state.
+ * Keystrokes only re-render this component, not the parent ChatPage.
+ *
+ * Parent API:
+ *   ref.current.getValue()  — get current input text
+ *   ref.current.clear()     — clear the input
+ *   ref.current.focus()     — focus the textarea
+ *   onSubmit(text)           — called with input text on send
+ */
+const ChatComposer = forwardRef(function ChatComposer(
+  { onSubmit, onCancel, loading, disabled, placeholder, defaultValue },
+  ref
+) {
   const textareaRef = useRef(null);
+  const [value, setValue] = useState(defaultValue || "");
 
+  // Auto-resize textarea
   useEffect(() => {
     const node = textareaRef.current;
     if (!node) return;
@@ -15,12 +30,27 @@ export default function ChatComposer({ value, onChange, onSubmit, onCancel, load
     node.style.height = `${Math.min(node.scrollHeight, 160)}px`;
   }, [value]);
 
+  // Expose methods to parent via ref
+  useImperativeHandle(ref, () => ({
+    getValue: () => value,
+    clear: () => setValue(""),
+    focus: () => textareaRef.current?.focus(),
+    setValue: (v) => setValue(v),
+  }), [value]);
+
+  const handleSubmit = () => {
+    const text = value.trim();
+    if (!text) return;
+    onSubmit?.(text);
+    setValue("");
+  };
+
   return (
     <div>
       <form
         onSubmit={(event) => {
           event.preventDefault();
-          onSubmit?.();
+          handleSubmit();
         }}
         className="rounded-[var(--radius-panel)] border border-[var(--border-color)] bg-[var(--card-bg)] px-2.5 py-2 shadow-[0_12px_28px_oklch(22%_0.026_238/0.08)]"
       >
@@ -32,11 +62,11 @@ export default function ChatComposer({ value, onChange, onSubmit, onCancel, load
             id="chat-composer"
             ref={textareaRef}
             value={value}
-            onChange={(event) => onChange(event.target.value)}
+            onChange={(event) => setValue(event.target.value)}
             onKeyDown={(event) => {
               if (event.key === "Enter" && !event.shiftKey) {
                 event.preventDefault();
-                onSubmit?.();
+                handleSubmit();
               }
             }}
             rows={1}
@@ -73,4 +103,6 @@ export default function ChatComposer({ value, onChange, onSubmit, onCancel, load
       </p>
     </div>
   );
-}
+});
+
+export default ChatComposer;

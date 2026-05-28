@@ -1,3 +1,4 @@
+import { memo } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import SourceCitationList from "@/features/user/components/chat/SourceCitationList";
@@ -28,7 +29,7 @@ function PipelineStatus({ step }) {
   );
 }
 
-export default function ChatMessage({ message, onRetry, onOpenSource, streaming }) {
+const ChatMessage = memo(function ChatMessage({ message, onRetry, onOpenSource, streaming }) {
   const isUser = message.role === "user" || message.isUser;
   const content = typeof message.content === "string" ? message.content : String(message.content || "");
 
@@ -44,14 +45,18 @@ export default function ChatMessage({ message, onRetry, onOpenSource, streaming 
               : "border-[var(--border-color)] bg-[var(--card-bg)] text-[var(--foreground)]"
           )}
         >
-          {isUser ? (
+        {isUser ? (
             <p className="whitespace-pre-wrap text-[13px] font-semibold leading-6">{content}</p>
           ) : streaming && !content ? (
             <PipelineStatus step={message._status} />
+          ) : streaming ? (
+            <div className="prose-saas max-w-none text-[13px] leading-7">
+              <span className="whitespace-pre-wrap">{content}</span>
+              <span className="inline-block h-4 w-0.5 translate-y-0.5 animate-pulse bg-[var(--brand-primary)]" />
+            </div>
           ) : (
             <div className="prose-saas max-w-none text-[13px] leading-7">
               <ReactMarkdown remarkPlugins={[remarkGfm]}>{content}</ReactMarkdown>
-              {streaming && <span className="inline-block h-4 w-0.5 translate-y-0.5 animate-pulse bg-[var(--brand-primary)]" />}
             </div>
           )}
         </div>
@@ -70,7 +75,9 @@ export default function ChatMessage({ message, onRetry, onOpenSource, streaming 
             </Button>
           </div>
         )}
-      </div>
+    </div>
     </article>
   );
-}
+});
+
+export default ChatMessage;

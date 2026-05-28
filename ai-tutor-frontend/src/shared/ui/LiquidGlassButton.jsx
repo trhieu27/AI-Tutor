@@ -58,13 +58,13 @@ export default function LiquidGlassButton({
         {loading ? (
           <span className="h-4 w-4 animate-spin rounded-full border-2 border-current/25 border-t-current" aria-hidden="true" />
         ) : icon ? (
-          <span className="material-symbols-outlined text-[17px]" aria-hidden="true">
+          <span className="material-symbols-outlined text-[17px] leading-none" aria-hidden="true">
             {icon}
           </span>
         ) : null}
         {!iconOnly && <span className="truncate">{children}</span>}
         {!loading && trailingIcon && !iconOnly && (
-          <span className="material-symbols-outlined text-[17px]" aria-hidden="true">
+          <span className="material-symbols-outlined text-[17px] leading-none" aria-hidden="true">
             {trailingIcon}
           </span>
         )}

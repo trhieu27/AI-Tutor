@@ -912,7 +912,7 @@ h6 {
 
 /* ── Custom Scrollbar ─────────────────────────────────────────────────── */
 .custom-scrollbar::-webkit-scrollbar {
-  width: 4px;
+  width: 6px;
 }
 
 .custom-scrollbar::-webkit-scrollbar-track {
@@ -920,20 +920,20 @@ h6 {
 }
 
 .custom-scrollbar::-webkit-scrollbar-thumb {
-  background: #E5E7EB;
-  border-radius: 4px;
+  background: oklch(70% 0.010 215 / 0.4);
+  border-radius: 6px;
 }
 
 .custom-scrollbar::-webkit-scrollbar-thumb:hover {
-  background: #D1D5DB;
+  background: oklch(55% 0.020 175 / 0.6);
 }
 
 .dark .custom-scrollbar::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.06);
+  background: oklch(55% 0.015 218 / 0.4);
 }
 
 .dark .custom-scrollbar::-webkit-scrollbar-thumb:hover {
-  background: rgba(255, 255, 255, 0.10);
+  background: oklch(65% 0.020 175 / 0.55);
 }
 
 /* ── 10. CHAT PROMPT — Input Box ───────────────────────────────────────── */

@@ -7,10 +7,16 @@ const { requireChatQuota, recordChatUsage, checkAndRecordAiQuota, isUserPro } = 
 const { sendAdminRealtimeEvent } = require('../utils/notifications');
 const config = require('../config');
 const rag = require('../rag/pipeline');
+const { generateTitle } = require('../rag/gemini');
+
+function capitalize(s) { return s ? s.charAt(0).toUpperCase() + s.slice(1) : s; }
 
 const INJECTION_PATTERN = /ignore (all |previous |above )?instructions?|forget (everything|all|your instructions?)|(reveal|output|print|show|display) (the |your )?(system |original )?prompt|you are now|act as (a |an )?(different|new)|jailbreak|DAN mode/i;
 const CTRL_CHAR_PATTERN = /[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]/g;
 const QUIZ_CACHE_VERSION = 2;
+
+// Session IDs mà frontend yêu cầu không lưu (user tạo chat mới giữa chừng)
+const discardedSessions = new Set();
 
 function sanitizeQuestion(text) {
   const cleaned = text.replace(CTRL_CHAR_PATTERN, '').trim();
@@ -134,29 +140,26 @@ router.post('/:documentId/ask', authMiddleware, requireChatQuota(), async (req, 
     const sessionId = requestedSessionId || uuidv4();
     let sessionData;
     if (requestedSessionId) {
-      sessionData = await ChatSession.findOne({ id: sessionId, user_id: req.userId, document_id: documentId }).lean();
+      sessionData = await ChatSession.findOne({ id: sessionId, user_id: req.userId, document_id: documentId }, { messages: { $slice: -10 } }).lean();
       if (!sessionData) return res.status(404).json({ detail: 'Phiên chat không tồn tại' });
     } else {
       sessionData = { messages: [] };
     }
 
-    // Build context window by tier
+    // Build context window — include full messages newest→oldest until budget hit
     const isPro = await isUserPro(req.userId);
+    const recentMsgs = sessionData.messages || [];
+    const CONTEXT_BUDGET = isPro ? 32000 : 12000; // ~8k / ~3k tokens
 
-    const historyMsgs = sessionData.messages || [];
-    let contextMsgs, maxCharPerMsg;
-    if (isPro) {
-      contextMsgs = historyMsgs;
-      maxCharPerMsg = 4000;
-    } else {
-      contextMsgs = historyMsgs.slice(-config.freeLimits.contextMessages);
-      maxCharPerMsg = config.freeLimits.msgChars;
+    let contextHistory = [];
+    let charCount = 0;
+
+    for (let i = recentMsgs.length - 1; i >= 0; i--) {
+      const msg = recentMsgs[i];
+      if (charCount + msg.content.length > CONTEXT_BUDGET) break;
+      contextHistory.unshift({ role: msg.role === 'user' ? 'human' : 'ai', content: msg.content });
+      charCount += msg.content.length;
     }
-
-    const chatHistory = contextMsgs.map(m => ({
-      role: m.role === 'user' ? 'human' : 'ai',
-      content: m.content.slice(0, maxCharPerMsg),
-    }));
 
     // Sanitize question
     let questionText;
@@ -184,7 +187,7 @@ router.post('/:documentId/ask', authMiddleware, requireChatQuota(), async (req, 
     };
 
     // Call production-grade RAG pipeline
-    const { answer, sources, pipeline } = await rag.ask(doc.chroma_collection_id, questionText, chatHistory, {
+    const { answer, sources, pipeline } = await rag.ask(doc.chroma_collection_id, questionText, contextHistory, {
       signal: requestController.signal,
       documentMetadata,
       debug,
@@ -201,11 +204,12 @@ router.post('/:documentId/ask', authMiddleware, requireChatQuota(), async (req, 
         { $push: { messages: { $each: [userMsg, aiMsg] } }, $set: { updated_at: new Date() } }
       );
     } else {
+      const aiTitle = await generateTitle(questionText, answer);
       await ChatSession.create({
         id: sessionId,
         user_id: req.userId,
         document_id: documentId,
-        title: (questionText || '').slice(0, 50),
+        title: capitalize(aiTitle || (questionText || '').slice(0, 50)),
         messages: [userMsg, aiMsg],
       });
     }
@@ -247,11 +251,16 @@ router.post('/:documentId/ask-stream', authMiddleware, requireChatQuota(), async
   req.on('aborted', markClientClosed);
   req.on('close', markClientClosed);
 
-  // Helper to safely write SSE (no-op after client disconnect)
+  // Check real-time — req.socket.destroyed phản hồi nhanh hơn close event
+  const isGone = () => clientClosed || requestController.signal.aborted || req.socket?.destroyed;
+
+  // Helper to safely write SSE and flush immediately (no-op after client disconnect)
   function sseWrite(event, data) {
-    if (clientClosed) return;
+    if (isGone()) return;
     try {
       res.write('event: ' + event + '\ndata: ' + JSON.stringify(data) + '\n\n');
+      // Force flush to push data through Node.js internal buffer to TCP immediately
+      if (typeof res.flush === 'function') res.flush();
     } catch (e) { /* ignore write-after-end */ }
   }
 
@@ -268,6 +277,11 @@ router.post('/:documentId/ask-stream', authMiddleware, requireChatQuota(), async
     res.setHeader('X-Accel-Buffering', 'no');
     res.flushHeaders();
 
+    // Disable Nagle's algorithm — send each write as its own TCP packet immediately
+    // This is critical for token-by-token streaming: without it, Node.js batches
+    // multiple small SSE events into a single TCP packet
+    if (res.socket) res.socket.setNoDelay(true);
+
     const doc = await Document.findOne({ id: documentId });
     if (!doc || !doc.chroma_collection_id) {
       sseWrite('error', { detail: 'T\u00e0i li\u1ec7u kh\u00f4ng t\u1ed3n t\u1ea1i ho\u1eb7c ch\u01b0a \u0111\u01b0\u1ee3c x\u1eed l\u00fd' });
@@ -279,7 +293,7 @@ router.post('/:documentId/ask-stream', authMiddleware, requireChatQuota(), async
     const sessionId = requestedSessionId || uuidv4();
     let sessionData;
     if (requestedSessionId) {
-      sessionData = await ChatSession.findOne({ id: sessionId, user_id: req.userId, document_id: documentId }).lean();
+      sessionData = await ChatSession.findOne({ id: sessionId, user_id: req.userId, document_id: documentId }, { messages: { $slice: -10 } }).lean();
       if (!sessionData) {
         sseWrite('error', { detail: 'Phi\u00ean chat kh\u00f4ng t\u1ed3n t\u1ea1i' });
         return res.end();
@@ -288,24 +302,20 @@ router.post('/:documentId/ask-stream', authMiddleware, requireChatQuota(), async
       sessionData = { messages: [] };
     }
 
-    // Build context window by tier
+    // Build context window — include full messages newest→oldest until budget hit
     const isPro = await isUserPro(req.userId);
-    const historyMsgs = sessionData.messages || [];
-    let contextMsgs, maxCharPerMsg;
-    if (isPro) {
-      contextMsgs = historyMsgs;
-      maxCharPerMsg = 4000;
-    } else {
-      contextMsgs = historyMsgs.slice(-config.freeLimits.contextMessages);
-      maxCharPerMsg = config.freeLimits.msgChars;
-    }
+    const recentMsgs = sessionData.messages || [];
+    const CONTEXT_BUDGET = isPro ? 32000 : 12000; // ~8k / ~3k tokens
 
-    const chatHistory = contextMsgs.map(function (m) {
-      return {
-        role: m.role === 'user' ? 'human' : 'ai',
-        content: m.content.slice(0, maxCharPerMsg),
-      };
-    });
+    let contextHistory = [];
+    let charCount = 0;
+
+    for (let i = recentMsgs.length - 1; i >= 0; i--) {
+      const msg = recentMsgs[i];
+      if (charCount + msg.content.length > CONTEXT_BUDGET) break;
+      contextHistory.unshift({ role: msg.role === 'user' ? 'human' : 'ai', content: msg.content });
+      charCount += msg.content.length;
+    }
 
     // Sanitize question
     let questionText;
@@ -323,7 +333,7 @@ router.post('/:documentId/ask-stream', authMiddleware, requireChatQuota(), async
       return res.end();
     }
 
-    if (clientClosed) return res.end();
+    if (isGone()) return res.end();
 
     // Build document metadata for retrieval router
     const debug = req.headers['x-debug'] === 'true';
@@ -334,35 +344,43 @@ router.post('/:documentId/ask-stream', authMiddleware, requireChatQuota(), async
       uploadedAt: doc.uploaded_at,
     };
 
+    // Gửi session_id sớm để frontend track → có thể xóa nếu cancel
+    if (!requestedSessionId) {
+      sseWrite('session', { session_id: sessionId });
+    }
+
     // Stream from pipeline
     let doneEvent = null;
-    for await (const event of rag.askStream(doc.chroma_collection_id, questionText, chatHistory, {
+    let sentAnswer = ''; // Track text đã gửi đến client
+    for await (const event of rag.askStream(doc.chroma_collection_id, questionText, contextHistory, {
       signal: requestController.signal,
       documentMetadata: documentMetadata,
       debug: debug,
     })) {
-      if (clientClosed) break;
+      if (isGone()) break;
 
       if (event.type === 'status') {
         sseWrite('status', { step: event.step });
       } else if (event.type === 'chunk') {
         sseWrite('chunk', { text: event.text });
+        sentAnswer += event.text;
       } else if (event.type === 'done') {
         doneEvent = event;
       }
     }
 
-    if (clientClosed) return res.end();
-
-    if (!doneEvent) {
-      sseWrite('error', { detail: 'Kh\u00f4ng nh\u1eadn \u0111\u01b0\u1ee3c ph\u1ea3n h\u1ed3i t\u1eeb AI' });
+    // Không có answer hoặc session bị discard → không lưu
+    if (!sentAnswer || discardedSessions.has(sessionId)) {
+      discardedSessions.delete(sessionId);
+      if (!sentAnswer) sseWrite('error', { detail: 'Không nhận được phản hồi từ AI' });
       return res.end();
     }
 
-    // Save session to DB
-    const answer = doneEvent.answer;
-    const sources = doneEvent.sources;
-    const pipeline = doneEvent.pipeline;
+    // Có answer → luôn lưu (kể cả partial khi user bấm dừng)
+    const answer = sentAnswer;
+    const sources = doneEvent ? doneEvent.sources : [];
+    const pipeline = doneEvent ? doneEvent.pipeline : {};
+    const clientDisconnected = isGone();
 
     const userMsg = { id: uuidv4(), session_id: sessionId, role: 'user', content: question, sources: [] };
     const aiMsg = { id: uuidv4(), session_id: sessionId, role: 'assistant', content: answer, sources: sources };
@@ -373,22 +391,24 @@ router.post('/:documentId/ask-stream', authMiddleware, requireChatQuota(), async
         { $push: { messages: { $each: [userMsg, aiMsg] } }, $set: { updated_at: new Date() } }
       );
     } else {
+      const aiTitle = clientDisconnected ? null : await generateTitle(questionText, answer);
       await ChatSession.create({
         id: sessionId,
         user_id: req.userId,
         document_id: documentId,
-        title: (questionText || '').slice(0, 50),
+        title: capitalize(aiTitle || (questionText || '').slice(0, 50)),
         messages: [userMsg, aiMsg],
       });
     }
 
-    // Send final done event
-    sseWrite('done', {
-      session_id: sessionId,
-      message: aiMsg,
-      sources: sources,
-      pipeline: pipeline,
-    });
+    if (!clientDisconnected) {
+      sseWrite('done', {
+        session_id: sessionId,
+        message: aiMsg,
+        sources: sources,
+        pipeline: pipeline,
+      });
+    }
 
     res.end();
 
@@ -401,7 +421,7 @@ router.post('/:documentId/ask-stream', authMiddleware, requireChatQuota(), async
     }).catch(function (eventErr) { console.warn('[AdminRealtime] chat_message_created failed:', eventErr.message); });
 
   } catch (err) {
-    if (clientClosed) return;
+    if (isGone()) return;
     var errName = err && err.name;
     if (errName === 'AbortError' || requestController.signal.aborted) {
       sseWrite('error', { detail: 'Y\u00eau c\u1ea7u \u0111\u00e3 \u0111\u01b0\u1ee3c h\u1ee7y.' });
@@ -703,23 +723,72 @@ router.get('/:documentId/sessions', authMiddleware, async (req, res) => {
   }
 });
 
-// GET /api/v1/chat/sessions/:sessionId
+// GET /api/v1/chat/sessions/:sessionId?limit=20&before=messageId
 router.get('/sessions/:sessionId', authMiddleware, async (req, res) => {
   try {
-    const session = await ChatSession.findOne({ id: req.params.sessionId, user_id: req.userId }).lean();
-    if (!session) return res.status(404).json({ detail: 'Không tìm thấy phiên chat' });
+    const limit = Math.min(parseInt(req.query.limit) || 20, 100);
+    const beforeId = req.query.before || null;
 
-    const messages = (session.messages || []).map(m => ({ ...m, session_id: session.id }));
-    res.json({
-      id: session.id,
-      user_id: session.user_id,
-      document_id: session.document_id,
-      title: session.title,
-      created_at: session.created_at,
-      updated_at: session.updated_at,
-      message_count: messages.length,
-      messages,
-    });
+    // If requesting initial load (no cursor), use MongoDB $slice for efficiency
+    if (!beforeId) {
+      // Fetch session metadata + only last `limit` messages using $slice
+      const session = await ChatSession.findOne(
+        { id: req.params.sessionId, user_id: req.userId },
+        {
+          id: 1, user_id: 1, document_id: 1, title: 1,
+          created_at: 1, updated_at: 1,
+          messages: { $slice: -limit },
+          // We need total count — MongoDB doesn't give it with $slice,
+          // so we also project a helper field
+        }
+      ).lean();
+      if (!session) return res.status(404).json({ detail: 'Không tìm thấy phiên chat' });
+
+      // Get total message count (separate lightweight query)
+      const countResult = await ChatSession.aggregate([
+        { $match: { id: req.params.sessionId } },
+        { $project: { count: { $size: '$messages' } } }
+      ]);
+      const totalCount = countResult[0]?.count || 0;
+
+      const messages = (session.messages || []).map(m => ({ ...m, session_id: session.id }));
+      res.json({
+        id: session.id,
+        user_id: session.user_id,
+        document_id: session.document_id,
+        title: session.title,
+        created_at: session.created_at,
+        updated_at: session.updated_at,
+        message_count: totalCount,
+        has_more: totalCount > messages.length,
+        messages,
+      });
+    } else {
+      // Cursor-based: fetch messages before a specific message ID
+      const session = await ChatSession.findOne(
+        { id: req.params.sessionId, user_id: req.userId }
+      ).lean();
+      if (!session) return res.status(404).json({ detail: 'Không tìm thấy phiên chat' });
+
+      const allMsgs = session.messages || [];
+      const cursorIdx = allMsgs.findIndex(m => m.id === beforeId);
+      if (cursorIdx <= 0) {
+        // Cursor not found or already at start — no more messages
+        return res.json({
+          has_more: false,
+          messages: [],
+        });
+      }
+
+      // Slice: [cursorIdx - limit ... cursorIdx)
+      const start = Math.max(0, cursorIdx - limit);
+      const olderMsgs = allMsgs.slice(start, cursorIdx).map(m => ({ ...m, session_id: session.id }));
+
+      res.json({
+        has_more: start > 0,
+        messages: olderMsgs,
+      });
+    }
   } catch (err) {
     res.status(500).json({ detail: 'Lỗi server' });
   }
@@ -734,6 +803,41 @@ router.delete('/sessions/:sessionId', authMiddleware, async (req, res) => {
   } catch (err) {
     res.status(500).json({ detail: 'Lỗi server' });
   }
+});
+
+// PATCH /api/v1/chat/sessions/:sessionId/truncate — cập nhật nội dung tin nhắn AI cuối
+router.patch('/sessions/:sessionId/truncate', authMiddleware, async (req, res) => {
+  try {
+    const { content } = req.body || {};
+    if (typeof content !== 'string') return res.status(400).json({ detail: 'Thiếu content' });
+
+    const session = await ChatSession.findOne({ id: req.params.sessionId, user_id: req.userId });
+    if (!session) return res.status(404).json({ detail: 'Không tìm thấy phiên chat' });
+
+    // Tìm tin nhắn assistant cuối cùng
+    const msgs = session.messages || [];
+    for (let i = msgs.length - 1; i >= 0; i--) {
+      if (msgs[i].role === 'assistant') {
+        msgs[i].content = content;
+        break;
+      }
+    }
+    await ChatSession.updateOne(
+      { id: req.params.sessionId, user_id: req.userId },
+      { $set: { messages: msgs, updated_at: new Date() } }
+    );
+    res.json({ status: 'success' });
+  } catch (err) {
+    res.status(500).json({ detail: 'Lỗi server' });
+  }
+});
+
+// POST /api/v1/chat/sessions/:sessionId/discard — báo backend không lưu session này
+router.post('/sessions/:sessionId/discard', authMiddleware, (req, res) => {
+  discardedSessions.add(req.params.sessionId);
+  // Tự xóa sau 60s tránh memory leak
+  setTimeout(() => discardedSessions.delete(req.params.sessionId), 60000);
+  res.json({ status: 'ok' });
 });
 
 module.exports = router;

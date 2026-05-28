@@ -8,11 +8,14 @@ import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import {
   askQuestionStream,
   deleteChatSession,
+  discardChatSession,
+  truncateChatMessage,
   fetchChatSessions,
   fetchDocument,
   fetchDocumentFileBlob,
   fetchDocumentStudyQuestionsStream,
   fetchDocumentSummaryStream,
+  fetchOlderMessages,
   fetchQuota,
   fetchSessionDetail,
   locateDocumentCitation,
@@ -729,15 +732,22 @@ export default function ChatPage() {
   const initialSession = initialSessionRef.current;
   const hasHandledInitialAction = useRef(false);
   const messagesEndRef = useRef(null);
+  const scrollContainerRef = useRef(null);
+  const topSentinelRef = useRef(null);
   const abortRef = useRef(null);
   const activeAskRef = useRef(null);
   const docNameRef = useRef("");
+  const isFetchingOlderRef = useRef(false);
+  const composerRef = useRef(null);
+  const instantScrollRef = useRef(true);
+  const suppressScrollRef = useRef(false);
+  const newSessionRef = useRef(null); // ID session vừa tạo, chưa hoàn tất
 
   const [docData, setDocData] = useState(null);
   const [sessions, setSessions] = useState([]);
   const [currentSessionId, setCurrentSessionId] = useState(null);
   const [messages, setMessages] = useState([]);
-  const [input, setInput] = useState("");
+  const [hasMore, setHasMore] = useState(false);
   const [pageLoading, setPageLoading] = useState(true);
   const [sessionsLoading, setSessionsLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -787,7 +797,9 @@ export default function ChatPage() {
       setIsSending(false);
       try {
         const detail = await fetchSessionDetail(sessionId);
+        instantScrollRef.current = true;
         setMessages(detail.messages || []);
+        setHasMore(detail.has_more || false);
         setCurrentSessionId(sessionId);
         if (!options.silentUrl) navigate(`/chat/${documentId}?session=${sessionId}`, { replace: true });
         setHistoryOpen(false);
@@ -797,6 +809,49 @@ export default function ChatPage() {
     },
     [documentId, navigate]
   );
+
+  // Load older messages when user scrolls to top (Messenger-style)
+  const loadOlderMessages = useCallback(async () => {
+    if (!currentSessionId || !hasMore || isFetchingOlderRef.current) return;
+    const firstMsg = messages[0];
+    if (!firstMsg?.id) return;
+    isFetchingOlderRef.current = true;
+    try {
+      const container = scrollContainerRef.current;
+      const prevScrollHeight = container?.scrollHeight || 0;
+      const result = await fetchOlderMessages(currentSessionId, firstMsg.id);
+      if (result.messages?.length > 0) {
+        suppressScrollRef.current = true;
+        setMessages(prev => [...result.messages, ...prev]);
+        setHasMore(result.has_more || false);
+        // Preserve scroll position after prepending
+        requestAnimationFrame(() => {
+          if (container) {
+            const newScrollHeight = container.scrollHeight;
+            container.scrollTop += (newScrollHeight - prevScrollHeight);
+          }
+        });
+      } else {
+        setHasMore(false);
+      }
+    } catch (err) {
+      console.error('Failed to load older messages:', err);
+    } finally {
+      isFetchingOlderRef.current = false;
+    }
+  }, [currentSessionId, hasMore, messages]);
+
+  // IntersectionObserver: trigger loadOlderMessages when top sentinel is visible
+  useEffect(() => {
+    const sentinel = topSentinelRef.current;
+    if (!sentinel || !hasMore) return;
+    const observer = new IntersectionObserver(
+      ([entry]) => { if (entry.isIntersecting) loadOlderMessages(); },
+      { root: scrollContainerRef.current, threshold: 0.1 }
+    );
+    observer.observe(sentinel);
+    return () => observer.disconnect();
+  }, [hasMore, loadOlderMessages]);
 
   useEffect(() => {
     let active = true;
@@ -832,7 +887,25 @@ export default function ChatPage() {
   }, [documentId, loadSession]);
 
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
+    // Skip scroll khi prepend tin cũ
+    if (suppressScrollRef.current) {
+      suppressScrollRef.current = false;
+      return;
+    }
+    if (instantScrollRef.current) {
+      // Mở/đổi session → scroll instant xuống cuối
+      messagesEndRef.current?.scrollIntoView({ behavior: "instant", block: "end" });
+      instantScrollRef.current = false;
+    } else {
+      // Chỉ auto-scroll nếu user đang ở gần cuối (< 150px)
+      const container = scrollContainerRef.current;
+      if (container) {
+        const distanceFromBottom = container.scrollHeight - container.scrollTop - container.clientHeight;
+        if (distanceFromBottom < 150) {
+          messagesEndRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
+        }
+      }
+    }
   }, [messages, isSending]);
 
   const handleQuickAction = useCallback(
@@ -846,7 +919,7 @@ export default function ChatPage() {
         return;
       }
       if (action === "explain") {
-        setInput(TEXTS.page.explainPrompt);
+        composerRef.current?.setValue(TEXTS.page.explainPrompt);
         return;
       }
       if (action === "summary") {
@@ -917,7 +990,7 @@ export default function ChatPage() {
     if (initialAction === "questions") handleQuickAction("questions");
     if (initialAction === "quiz") handleQuickAction("quiz");
     if (initialAction === "mindmap") handleQuickAction("mindmap");
-    if (initialAction === "explain") setInput(TEXTS.page.initialExplainPrompt);
+    if (initialAction === "explain") composerRef.current?.setValue(TEXTS.page.initialExplainPrompt);
   }, [handleQuickAction, initialAction, pageLoading]);
 
   const filteredSessions = useMemo(() => {
@@ -938,8 +1011,8 @@ export default function ChatPage() {
   }, [messages]);
 
 
-  const handleSend = async () => {
-    const question = input.trim();
+  const handleSend = async (text) => {
+    const question = (text || composerRef.current?.getValue() || "").trim();
     if (!question || isSending) return;
 
     const requestId = `ask-${Date.now()}`;
@@ -962,7 +1035,8 @@ export default function ChatPage() {
       sources: [],
       _streaming: true,
     }]);
-    setInput("");
+    composerRef.current?.clear();
+    instantScrollRef.current = true; // Luôn scroll xuống khi gửi tin mới
     setIsSending(true);
 
     const controller = new AbortController();
@@ -997,6 +1071,10 @@ export default function ChatPage() {
               msg.id === aiMsgId ? { ...msg, _status: step } : msg
             )
           );
+        },
+        // onSession: track session ID sớm để xóa nếu cancel
+        (sessionId) => {
+          newSessionRef.current = sessionId;
         }
       );
 
@@ -1004,6 +1082,7 @@ export default function ChatPage() {
 
       const nextSessionId = response.session_id || currentSessionId;
       if (nextSessionId && !currentSessionId) {
+        newSessionRef.current = nextSessionId;
         setCurrentSessionId(nextSessionId);
         navigate(`/chat/${documentId}?session=${nextSessionId}`, { replace: true });
       }
@@ -1046,6 +1125,7 @@ export default function ChatPage() {
         setIsSending(false);
         abortRef.current = null;
         activeAskRef.current = null;
+        newSessionRef.current = null; // Hoàn tất → không cần xóa nữa
       }
     }
   };
@@ -1055,6 +1135,7 @@ export default function ChatPage() {
     activeAskRef.current?.controller?.abort();
     abortRef.current?.abort();
     setIsSending(false);
+    newSessionRef.current = null;
     setMessages((prev) =>
       prev
         .map((msg) => (msg._streaming ? { ...msg, _streaming: false } : msg))
@@ -1064,9 +1145,15 @@ export default function ChatPage() {
 
   const startNewChat = () => {
     if (activeAskRef.current) activeAskRef.current.cancelled = true;
+    // Session mới chưa có history → discard (không lưu)
+    // Session cũ đã có history → để backend lưu partial
+    if (newSessionRef.current) {
+      discardChatSession(newSessionRef.current).catch(() => {});
+    }
     activeAskRef.current?.controller?.abort();
     abortRef.current?.abort();
     setIsSending(false);
+    newSessionRef.current = null;
     setCurrentSessionId(null);
     setMessages([]);
     navigate(`/chat/${documentId}`, { replace: true });
@@ -1175,7 +1262,7 @@ export default function ChatPage() {
             </div>
           </header>
 
-          <div className="min-h-0 flex-1 overflow-y-auto px-3 py-5 sm:px-5 custom-scrollbar">
+          <div ref={scrollContainerRef} className="min-h-0 flex-1 overflow-y-auto px-3 py-5 sm:px-5 custom-scrollbar">
             {messages.length === 0 ? (
               <div className="mx-auto flex min-h-full max-w-3xl flex-col justify-center py-8">
                 <EmptyState
@@ -1192,6 +1279,13 @@ export default function ChatPage() {
               </div>
             ) : (
               <div className="mx-auto max-w-3xl space-y-5">
+                {/* Top sentinel — triggers loading older messages on scroll up */}
+                <div ref={topSentinelRef} className="h-1" />
+                {hasMore && (
+                  <div className="flex justify-center py-2">
+                    <span className="text-[11px] font-medium text-[var(--muted)]">Đang tải tin nhắn cũ...</span>
+                  </div>
+                )}
                 {messages.map((message) => (
                   <ChatMessage
                     key={message.id || `${message.role}-${message.created_at}`}
@@ -1208,8 +1302,7 @@ export default function ChatPage() {
           <div className="shrink-0 border-t border-[var(--border-color)] bg-[linear-gradient(180deg,transparent,var(--background)_22%)] px-3 py-2 sm:px-4 sm:py-2.5">
             <div className="mx-auto max-w-3xl">
               <ChatComposer
-                value={input}
-                onChange={setInput}
+                ref={composerRef}
                 onSubmit={handleSend}
                 onCancel={handleCancel}
                 loading={isSending}
@@ -1279,7 +1372,7 @@ export default function ChatPage() {
             setModalType(null);
             abortRef.current?.abort();
           }}
-          onAskQuestion={(question) => setInput(TEXTS.page.askStudyQuestion(question))}
+          onAskQuestion={(question) => composerRef.current?.setValue(TEXTS.page.askStudyQuestion(question))}
         />
       )}
 

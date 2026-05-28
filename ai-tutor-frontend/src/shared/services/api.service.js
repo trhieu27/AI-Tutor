@@ -191,7 +191,7 @@ export async function askQuestion(documentId, request, signal) {
  * @param {AbortSignal} signal
  * @returns {Promise<object>} final data { session_id, message, sources, pipeline }
  */
-export async function askQuestionStream(documentId, request, onChunk, signal, onStatus) {
+export async function askQuestionStream(documentId, request, onChunk, signal, onStatus, onSession) {
   const headers = { 'Content-Type': 'application/json', 'Accept': 'text/event-stream' };
   if (request.debug) headers['X-Debug'] = 'true';
 
@@ -218,6 +218,7 @@ export async function askQuestionStream(documentId, request, onChunk, signal, on
   let buffer = '';
   let finalData = null;
 
+  // ── Read SSE stream ──────────────────────────────────────────────────
   while (true) {
     const { done, value } = await reader.read();
     if (done) break;
@@ -232,7 +233,12 @@ export async function askQuestionStream(documentId, request, onChunk, signal, on
         currentEvent = line.slice(7).trim();
       } else if (line.startsWith('data: ')) {
         const dataStr = line.slice(6);
-        if (currentEvent === 'status') {
+        if (currentEvent === 'session') {
+          try {
+            const parsed = JSON.parse(dataStr);
+            if (parsed.session_id) onSession?.(parsed.session_id);
+          } catch (e) { /* skip */ }
+        } else if (currentEvent === 'status') {
           try {
             const parsed = JSON.parse(dataStr);
             if (parsed.step) onStatus?.(parsed.step);
@@ -310,11 +316,32 @@ export async function fetchSessionDetail(sessionId) {
   }
   return safeJson(res, {});
 }
+
+export async function fetchOlderMessages(sessionId, beforeMessageId, limit = 20) {
+  const params = new URLSearchParams({ before: beforeMessageId, limit: String(limit) });
+  const res = await authFetch(`${API_BASE}/chat/sessions/${sessionId}?${params}`);
+  if (!res.ok) {
+    const errorData = await safeJson(res, {});
+    throw new Error(`[${res.status}] ${errorData.detail || 'Lỗi tải tin nhắn'}`);
+  }
+  return safeJson(res, { has_more: false, messages: [] });
+}
 export async function deleteChatSession(sessionId) {
   const res = await authFetch(`${API_BASE}/chat/sessions/${sessionId}`, {
     method: 'DELETE'
   });
   if (!res.ok) throw new Error('Xóa phiên chat thất bại');
+}
+export async function truncateChatMessage(sessionId, content) {
+  const res = await authFetch(`${API_BASE}/chat/sessions/${sessionId}/truncate`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ content }),
+  });
+  if (!res.ok) throw new Error('Cập nhật tin nhắn thất bại');
+}
+export async function discardChatSession(sessionId) {
+  await authFetch(`${API_BASE}/chat/sessions/${sessionId}/discard`, { method: 'POST' });
 }
 async function readStream(res, onChunk) {
   const reader = res.body?.getReader();

@@ -12,7 +12,7 @@ const { v4: uuidv4 } = require('uuid');
 const path = require('path');
 const { extractText, detectImagePages, extractDocxImages } = require('./extractor');
 const { chunkText } = require('./chunker');
-const { embedTexts, embedQuery, generateText, generateStream, describeDocumentImages, describeDocxImages } = require('./gemini');
+const { embedTexts, embedQuery, generateText, generateStream, chatStream, describeDocumentImages, describeDocxImages } = require('./gemini');
 const vectorstore = require('./vectorstore');
 const { rewriteQuery } = require('./query-rewriter');
 const { hybridSearch } = require('./hybrid-search');
@@ -138,11 +138,11 @@ async function ingest(filePath, documentId, options = {}) {
  *
  * @param {string} collectionName
  * @param {string} question
- * @param {Array<{role:'human'|'ai', content:string}>} chatHistory
+ * @param {Array<{role:'human'|'ai', content:string}>} conversationHistory
  * @param {object} [options] - { signal, documentMetadata, debug }
  * @returns {{ answer, sources, pipeline }}
  */
-async function ask(collectionName, question, chatHistory = [], options = {}) {
+async function ask(collectionName, question, conversationHistory = [], options = {}) {
   const { signal, documentMetadata = {}, debug = false } = options;
   const pipelineLog = {
     originalQuery: question,
@@ -182,14 +182,14 @@ async function ask(collectionName, question, chatHistory = [], options = {}) {
 
   // ── Step 1: Query Rewriting ──
   const rewriteStart = Date.now();
-  const rewrittenQuery = await rewriteQuery(question, chatHistory, { signal });
+  const rewrittenQuery = await rewriteQuery(question, conversationHistory, { signal });
   pipelineLog.rewrittenQuery = rewrittenQuery;
   pipelineLog.timings.rewrite = Date.now() - rewriteStart;
   throwIfAborted(signal);
 
   // ── Step 2: Retrieval Strategy Router ──
   const docMeta = { ...documentMetadata, collectionName };
-  const { strategy, reasons, cacheHit } = chooseRetrievalStrategy(rewrittenQuery, docMeta, chatHistory);
+  const { strategy, reasons, cacheHit } = chooseRetrievalStrategy(rewrittenQuery, docMeta, conversationHistory);
   pipelineLog.strategy = strategy;
   pipelineLog.strategyReasons = reasons;
 
@@ -283,8 +283,8 @@ async function ask(collectionName, question, chatHistory = [], options = {}) {
   // ── Step 6: Grounded Answer Generation ──
   const generateStart = Date.now();
 
-  // Format chat history
-  const historyText = chatHistory
+  // Format conversation history for prompt
+  const historyText = conversationHistory
     .map(m => `${m.role === 'human' ? 'Học sinh' : 'Trợ lý'}: ${m.content}`)
     .join('\n');
 
@@ -577,11 +577,11 @@ ${context}`;
  *
  * @param {string} collectionName
  * @param {string} question
- * @param {Array<{role:'human'|'ai', content:string}>} chatHistory
+ * @param {Array<{role:'human'|'ai', content:string}>} conversationHistory
  * @param {object} [options] - { signal, documentMetadata, debug }
  */
-async function* askStream(collectionName, question, chatHistory, options) {
-  chatHistory = chatHistory || [];
+async function* askStream(collectionName, question, conversationHistory, options) {
+  conversationHistory = conversationHistory || [];
   options = options || {};
   const signal = options.signal;
   const documentMetadata = options.documentMetadata || {};
@@ -626,14 +626,14 @@ async function* askStream(collectionName, question, chatHistory, options) {
   // ── Step 1: Query Rewriting ──
   yield { type: 'status', step: 'analyzing' };
   const rewriteStart = Date.now();
-  const rewrittenQuery = await rewriteQuery(question, chatHistory, { signal });
+  const rewrittenQuery = await rewriteQuery(question, conversationHistory, { signal });
   pipelineLog.rewrittenQuery = rewrittenQuery;
   pipelineLog.timings.rewrite = Date.now() - rewriteStart;
   throwIfAborted(signal);
 
   // ── Step 2: Retrieval Strategy Router ──
   const docMeta = Object.assign({}, documentMetadata, { collectionName: collectionName });
-  const routerResult = chooseRetrievalStrategy(rewrittenQuery, docMeta, chatHistory);
+  const routerResult = chooseRetrievalStrategy(rewrittenQuery, docMeta, conversationHistory);
   const strategy = routerResult.strategy;
   const reasons = routerResult.reasons;
   const cacheHit = routerResult.cacheHit;
@@ -725,33 +725,40 @@ async function* askStream(collectionName, question, chatHistory, options) {
     setCachedStaticContext(collectionName, rewrittenQuery, { selectedChunks: selectedChunks, contextText: contextText, tokenEstimate: tokenEstimate }, { knowledgeType: knowledgeType });
   }
 
-  // ── Step 6: Grounded Answer Generation (streaming) ──
+  // ── Step 6: Grounded Answer Generation (multi-turn streaming) ──
   yield { type: 'status', step: 'generating' };
   const generateStart = Date.now();
 
-  const historyText = chatHistory
-    .map(function (m) { return (m.role === 'human' ? 'H\u1ecdc sinh' : 'Tr\u1ee3 l\u00fd') + ': ' + m.content; })
-    .join('\n');
+  // System instruction — separated and cached by Gemini (like ChatGPT/Claude)
+  const systemInstruction = 'Bạn là trợ lý AI hỗ trợ học tập thông minh. Dựa trên nội dung tài liệu được cung cấp, hãy trả lời câu hỏi một cách chính xác, rõ ràng và có cấu trúc.\n\n'
+    + 'QUY TẮC QUAN TRỌNG:\n'
+    + '- CHỈ trả lời dựa trên nội dung tài liệu được cung cấp bên dưới\n'
+    + '- Nếu thông tin KHÔNG có trong tài liệu, hãy nói rõ: "Tài liệu không chứa đủ thông tin để trả lời câu hỏi này"\n'
+    + '- KHÔNG bịa đặt hoặc thêm thông tin không có trong tài liệu\n'
+    + '- Khi trích dẫn, ghi rõ trang nguồn, ví dụ: "(Trang 6)" hoặc "(Trang 1, Trang 8)". CHỈ dùng số trang có trong phần NỘI DUNG TÀI LIỆU\n'
+    + '- KHÔNG ĐƯỢC viết "Theo Nguồn 1", "Nguồn 5" hay bất kỳ số nguồn nào — chỉ dùng số trang\n'
+    + '- Trả lời bằng tiếng Việt, rõ ràng và có cấu trúc\n'
+    + '- KHÔNG dùng cú pháp LaTeX ($...$, \\hat, \\beta, \\frac...). Thay bằng ký tự Unicode: Ŷ, β₀, β₁, x̄, Σ, √, ², ³, ≥, ≤, ≠, →, ×, ÷ hoặc viết dạng text (ví dụ: "Y mũ", "beta 0")';
 
-  var prompt = 'B\u1ea1n l\u00e0 tr\u1ee3 l\u00fd AI h\u1ed7 tr\u1ee3 h\u1ecdc t\u1eadp th\u00f4ng minh. D\u1ef1a tr\u00ean n\u1ed9i dung t\u00e0i li\u1ec7u \u0111\u01b0\u1ee3c cung c\u1ea5p, h\u00e3y tr\u1ea3 l\u1eddi c\u00e2u h\u1ecfi m\u1ed9t c\u00e1ch ch\u00ednh x\u00e1c, r\u00f5 r\u00e0ng v\u00e0 c\u00f3 c\u1ea5u tr\u00fac.\n\n'
-    + 'QUY T\u1eaeC QUAN TR\u1eccNG:\n'
-    + '- CH\u1ec8 tr\u1ea3 l\u1eddi d\u1ef1a tr\u00ean n\u1ed9i dung t\u00e0i li\u1ec7u \u0111\u01b0\u1ee3c cung c\u1ea5p b\u00ean d\u01b0\u1edbi\n'
-    + '- N\u1ebfu th\u00f4ng tin KH\u00d4NG c\u00f3 trong t\u00e0i li\u1ec7u, h\u00e3y n\u00f3i r\u00f5: "T\u00e0i li\u1ec7u kh\u00f4ng ch\u1ee9a \u0111\u1ee7 th\u00f4ng tin \u0111\u1ec3 tr\u1ea3 l\u1eddi c\u00e2u h\u1ecfi n\u00e0y"\n'
-    + '- KH\u00d4NG b\u1ecba \u0111\u1eb7t ho\u1eb7c th\u00eam th\u00f4ng tin kh\u00f4ng c\u00f3 trong t\u00e0i li\u1ec7u\n'
-    + '- Khi tr\u00edch d\u1eabn, ghi r\u00f5 trang ngu\u1ed3n, v\u00ed d\u1ee5: "(Trang 6)" ho\u1eb7c "(Trang 1, Trang 8)". CH\u1ec8 d\u00f9ng s\u1ed1 trang c\u00f3 trong ph\u1ea7n N\u1ed8I DUNG T\u00c0I LI\u1ec6U b\u00ean d\u01b0\u1edbi\n'
-    + '- KH\u00d4NG \u0110\u01af\u1ee2C vi\u1ebft "Theo Ngu\u1ed3n 1", "Ngu\u1ed3n 5" hay b\u1ea5t k\u1ef3 s\u1ed1 ngu\u1ed3n n\u00e0o \u2014 ch\u1ec9 d\u00f9ng s\u1ed1 trang\n'
-    + '- Tr\u1ea3 l\u1eddi b\u1eb1ng ti\u1ebfng Vi\u1ec7t, r\u00f5 r\u00e0ng v\u00e0 c\u00f3 c\u1ea5u tr\u00fac\n'
-    + '- KH\u00d4NG d\u00f9ng c\u00fa ph\u00e1p LaTeX ($...$, \\hat, \\beta, \\frac...). Thay b\u1eb1ng k\u00fd t\u1ef1 Unicode: \u0176, \u03b2\u2080, \u03b2\u2081, x\u0304, \u03a3, \u221a, \u00b2, \u00b3, \u2265, \u2264, \u2260, \u2192, \u00d7, \u00f7 ho\u1eb7c vi\u1ebft d\u1ea1ng text (v\u00ed d\u1ee5: "Y m\u0169", "beta 0")\n\n'
-    + 'N\u1ed8I DUNG T\u00c0I LI\u1ec6U:\n'
-    + (contextText || '(Kh\u00f4ng t\u00ecm th\u1ea5y n\u1ed9i dung li\u00ean quan trong t\u00e0i li\u1ec7u)')
-    + '\n\n'
-    + (historyText ? ('L\u1ecaCH S\u1eed CU\u1ed8C TR\u00d2 CHUY\u1ec6N:\n' + historyText + '\n') : '')
-    + 'C\u00c2U H\u1eceI G\u1ed0C: ' + question
-    + (rewrittenQuery !== question ? ('\nC\u00c2U H\u1eceI \u0110\u00c3 PH\u00c2N T\u00cdCH: ' + rewrittenQuery) : '')
-    + '\n\nH\u00e3y tr\u1ea3 l\u1eddi:';
+  // Convert conversation history → Gemini multi-turn format
+  const geminiTurns = conversationHistory.flatMap(function (m) {
+    return [{
+      role: m.role === 'human' ? 'user' : 'model',
+      parts: [{ text: m.content }],
+    }];
+  });
+
+  // User message = RAG context + current question (context only for this turn)
+  var userMessage = 'NỘI DUNG TÀI LIỆU:\n'
+    + (contextText || '(Không tìm thấy nội dung liên quan trong tài liệu)')
+    + '\n\nCÂU HỎI: ' + question
+    + (rewrittenQuery !== question ? ('\nCÂU HỎI ĐÃ PHÂN TÍCH: ' + rewrittenQuery) : '')
+    + '\n\nHãy trả lời:';
 
   let fullAnswer = '';
-  for await (const chunk of generateStream(prompt, { temperature: 0.2, maxTokens: 4096, signal: signal })) {
+  for await (const chunk of chatStream(systemInstruction, geminiTurns, userMessage, {
+    temperature: 0.2, maxTokens: 8192, signal: signal, thinkingBudget: 2048,
+  })) {
     fullAnswer += chunk;
     yield { type: 'chunk', text: chunk };
   }
@@ -784,6 +791,9 @@ async function* askStream(collectionName, question, chatHistory, options) {
       totalTimeMs: pipelineLog.timings.total,
     };
   }
+
+  // Không yield done nếu request đã bị hủy → chat.js sẽ không lưu DB
+  throwIfAborted(signal);
 
   yield { type: 'done', answer: fullAnswer, sources: sources, pipeline: pipeline };
 }
