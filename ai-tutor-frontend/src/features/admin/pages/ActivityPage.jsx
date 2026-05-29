@@ -14,6 +14,7 @@ import {
   AdminTable,
   formatDateTime,
   formatNumber,
+  formatRelativeTime,
 } from "@/features/admin/components/AdminPrimitives";
 
 function compactUserAgent(value) {
@@ -35,7 +36,7 @@ function ActivityCard({ item }) {
           <h3 className="truncate text-[14px] font-bold text-[var(--foreground)]">{item.user?.full_name || "Người dùng"}</h3>
           <p className="truncate text-[12px] font-semibold text-[var(--muted)]">{item.user?.email}</p>
         </div>
-        <AdminStatusPill tone="green" icon="online_prediction">Đang online</AdminStatusPill>
+        <AdminStatusPill tone={item.is_online ? "green" : "neutral"} icon="online_prediction">{item.is_online ? "Đang online" : "Không online"}</AdminStatusPill>
       </div>
       <div className="mt-3 grid gap-2 text-[11px] font-bold text-[var(--muted)]">
         <span className="truncate rounded-[var(--radius-chip)] bg-[var(--surface)] px-2 py-2">{compactUserAgent(item.user_agent)}</span>
@@ -133,7 +134,7 @@ export default function AdminActivityPage() {
           <AdminSection title="Phiên hoạt động" subtitle={`${formatNumber(data?.pagination?.total || 0)} phiên trong ${data?.activeWithinMinutes || filters.activeWithinMinutes} phút`}>
             {(data?.items || []).length ? (
               <>
-                <AdminTable columns={Object.values(ADMIN_TEXTS.activity.columns)} minWidth="900px" widths={["26%", "34%", "22%", "18%"]}>
+                <AdminTable columns={Object.values(ADMIN_TEXTS.activity.columns)} minWidth="900px" widths={["26%", "34%", "22%", "18%"]} aligns={[null, "center", "center", null]}>
                   {data.items.map((item) => (
                     <tr key={item.id} className="border-b border-[var(--border-subtle)] last:border-0 hover:bg-[var(--surface)]">
                       <td className="px-4 py-4">
@@ -143,7 +144,7 @@ export default function AdminActivityPage() {
                         </div>
                       </td>
                       <td className="px-4 py-4">
-                        <div className="min-w-0 space-y-1.5">
+                        <div className="min-w-0 space-y-1.5 text-center">
                           <span className="inline-flex max-w-56 items-center gap-1.5 rounded-[var(--radius-chip)] bg-[var(--surface)] px-2.5 py-1 text-[11px] font-bold text-[var(--foreground)]">
                             <span className="material-symbols-outlined text-[15px]" aria-hidden="true">devices</span>
                             <span className="truncate">{compactUserAgent(item.user_agent)}</span>
@@ -152,8 +153,8 @@ export default function AdminActivityPage() {
                         </div>
                       </td>
                       <td className="px-4 py-4">
-                        <div className="min-w-0 space-y-1.5">
-                          <AdminStatusPill tone="green">Đang hoạt động</AdminStatusPill>
+                        <div className="min-w-0 space-y-1.5 text-center">
+                          <AdminStatusPill tone={item.is_online ? "green" : "neutral"}>{item.is_online ? "Đang hoạt động" : (formatRelativeTime(item.last_active) || "Không online")}</AdminStatusPill>
                           <p className="truncate text-[11px] font-semibold text-[var(--muted)]">{formatDateTime(item.last_active)}</p>
                         </div>
                       </td>

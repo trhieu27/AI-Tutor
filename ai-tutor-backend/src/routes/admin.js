@@ -448,21 +448,24 @@ async function activeAdminCountExcluding(userId) {
 
 async function enrichUsers(users) {
   const userIds = users.map((user) => user.id);
-  const [subs, documentCounts, chatCounts, aiUsageToday, chatToday] = await Promise.all([
+  const [subs, documentCounts, chatCounts, aiUsageToday, chatToday, presenceMap] = await Promise.all([
     UserSubscription.find({ user_id: { $in: userIds } }).lean(),
     getCountsByField(Document, 'owner_id', userIds),
     getCountsByField(ChatSession, 'user_id', userIds),
     getUsageTodayByUser(userIds),
     getChatTodayByUser(userIds),
+    getPresenceByUser(userIds),
   ]);
 
   const subMap = new Map(subs.map((sub) => [sub.user_id, sub]));
   const planMap = await getPlanMap();
+  const onlineUserIds = new Set(getOnlineUserIds());
 
   return users.map((user) => {
     const sub = subMap.get(user.id);
     const isPro = Boolean(sub && sub.status === 'active' && sub.plan_id !== 'free' && (!sub.expires_at || new Date(sub.expires_at) > new Date()));
     const plan = isPro ? planMap.get(sub.plan_id) : planMap.get('free');
+    const presence = presenceMap.get(user.id) || {};
     return {
       id: user.id,
       student_id: user.student_id || '',
@@ -474,6 +477,8 @@ async function enrichUsers(users) {
       document_count: documentCounts.get(user.id) || 0,
       chat_count: chatCounts.get(user.id) || 0,
       ai_usage_today: (aiUsageToday.get(user.id) || 0) + (chatToday.get(user.id) || 0),
+      is_online: onlineUserIds.has(user.id),
+      last_active: presence.last_active || null,
     };
   });
 }
@@ -1178,10 +1183,13 @@ router.get('/activity', async (req, res) => {
     ]);
     const usageMap = new Map(usageRows.map((row) => [row._id, row.count]));
 
+    const onlineUserIds = new Set(getOnlineUserIds());
+
     res.json({
       items: sessions.map((session) => ({
         ...stripMongo(session),
         user: serializeUser(userMap.get(session.user_id)),
+        is_online: onlineUserIds.has(session.user_id),
         document_count: documentCounts.get(session.user_id) || 0,
         recent_usage_count: usageMap.get(session.user_id) || 0,
       })),

@@ -28,6 +28,7 @@ import {
   formatAdminStatus,
   formatDate,
   formatDateTime,
+  formatRelativeTime,
   formatNumber,
 } from "@/features/admin/components/AdminPrimitives";
 
@@ -85,7 +86,7 @@ function statusTone(status) {
 }
 
 function isUserOnline(user) {
-  return Boolean(user?._online) && user?.status !== "blocked" && user?.status !== "deleted";
+  return (Boolean(user?._online) || Boolean(user?.is_online)) && user?.status !== "blocked" && user?.status !== "deleted";
 }
 
 function activityTone(user) {
@@ -96,7 +97,9 @@ function activityTone(user) {
 
 function formatUserActivityStatus(user) {
   if (user?.status === "blocked" || user?.status === "deleted") return formatAdminStatus(user.status);
-  return isUserOnline(user) ? "Đang online" : "Không online";
+  if (isUserOnline(user)) return "Đang online";
+  const relative = formatRelativeTime(user?.last_active);
+  return relative || "Không online";
 }
 
 function isUserPro(user) {
@@ -129,7 +132,10 @@ function UserMobileCard({ user, onDetail, onPatch }) {
           <p className="truncate text-[12px] font-semibold text-[var(--muted)]">{user.email}</p>
           <p className="mt-1 truncate text-[11px] font-semibold text-[var(--muted)]">{user.student_id || "Chưa có MSSV"}</p>
         </div>
-        <AdminStatusPill tone={activityTone(user)}>{formatUserActivityStatus(user)}</AdminStatusPill>
+        <div className="text-right">
+          <AdminStatusPill tone={activityTone(user)}>{formatUserActivityStatus(user)}</AdminStatusPill>
+          {user.last_active && <p className="mt-1 text-[10px] font-semibold text-[var(--muted)]">{formatDateTime(user.last_active)}</p>}
+        </div>
       </div>
       <div className="mt-3 grid grid-cols-3 gap-2 text-[11px] font-bold">
         <span className="rounded-[var(--radius-chip)] bg-[var(--surface)] px-2 py-2 text-[var(--muted)]">{planLabel(user)}</span>
@@ -556,7 +562,6 @@ export default function AdminUsersPage() {
   }, []);
 
   const patchUser = async (id, patch) => {
-    // Optimistic: update UI immediately
     if (detail?.user?.id === id) {
       setDetail((prev) => prev ? { ...prev, user: { ...prev.user, ...patch } } : prev);
     }
@@ -566,10 +571,10 @@ export default function AdminUsersPage() {
     });
     try {
       await updateAdminUser(id, patch);
-      load(); // background refresh, no await
+      load();
     } catch (err) {
       console.error(err.message);
-      load(); // revert on error
+      load();
     }
   };
 
@@ -657,7 +662,7 @@ export default function AdminUsersPage() {
           <AdminSection title="Danh sách người dùng" subtitle={`${formatNumber(data?.pagination?.total || 0)} tài khoản phù hợp`}>
             {visibleUsers.length ? (
               <>
-                <AdminTable columns={Object.values(ADMIN_TEXTS.users.columns)} minWidth="980px" widths={["20%", "10%", "28%", "18%", "14%", "10%"]}>
+                <AdminTable columns={Object.values(ADMIN_TEXTS.users.columns)} minWidth="980px" widths={["20%", "10%", "28%", "18%", "14%", "10%"]} aligns={[null, null, null, null, "center", null]}>
                   {visibleUsers.map((user) => (
                     <tr key={user.id} className="border-b border-[var(--border-subtle)] last:border-0 hover:bg-[var(--surface)]">
                       <td className="px-4 py-4">
@@ -682,7 +687,10 @@ export default function AdminUsersPage() {
                         </div>
                       </td>
                       <td className="px-4 py-4">
+                        <div className="space-y-1 text-center">
                           <AdminStatusPill tone={activityTone(user)}>{formatUserActivityStatus(user)}</AdminStatusPill>
+                          {user.last_active && <p className="text-[10px] font-semibold text-[var(--muted)]">{formatDateTime(user.last_active)}</p>}
+                        </div>
                       </td>
                       <td className="px-4 py-4 text-left">
                         <UserActions user={user} onDetail={openDetail} onPatch={patchUser} />
@@ -705,3 +713,4 @@ export default function AdminUsersPage() {
     </div>
   );
 }
+

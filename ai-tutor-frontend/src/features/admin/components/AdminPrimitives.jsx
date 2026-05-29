@@ -40,6 +40,18 @@ export function formatDate(value) {
   }).format(date);
 }
 
+export function formatRelativeTime(value) {
+  if (!value) return null;
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return null;
+  const diff = Math.floor((Date.now() - date.getTime()) / 1000);
+  if (diff < 60) return "Vừa xong";
+  if (diff < 3600) return `${Math.floor(diff / 60)} phút trước`;
+  if (diff < 86400) return `${Math.floor(diff / 3600)} giờ trước`;
+  if (diff < 604800) return `${Math.floor(diff / 86400)} ngày trước`;
+  return formatDateTime(value);
+}
+
 export function formatFileSize(value) {
   return `${formatNumber(Number(value || 0).toFixed(Number(value || 0) >= 10 ? 0 : 1))} MB`;
 }
@@ -430,7 +442,7 @@ export function AdminSelect({
   );
 }
 
-export function AdminTable({ columns, children, minWidth = "900px", widths }) {
+export function AdminTable({ columns, children, minWidth = "900px", widths, aligns }) {
   return (
     <div className="hidden min-w-0 overflow-x-auto md:block custom-scrollbar">
       <table className="admin-table w-full table-fixed border-collapse text-left" style={{ minWidth }}>
@@ -440,7 +452,7 @@ export function AdminTable({ columns, children, minWidth = "900px", widths }) {
               <th
                 key={index}
                 className="px-4 py-3 text-[11px] font-bold text-[var(--muted)]"
-                style={widths?.[index] ? { width: widths[index] } : undefined}
+                style={{ ...(widths?.[index] ? { width: widths[index] } : {}), ...(aligns?.[index] ? { textAlign: aligns[index] } : {}) }}
               >
                 {column}
               </th>

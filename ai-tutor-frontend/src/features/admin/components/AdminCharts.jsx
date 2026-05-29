@@ -126,10 +126,10 @@ export function RevenueAreaChart({ series = [], height = 340 }) {
         }}
       >
         <defs>
-          <linearGradient id={lineGradientId} x1="0%" x2="100%" y1="0%" y2="0%">
-            <stop offset="0%" stopColor={brandSecondary} />
-            <stop offset="54%" stopColor={brandPrimary} />
-            <stop offset="100%" stopColor={brandWarm} />
+          <linearGradient id={lineGradientId} x1="0%" x2="0%" y1="0%" y2="100%">
+            <stop offset="0%" stopColor={brandWarm} />
+            <stop offset="46%" stopColor={brandPrimary} />
+            <stop offset="100%" stopColor={brandSecondary} />
           </linearGradient>
           <linearGradient id={areaGradientId} x1="0%" x2="0%" y1="0%" y2="100%">
             <stop offset="0%" stopColor={brandPrimary} stopOpacity="0.3" />
