@@ -1,4 +1,4 @@
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { useState } from "react";
 import { useGoogleLogin } from "@react-oauth/google";
 import { useAuth } from "@/features/auth/context/AuthContext";
@@ -18,6 +18,8 @@ export default function RegisterPage() {
   const [localError, setLocalError] = useState("");
   const { register, googleLogin: loginWithGoogle, isLoading } = useAuth();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const redirectUrl = searchParams.get("redirect") || "/";
 
   const handleRegister = async (event) => {
     event.preventDefault();
@@ -28,7 +30,7 @@ export default function RegisterPage() {
     }
     try {
       await register(name, email, password);
-      navigate("/", { replace: true });
+      navigate(redirectUrl, { replace: true });
     } catch (err) {
       setLocalError(err?.message || AUTH_TEXTS.REGISTER.REGISTER_ERROR);
     }
@@ -39,7 +41,7 @@ export default function RegisterPage() {
       setLocalError("");
       try {
         await loginWithGoogle(tokenResponse.access_token);
-        navigate("/", { replace: true });
+        navigate(redirectUrl, { replace: true });
       } catch (err) {
         setLocalError(err.message || AUTH_TEXTS.GOOGLE.ERROR);
       }
@@ -204,7 +206,7 @@ export default function RegisterPage() {
 
           <p className="mt-7 text-center text-[13px] font-medium text-[var(--muted)]">
             {AUTH_TEXTS.REGISTER.HAVE_ACCOUNT}{" "}
-            <Link to="/login" className="font-bold text-[var(--brand-primary)] hover:text-[var(--brand-primary-strong)]">
+            <Link to={redirectUrl !== "/" ? `/login?redirect=${encodeURIComponent(redirectUrl)}` : "/login"} className="font-bold text-[var(--brand-primary)] hover:text-[var(--brand-primary-strong)]">
               {AUTH_TEXTS.REGISTER.LOGIN_NOW}
             </Link>
           </p>

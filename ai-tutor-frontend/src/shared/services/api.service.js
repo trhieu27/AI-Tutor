@@ -191,7 +191,7 @@ export async function askQuestion(documentId, request, signal) {
  * @param {AbortSignal} signal
  * @returns {Promise<object>} final data { session_id, message, sources, pipeline }
  */
-export async function askQuestionStream(documentId, request, onChunk, signal, onStatus, onSession) {
+export async function askQuestionStream(documentId, request, onChunk, signal, onStatus, onSession, onSuggestions) {
   const headers = { 'Content-Type': 'application/json', 'Accept': 'text/event-stream' };
   if (request.debug) headers['X-Debug'] = 'true';
 
@@ -251,6 +251,11 @@ export async function askQuestionStream(documentId, request, onChunk, signal, on
         } else if (currentEvent === 'done') {
           try {
             finalData = JSON.parse(dataStr);
+          } catch (e) { /* skip */ }
+        } else if (currentEvent === 'suggestions') {
+          try {
+            const sugData = JSON.parse(dataStr);
+            if (sugData.suggestions && onSuggestions) onSuggestions(sugData.suggestions);
           } catch (e) { /* skip */ }
         } else if (currentEvent === 'error') {
           try {
@@ -617,4 +622,29 @@ export async function clearAllNotifications() {
   await authFetch(`${API_BASE}/notifications`, {
     method: 'DELETE'
   });
+}
+
+// ── Share Links ───────────────────────────────────────────────────────────────
+
+export async function createChatShareLink(sessionId) {
+  const res = await authFetch(`${API_BASE}/share`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ session_id: sessionId }),
+  });
+  return safeJson(res);
+}
+
+export async function fetchSharedContent(shareId) {
+  const res = await authFetch(`${API_BASE}/share/${shareId}`);
+  if (!res.ok) throw new Error('Không tìm thấy nội dung chia sẻ');
+  return safeJson(res);
+}
+
+export async function deleteShareLink(shareId) {
+  const res = await authFetch(`${API_BASE}/share/${shareId}`, {
+    method: 'DELETE',
+  });
+  if (!res.ok) throw new Error('Không thể xóa link chia sẻ');
+  return safeJson(res);
 }

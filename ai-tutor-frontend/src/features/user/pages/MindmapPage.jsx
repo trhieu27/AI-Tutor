@@ -708,6 +708,7 @@ export default function InteractiveMindmapPage() {
         }}
         onCancel={() => setShowResetConfirm(false)}
       />
+
     </>
   );
 }

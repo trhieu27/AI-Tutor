@@ -1,6 +1,8 @@
 import { cx } from "@/shared/ui/Premium";
 import { Skeleton } from "@/shared/ui/States";
 import { CHAT_WORKSPACE_TEXTS } from "@/shared/constants/texts";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 
 const T = CHAT_WORKSPACE_TEXTS.threads;
 
@@ -9,17 +11,74 @@ function getSessionTitle(session) {
   return title || T.fallbackTitle;
 }
 
+function SessionMenu({ sessionId, onDelete, onShare, anchorRect, onClose }) {
+  const menuRef = useRef(null);
+
+  useEffect(() => {
+    const handleClick = (e) => { if (!menuRef.current?.contains(e.target)) onClose(); };
+    const handleKey = (e) => { if (e.key === "Escape") onClose(); };
+    document.addEventListener("pointerdown", handleClick);
+    document.addEventListener("keydown", handleKey);
+    return () => {
+      document.removeEventListener("pointerdown", handleClick);
+      document.removeEventListener("keydown", handleKey);
+    };
+  }, [onClose]);
+
+  if (!anchorRect) return null;
+
+  const style = {
+    position: "fixed",
+    top: anchorRect.bottom + 4,
+    left: anchorRect.left,
+    zIndex: 9999,
+  };
+
+  return createPortal(
+    <div ref={menuRef} style={style} className="min-w-[140px] overflow-hidden rounded-[var(--radius-panel)] border border-[var(--border-color)] bg-[var(--card-bg)] p-1 shadow-[var(--premium-shadow-md)]">
+      {onShare && (
+        <button
+          type="button"
+          className="flex h-8 w-full items-center gap-2.5 rounded-md px-2.5 text-[12px] font-semibold text-[var(--foreground)] transition hover:bg-[var(--surface)]"
+          onClick={() => { onShare(sessionId); onClose(); }}
+        >
+          <span className="material-symbols-outlined icon-thin text-[16px] text-[var(--muted)]">share</span>
+          Chia sẻ
+        </button>
+      )}
+      {onDelete && (
+        <button
+          type="button"
+          className="flex h-8 w-full items-center gap-2.5 rounded-md px-2.5 text-[12px] font-semibold text-[var(--brand-rose)] transition hover:bg-[var(--danger-soft)]"
+          onClick={() => { onDelete(sessionId); onClose(); }}
+        >
+          <span className="material-symbols-outlined icon-thin text-[16px]">delete</span>
+          Xóa
+        </button>
+      )}
+    </div>,
+    document.body
+  );
+}
+
 export default function ChatThreadList({
   sessions = [],
   activeSessionId,
   onSelect,
   onDelete,
+  onShare,
   onNewChat,
   onCollapse,
   search,
   onSearch,
   loading,
 }) {
+  const [menuState, setMenuState] = useState(null);
+  const handleMore = useCallback((sessionId, event) => {
+    const rect = event.currentTarget.getBoundingClientRect();
+    setMenuState({ sessionId, rect });
+  }, []);
+  const closeMenu = useCallback(() => setMenuState(null), []);
   return (
     <aside className="flex h-full flex-col border-r border-[var(--border-color)] bg-[var(--sidebar-bg)] text-[var(--foreground)]">
       <div className="p-2.5">
@@ -102,19 +161,18 @@ export default function ChatThreadList({
                       {getSessionTitle(session)}
                     </span>
                   </button>
-                  {onDelete && (
+                  {(onDelete || onShare) && (
                     <button
                       type="button"
-                      aria-label={T.deleteSession}
-                      title={T.deleteSession}
+                      aria-label="Tùy chọn"
                       className={cx(
-                        "mr-1.5 grid h-7 w-7 shrink-0 place-items-center rounded-md text-[var(--muted)] transition hover:text-[var(--foreground)] focus-visible:opacity-100 group-hover:opacity-100",
-                        active ? "opacity-70" : "opacity-0"
+                        "mr-1.5 grid h-7 w-7 shrink-0 place-items-center rounded-md text-[var(--muted)] transition hover:bg-[var(--card-bg-hover)] hover:text-[var(--foreground)] focus-visible:opacity-100 group-hover:opacity-100",
+                        active || menuState?.sessionId === session.id ? "opacity-70" : "opacity-0"
                       )}
-                      onClick={() => onDelete(session.id)}
+                      onClick={(e) => handleMore(session.id, e)}
                     >
                       <span className="material-symbols-outlined icon-thin text-[16px]" aria-hidden="true">
-                        delete
+                        more_horiz
                       </span>
                     </button>
                   )}
@@ -124,6 +182,15 @@ export default function ChatThreadList({
           </div>
         )}
       </div>
+      {menuState && (
+        <SessionMenu
+          sessionId={menuState.sessionId}
+          onDelete={onDelete}
+          onShare={onShare}
+          anchorRect={menuState.rect}
+          onClose={closeMenu}
+        />
+      )}
     </aside>
   );
 }

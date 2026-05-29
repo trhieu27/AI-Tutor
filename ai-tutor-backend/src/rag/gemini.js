@@ -411,4 +411,34 @@ Tiêu đề:`;
     }
 }
 
-module.exports = { embedTexts, embedQuery, generateText, generateStream, chatStream, generateTitle, describeDocumentImages, describeDocxImages, browserTool };
+/**
+ * Tạo 2-3 câu hỏi gợi ý tiếp theo dựa trên câu hỏi và câu trả lời.
+ * Dùng model lite (nhanh, rẻ). Trả về mảng string hoặc [] nếu lỗi.
+ */
+async function generateSuggestions(question, answer) {
+    try {
+        const model = genAI.getGenerativeModel({
+            model: LITE_MODEL,
+            generationConfig: { temperature: 0.7, maxOutputTokens: 256 },
+        });
+        const prompt = `Dựa trên câu hỏi và câu trả lời dưới đây, gợi ý 3 câu hỏi tiếp theo mà sinh viên có thể muốn hỏi để hiểu sâu hơn. Câu hỏi ngắn gọn (tối đa 60 ký tự), bằng tiếng Việt.
+
+Trả về CHÍNH XÁC dạng JSON array, không giải thích:
+["câu hỏi 1", "câu hỏi 2", "câu hỏi 3"]
+
+Câu hỏi: ${question.slice(0, 300)}
+Trả lời: ${answer.slice(0, 800)}`;
+        const result = await model.generateContent(prompt);
+        let text = result.response.text().trim();
+        // Extract JSON array from response
+        const match = text.match(/\[.*\]/s);
+        if (match) text = match[0];
+        const suggestions = JSON.parse(text);
+        return Array.isArray(suggestions) ? suggestions.slice(0, 3).map(s => String(s).slice(0, 80)) : [];
+    } catch (err) {
+        console.warn('[generateSuggestions] Failed:', err.message);
+        return [];
+    }
+}
+
+module.exports = { embedTexts, embedQuery, generateText, generateStream, chatStream, generateTitle, generateSuggestions, describeDocumentImages, describeDocxImages, browserTool };

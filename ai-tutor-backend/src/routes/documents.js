@@ -4,7 +4,7 @@ const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
 const { v4: uuidv4 } = require('uuid');
-const { Document } = require('../db/models');
+const { Document, ChatSession } = require('../db/models');
 const { authMiddleware } = require('../middleware/auth');
 const { requireDocQuota } = require('../utils/quota');
 const { sendNotification, sendAdminRealtimeEvent } = require('../utils/notifications');
@@ -237,8 +237,11 @@ router.get('/:documentId/file', authMiddleware, async(req, res) => {
         const doc = await Document.findOne({ id: req.params.documentId, owner_id: req.userId }).lean();
         if (!doc) return res.status(404).json({ detail: 'Tài liệu không tồn tại.' });
 
+        // For shared docs, file is stored under the original document ID
+        const fileId = doc._shared_doc_id || doc.id;
+
         // Try local file first
-        const storedFile = findStoredFile(req.params.documentId);
+        const storedFile = findStoredFile(fileId);
         if (storedFile) {
             const contentTypes = {
                 '.pdf': 'application/pdf',
@@ -252,7 +255,7 @@ router.get('/:documentId/file', authMiddleware, async(req, res) => {
 
         // Try S3
         if (s3.s3Enabled) {
-            const s3File = await s3.findFile(req.params.documentId);
+            const s3File = await s3.findFile(fileId);
             if (s3File) {
                 const streamed = await s3.streamToResponse(s3File.filename, res, doc.file_name);
                 if (streamed) return;
@@ -275,8 +278,9 @@ router.post('/:documentId/locate', authMiddleware, async(req, res) => {
         const snippet = String((req.body && req.body.text) || '').trim();
         if (snippet.length < 12) return res.status(400).json({ detail: 'Đoạn trích dẫn quá ngắn.' });
 
-        // Try local first, then S3
-        const storedFile = await ensureLocalFile(req.params.documentId);
+        // For shared docs, file is stored under the original document ID
+        const fileId = doc._shared_doc_id || doc.id;
+        const storedFile = await ensureLocalFile(fileId);
         if (!storedFile) return res.status(404).json({ detail: 'Không tìm thấy file tài liệu.' });
 
         const { pages = [] } = await extractText(storedFile.filePath);

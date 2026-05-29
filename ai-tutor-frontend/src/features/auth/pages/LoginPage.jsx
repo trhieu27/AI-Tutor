@@ -1,4 +1,4 @@
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { useEffect, useState } from "react";
 import { useGoogleLogin } from "@react-oauth/google";
 import { useAuth } from "@/features/auth/context/AuthContext";
@@ -20,6 +20,8 @@ export default function LoginPage() {
   const [lockoutTimer, setLockoutTimer] = useState(0);
   const { login, googleLogin: loginWithGoogle, isLoading, error: authError } = useAuth();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const redirectUrl = searchParams.get("redirect") || "/";
 
   useEffect(() => {
     const storedLockoutUntil = localStorage.getItem("login_lockout_until");
@@ -55,7 +57,7 @@ export default function LoginPage() {
     setLocalError("");
     try {
       await login(email, password);
-      navigate("/", { replace: true });
+      navigate(redirectUrl, { replace: true });
     } catch (err) {
       const newAttempts = failedAttempts + 1;
       setFailedAttempts(newAttempts);
@@ -75,7 +77,7 @@ export default function LoginPage() {
       setLocalError("");
       try {
         const user = await loginWithGoogle(tokenResponse.access_token);
-        navigate(user?.role === "ADMIN" ? "/admin" : "/", { replace: true });
+        navigate(user?.role === "ADMIN" ? "/admin" : redirectUrl, { replace: true });
       } catch (err) {
         setLocalError(err.message || AUTH_TEXTS.GOOGLE.ERROR);
       }
@@ -212,7 +214,7 @@ export default function LoginPage() {
 
           <p className="mt-7 text-center text-[13px] font-medium text-[var(--muted)]">
             {AUTH_TEXTS.LOGIN.NO_ACCOUNT}{" "}
-            <Link to="/register" className="font-bold text-[var(--brand-primary)] hover:text-[var(--brand-primary-strong)]">
+            <Link to={redirectUrl !== "/" ? `/register?redirect=${encodeURIComponent(redirectUrl)}` : "/register"} className="font-bold text-[var(--brand-primary)] hover:text-[var(--brand-primary-strong)]">
               {AUTH_TEXTS.LOGIN.REGISTER_NOW}
             </Link>
           </p>

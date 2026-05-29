@@ -32,6 +32,7 @@ import DocumentContextPanel from "@/features/user/components/chat/DocumentContex
 import { getDocumentName } from "@/features/user/components/documents/documentUtils";
 import { cx } from "@/shared/ui/Premium";
 import { CHAT_WORKSPACE_TEXTS } from "@/shared/constants/texts";
+import ShareDialog from "@/shared/ui/ShareDialog";
 
 const TEXTS = CHAT_WORKSPACE_TEXTS;
 const CHAT_LAYOUT_STORAGE_KEYS = {
@@ -768,6 +769,8 @@ export default function ChatPage() {
   const [modalLoading, setModalLoading] = useState(false);
   const [pdfPreviewSource, setPdfPreviewSource] = useState(null);
   const [deleteSessionId, setDeleteSessionId] = useState(null);
+  const [suggestions, setSuggestions] = useState([]);
+  const [shareOpen, setShareOpen] = useState(null); // sessionId or null
 
   const refreshSessions = useCallback(async () => {
     try {
@@ -1014,6 +1017,7 @@ export default function ChatPage() {
   const handleSend = async (text) => {
     const question = (text || composerRef.current?.getValue() || "").trim();
     if (!question || isSending) return;
+    setSuggestions([]);
 
     const requestId = `ask-${Date.now()}`;
     const aiMsgId = `stream-${requestId}`;
@@ -1075,7 +1079,9 @@ export default function ChatPage() {
         // onSession: track session ID sớm để xóa nếu cancel
         (sessionId) => {
           newSessionRef.current = sessionId;
-        }
+        },
+        // onSuggestions: receive follow-up suggestion chips
+        setSuggestions
       );
 
       if (!isActiveRequest()) return;
@@ -1234,6 +1240,7 @@ export default function ChatPage() {
               activeSessionId={currentSessionId}
               onSelect={loadSession}
               onDelete={handleDeleteSession}
+              onShare={(sid) => setShareOpen(sid)}
               onNewChat={startNewChat}
               onCollapse={() => setHistoryCollapsed(true)}
               search={sessionSearch}
@@ -1294,6 +1301,25 @@ export default function ChatPage() {
                     streaming={message._streaming}
                   />
                 ))}
+                {suggestions.length > 0 && !isSending && (
+                  <div className="flex flex-wrap gap-2 pt-2">
+                    {suggestions.map((suggestion, index) => (
+                      <button
+                        key={index}
+                        type="button"
+                        className="inline-flex items-center gap-1.5 rounded-[var(--radius-control)] border border-[var(--border-color)] bg-[var(--card-bg)] px-3 py-2 text-[12px] font-semibold text-[var(--foreground)] shadow-[var(--premium-shadow-sm)] transition-all duration-150 hover:border-[var(--brand-primary)] hover:bg-[var(--surface)] hover:shadow-[var(--premium-shadow)] active:scale-[0.97]"
+                        onClick={() => {
+                          setSuggestions([]);
+                          composerRef.current?.setValue(suggestion);
+                          composerRef.current?.focus();
+                        }}
+                      >
+                        <span className="material-symbols-outlined icon-thin text-[14px] text-[var(--brand-primary)]">auto_awesome</span>
+                        {suggestion}
+                      </button>
+                    ))}
+                  </div>
+                )}
                 <div ref={messagesEndRef} />
               </div>
             )}
@@ -1335,6 +1361,7 @@ export default function ChatPage() {
                 activeSessionId={currentSessionId}
                 onSelect={loadSession}
                 onDelete={handleDeleteSession}
+                onShare={(sid) => setShareOpen(sid)}
                 onNewChat={startNewChat}
                 search={sessionSearch}
                 onSearch={setSessionSearch}
@@ -1393,6 +1420,12 @@ export default function ChatPage() {
           fallbackDocumentId={documentId}
           documentName={docNameRef.current}
           onClose={() => setPdfPreviewSource(null)}
+        />
+      )}
+      {shareOpen && (
+        <ShareDialog
+          sessionId={shareOpen}
+          onClose={() => setShareOpen(null)}
         />
       )}
     </>

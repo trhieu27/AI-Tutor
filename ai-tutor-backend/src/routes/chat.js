@@ -7,7 +7,7 @@ const { requireChatQuota, recordChatUsage, checkAndRecordAiQuota, isUserPro } = 
 const { sendAdminRealtimeEvent } = require('../utils/notifications');
 const config = require('../config');
 const rag = require('../rag/pipeline');
-const { generateTitle } = require('../rag/gemini');
+const { generateTitle, generateSuggestions } = require('../rag/gemini');
 
 function capitalize(s) { return s ? s.charAt(0).toUpperCase() + s.slice(1) : s; }
 
@@ -410,7 +410,19 @@ router.post('/:documentId/ask-stream', authMiddleware, requireChatQuota(), async
       });
     }
 
-    res.end();
+    // Generate suggestions after done (fire-and-forget, non-blocking)
+    if (!clientDisconnected) {
+      generateSuggestions(questionText, answer)
+        .then(suggestions => {
+          if (suggestions.length > 0 && !isGone()) {
+            sseWrite('suggestions', { suggestions });
+          }
+        })
+        .catch(() => {})
+        .finally(() => res.end());
+    } else {
+      res.end();
+    }
 
     // Post-response side effects (fire-and-forget)
     recordChatUsage(req.userId).catch(function () {});
@@ -673,7 +685,6 @@ router.get('/sessions/recent', authMiddleware, async (req, res) => {
     const documentIds = [...new Set(sessions.map(s => s.document_id).filter(Boolean))];
     const documents = await Document.find({
       id: { $in: documentIds },
-      owner_id: req.userId,
     }).select('id file_name status page_count uploaded_at').lean();
     const docsById = new Map(documents.map(doc => [doc.id, doc]));
 

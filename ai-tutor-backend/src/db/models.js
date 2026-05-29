@@ -55,6 +55,7 @@ const documentSchema = new mongoose.Schema({
   summary: { type: String, default: null },
   quiz: { type: mongoose.Schema.Types.Mixed, default: null },
   study_questions: { type: [String], default: null },
+  _shared_doc_id: { type: String, default: null, index: true },
   uploaded_at: { type: Date, default: Date.now },
   updated_at: { type: Date, default: Date.now },
 });
@@ -81,6 +82,7 @@ const chatSessionSchema = new mongoose.Schema({
   user_id: { type: String, required: true, index: true },
   document_id: { type: String, required: true, index: true },
   title: { type: String, default: 'Cuộc trò chuyện mới' },
+  _shared_from: { type: String, default: null, index: true },
   created_at: { type: Date, default: Date.now },
   updated_at: { type: Date, default: Date.now },
   messages: { type: [chatMessageSchema], default: [] },
@@ -238,6 +240,19 @@ pendingPaymentSchema.index({ created_at: 1 }, { expireAfterSeconds: 30 * 60 }); 
 const PendingPayment = mongoose.model('PendingPayment', pendingPaymentSchema, 'pending_payments');
 
 
+// ── Share Link ────────────────────────────────────────────────────────────────
+
+const shareLinkSchema = new mongoose.Schema({
+  id: { type: String, required: true, unique: true, index: true },
+  owner_id: { type: String, required: true, index: true },
+  resource_type: { type: String, enum: ['chat'], required: true },
+  resource_id: { type: String, required: true, index: true },
+  access_type: { type: String, enum: ['view'], default: 'view' },
+  expires_at: { type: Date, default: null },
+  view_count: { type: Number, default: 0 },
+  created_at: { type: Date, default: Date.now },
+});
+shareLinkSchema.index({ owner_id: 1, resource_type: 1, resource_id: 1 });
 
 const User = mongoose.model('User', userSchema, 'users');
 const UserSession = mongoose.model('UserSession', userSessionSchema, 'user_sessions');
@@ -251,6 +266,7 @@ const SubscriptionPlan = mongoose.model('SubscriptionPlan', subscriptionPlanSche
 const UserSubscription = mongoose.model('UserSubscription', userSubscriptionSchema, 'user_subscriptions');
 const PaymentTransaction = mongoose.model('PaymentTransaction', paymentTransactionSchema, 'payment_transactions');
 const AdminAuditLog = mongoose.model('AdminAuditLog', adminAuditLogSchema, 'admin_audit_logs');
+const ShareLink = mongoose.model('ShareLink', shareLinkSchema, 'share_links');
 
 module.exports = {
   User,
@@ -265,4 +281,5 @@ module.exports = {
   PaymentTransaction,
   AdminAuditLog,
   PendingPayment,
+  ShareLink,
 };

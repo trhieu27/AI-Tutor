@@ -1,4 +1,4 @@
-import { Navigate, Route, Routes } from "react-router-dom";
+import { Navigate, Route, Routes, useLocation, useSearchParams } from "react-router-dom";
 import { AuthProvider, useAuth } from "@/features/auth/context/AuthContext";
 import { ThemeProvider } from "@/shared/ui/ThemeProvider";
 
@@ -18,6 +18,7 @@ import PracticePage from "@/features/user/pages/PracticePage";
 import SettingsPage from "@/features/user/pages/SettingsPage";
 import HelpPage from "@/features/user/pages/HelpPage";
 import PricingPage from "@/features/user/pages/PricingPage";
+import ShareRedirect from "@/features/user/pages/ShareRedirect";
 
 import AdminLayout from "@/features/admin/pages/AdminLayout";
 import AdminLoginPage from "@/features/admin/pages/LoginPage";
@@ -48,12 +49,18 @@ function AppRouteShimmer() {
 
 function PrivateRoute({ children }) {
   const { isAuthenticated, isInitialLoading } = useAuth();
+  const location = useLocation();
 
   if (isInitialLoading) {
     return <AppRouteShimmer />;
   }
 
-  return isAuthenticated ? children : <Navigate to="/login" replace />;
+  if (!isAuthenticated) {
+    const redirectTo = location.pathname + location.search;
+    const loginUrl = redirectTo && redirectTo !== "/" ? `/login?redirect=${encodeURIComponent(redirectTo)}` : "/login";
+    return <Navigate to={loginUrl} replace />;
+  }
+  return children;
 }
 
 function AdminRoute({ children }) {
@@ -69,8 +76,11 @@ function AdminRoute({ children }) {
 
 function PublicRoute({ children }) {
   const { user, isAuthenticated, isInitialLoading } = useAuth();
+  const [searchParams] = useSearchParams();
   if (isInitialLoading) return <AppRouteShimmer />;
   if (!isAuthenticated) return children;
+  const redirect = searchParams.get("redirect");
+  if (redirect && redirect !== "/") return <Navigate to={redirect} replace />;
   return <Navigate to={user?.role === "ADMIN" ? "/admin" : "/"} replace />;
 }
 
@@ -155,6 +165,8 @@ export default function App() {
                 <Route path="activity" element={<AdminActivityPage />} />
                 <Route path="audit" element={<AdminAuditPage />} />
               </Route>
+
+              <Route path="/shared/:shareId" element={<PrivateRoute><ShareRedirect /></PrivateRoute>} />
 
               <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
