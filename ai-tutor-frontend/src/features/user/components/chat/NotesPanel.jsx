@@ -107,7 +107,7 @@ function NoteCard({ note, onDelete, onEdit }) {
             className="grid h-5 w-5 place-items-center rounded text-[var(--muted-light)] opacity-0 transition group-hover:opacity-100 hover:text-[var(--foreground)]"
             title="Chỉnh sửa"
           >
-            <span className="material-symbols-outlined text-[12px]">edit</span>
+            <span className="material-symbols-outlined !text-[13px]">edit</span>
           </button>
         )}
         <button
@@ -117,7 +117,7 @@ function NoteCard({ note, onDelete, onEdit }) {
           className="grid h-5 w-5 place-items-center rounded text-[var(--muted-light)] opacity-0 transition group-hover:opacity-100 hover:text-[var(--brand-rose)]"
           title="Xóa"
         >
-          <span className="material-symbols-outlined text-[12px]">delete</span>
+          <span className="material-symbols-outlined !text-[13px]">delete</span>
         </button>
       </div>
     </div>
