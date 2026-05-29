@@ -941,7 +941,7 @@ router.patch('/users/:id', async (req, res) => {
 
     if (req.body.student_id !== undefined) {
       const studentId = String(req.body.student_id).trim();
-      if (!studentId || studentId.length > 40) return res.status(400).json({ detail: 'MSSV không hợp lệ' });
+      if (!studentId || studentId.length > 40) return res.status(400).json({ detail: 'ID không hợp lệ' });
       updates.student_id = studentId;
       changed.student_id = { from: target.student_id, to: studentId };
     }
@@ -971,8 +971,25 @@ router.patch('/users/:id', async (req, res) => {
     sendAdminRealtimeEvent('user_updated', { user_id: target.id, role: updates.role, status: updates.status }).catch(console.error);
     const updated = await User.findOne({ id: target.id }).lean();
 
-    if (changed.status?.to === 'blocked') await logAudit(req, DANGEROUS_ACTIONS.USER_BLOCKED, 'user', target.id, changed);
-    else if (changed.status?.from === 'blocked' && changed.status?.to === 'active') await logAudit(req, DANGEROUS_ACTIONS.USER_UNBLOCKED, 'user', target.id, changed);
+    if (changed.status?.to === 'blocked') {
+      await logAudit(req, DANGEROUS_ACTIONS.USER_BLOCKED, 'user', target.id, changed);
+      // Notify the blocked user via WebSocket, then disconnect after a short delay
+      notificationManager.push(target.id, {
+        type: 'force_logout',
+        title: 'Tài khoản bị khóa',
+        message: 'Tài khoản của bạn đã bị khóa bởi quản trị viên.',
+        created_at: new Date().toISOString(),
+      }).catch(console.error);
+      setTimeout(() => {
+        const sockets = notificationManager._connections.get(target.id);
+        if (sockets) {
+          for (const ws of sockets) {
+            try { ws.close(1000, 'account_blocked'); } catch {}
+          }
+          notificationManager._connections.delete(target.id);
+        }
+      }, 2000);
+    } else if (changed.status?.from === 'blocked' && changed.status?.to === 'active') await logAudit(req, DANGEROUS_ACTIONS.USER_UNBLOCKED, 'user', target.id, changed);
     if (changed.role) await logAudit(req, DANGEROUS_ACTIONS.USER_ROLE_CHANGED, 'user', target.id, changed);
     if (!changed.role && !changed.status) await logAudit(req, DANGEROUS_ACTIONS.USER_UPDATED, 'user', target.id, changed);
 

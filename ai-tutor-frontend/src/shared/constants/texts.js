@@ -576,7 +576,7 @@ export const SETTINGS_PAGE_TEXTS = {
     subtitle: "Thông tin cá nhân",
     fields: {
       fullName: "Họ và tên",
-      studentId: "MSSV",
+      studentId: "ID",
       email: "Email",
       bio: "Giới thiệu",
       bioPlaceholder: "Bạn đang học gì...",
@@ -1580,7 +1580,7 @@ export const ADMIN_TEXTS = {
   users: {
     title: "Quản lý người dùng",
     searchPlaceholder: "Tìm theo tên hoặc email...",
-    columns: ["Người dùng", "MSSV", "Email", "Gói", "Trạng thái", "Thao tác"],
+    columns: ["Người dùng", "ID", "Email", "Gói", "Trạng thái", "Thao tác"],
     actions: {
       detail: "Chi tiết",
       block: "Khóa",

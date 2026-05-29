@@ -8,7 +8,7 @@ import { Msg, InlineLoading } from "./SettingsShared";
 const API = "/api/v1";
 const TEXTS = SETTINGS_PAGE_TEXTS;
 
-/** Chỉnh sửa hồ sơ cá nhân (tên, MSSV, email, bio) */
+/** Chỉnh sửa hồ sơ cá nhân (tên, ID, email, bio) */
 export default function ProfileSection({
   profile,
   onRefresh

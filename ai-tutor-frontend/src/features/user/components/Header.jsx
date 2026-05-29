@@ -39,6 +39,17 @@ export default function Header({ onMenuClick }) {
   }, []);
 
   const handleNotification = useCallback(notification => {
+    // Force logout khi tài khoản bị khóa bởi admin
+    if (notification.type === 'force_logout') {
+      addToast({
+        type: 'system',
+        title: notification.title || 'Tài khoản bị khóa',
+        message: notification.message || 'Tài khoản của bạn đã bị khóa bởi quản trị viên.',
+      });
+      setTimeout(() => logout('/login?reason=blocked'), 3000);
+      return;
+    }
+
     setNotifications(prev => [{ ...notification, is_read: false }, ...prev]);
     // Refresh danh sách tài liệu khi xử lý xong
     if (notification.type === 'document_ready' || notification.type === 'document_failed') {
@@ -50,7 +61,7 @@ export default function Header({ onMenuClick }) {
       message: notification.message || '',
       documentId: notification.document_id,
     });
-  }, [addToast, notifyDocReady]);
+  }, [addToast, notifyDocReady, logout]);
 
   useNotifications({ token: accessToken, onNotification: handleNotification });
 

@@ -98,7 +98,10 @@ function activityTone(user) {
 function formatUserActivityStatus(user) {
   if (user?.status === "blocked" || user?.status === "deleted") return formatAdminStatus(user.status);
   if (isUserOnline(user)) return "Đang online";
-  const relative = formatRelativeTime(user?.last_active);
+  if (!user?.last_active) return "Không online";
+  const diffMs = Date.now() - new Date(user.last_active).getTime();
+  if (diffMs < 2 * 60 * 1000) return "Không online";
+  const relative = formatRelativeTime(user.last_active);
   return relative || "Không online";
 }
 
@@ -111,26 +114,27 @@ function planLabel(user) {
   return user.plan?.display_name || "Pro";
 }
 
-function UserActions({ user, onDetail, onPatch }) {
+function UserActions({ user, onDetail, onPatch, patchingId }) {
   const blocked = user.status === "blocked";
+  const isPatching = patchingId === user.id;
   return (
     <div className="admin-action-group" aria-label="Thao tác người dùng">
       <AdminActionButton icon="info" onClick={() => onDetail(user.id)}>{ADMIN_TEXTS.users.actions.detail}</AdminActionButton>
-      <AdminActionButton icon={blocked ? "lock_open" : "lock"} tone={blocked ? "green" : "rose"} onClick={() => onPatch(user.id, { status: blocked ? "active" : "blocked" })}>
+      <AdminActionButton icon={blocked ? "lock_open" : "lock"} tone={blocked ? "green" : "rose"} loading={isPatching} onClick={() => onPatch(user.id, { status: blocked ? "active" : "blocked" })}>
         {blocked ? ADMIN_TEXTS.users.actions.unblock : ADMIN_TEXTS.users.actions.block}
       </AdminActionButton>
     </div>
   );
 }
 
-function UserMobileCard({ user, onDetail, onPatch }) {
+function UserMobileCard({ user, onDetail, onPatch, patchingId }) {
   return (
     <article className="rounded-[var(--radius-panel)] border border-[var(--border-color)] bg-[var(--card-bg)] p-4 shadow-[var(--premium-shadow-sm)]">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <h3 className="truncate text-[14px] font-bold text-[var(--foreground)]">{user.full_name}</h3>
           <p className="truncate text-[12px] font-semibold text-[var(--muted)]">{user.email}</p>
-          <p className="mt-1 truncate text-[11px] font-semibold text-[var(--muted)]">{user.student_id || "Chưa có MSSV"}</p>
+          <p className="mt-1 truncate text-[11px] font-semibold text-[var(--muted)]">{user.student_id || "—"}</p>
         </div>
         <div className="text-right">
           <AdminStatusPill tone={activityTone(user)}>{formatUserActivityStatus(user)}</AdminStatusPill>
@@ -143,7 +147,7 @@ function UserMobileCard({ user, onDetail, onPatch }) {
         <span className="rounded-[var(--radius-chip)] bg-[var(--surface)] px-2 py-2 text-[var(--muted)]">{formatNumber(user.ai_usage_today)} AI</span>
       </div>
       <div className="mt-3">
-        <UserActions user={user} onDetail={onDetail} onPatch={onPatch} />
+        <UserActions user={user} onDetail={onDetail} onPatch={onPatch} patchingId={patchingId} />
       </div>
     </article>
   );
@@ -268,7 +272,7 @@ function UserDetailDialog({ detail, loading, onClose, onPatch, onAssignPlan, sav
             <p className="text-[12px] font-bold text-[var(--muted)]">{ADMIN_TEXTS.users.detail.profile}</p>
             <div className="mt-3 space-y-2 text-[13px] font-semibold">
               <p className="truncate text-[var(--foreground)]">{user.full_name}</p>
-              <p className="truncate text-[var(--muted)]">{user.student_id || "Chưa có MSSV"}</p>
+              <p className="truncate text-[var(--muted)]">{user.student_id || "—"}</p>
               <div className="flex flex-wrap gap-2">
                 <AdminStatusPill tone={roleTone(user.role)}>{formatAdminRole(user.role)}</AdminStatusPill>
                 <AdminStatusPill tone={statusTone(user.status)}>{formatAdminStatus(user.status)}</AdminStatusPill>
@@ -561,7 +565,10 @@ export default function AdminUsersPage() {
     setDetailLoading(false);
   }, []);
 
+  const [patchingId, setPatchingId] = useState(null);
+
   const patchUser = async (id, patch) => {
+    setPatchingId(id);
     if (detail?.user?.id === id) {
       setDetail((prev) => prev ? { ...prev, user: { ...prev.user, ...patch } } : prev);
     }
@@ -571,10 +578,11 @@ export default function AdminUsersPage() {
     });
     try {
       await updateAdminUser(id, patch);
-      load();
     } catch (err) {
       console.error(err.message);
-      load();
+      load(); // chỉ reload khi lỗi để revert optimistic update
+    } finally {
+      setPatchingId(null);
     }
   };
 
@@ -693,18 +701,18 @@ export default function AdminUsersPage() {
                         </div>
                       </td>
                       <td className="px-4 py-4 text-left">
-                        <UserActions user={user} onDetail={openDetail} onPatch={patchUser} />
+                        <UserActions user={user} onDetail={openDetail} onPatch={patchUser} patchingId={patchingId} />
                       </td>
                     </tr>
                   ))}
                 </AdminTable>
                 <div className="space-y-3 p-3 md:hidden">
-                  {visibleUsers.map((user) => <UserMobileCard key={user.id} user={user} onDetail={openDetail} onPatch={patchUser} />)}
+                  {visibleUsers.map((user) => <UserMobileCard key={user.id} user={user} onDetail={openDetail} onPatch={patchUser} patchingId={patchingId} />)}
                 </div>
                 <AdminPagination pagination={data.pagination} onPageChange={(page) => setFilter("page", page)} onLimitChange={(limit) => setFilter("limit", limit)} />
               </>
             ) : (
-              <AdminEmpty icon="group_off" title="Không tìm thấy người dùng" subtitle="Thử đổi bộ lọc hoặc tìm theo email, họ tên, MSSV" />
+              <AdminEmpty icon="group_off" title="Không tìm thấy người dùng" subtitle="Thử đổi bộ lọc hoặc tìm theo email, họ tên, ID" />
             )}
           </AdminSection>
           </div>
