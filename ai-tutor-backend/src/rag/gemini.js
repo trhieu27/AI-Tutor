@@ -441,4 +441,36 @@ Trả lời: ${answer.slice(0, 800)}`;
     }
 }
 
-module.exports = { embedTexts, embedQuery, generateText, generateStream, chatStream, generateTitle, generateSuggestions, describeDocumentImages, describeDocxImages, browserTool };
+/**
+ * Format raw note text and generate a tag using Gemini lite.
+ * Returns { formatted, tag }.
+ */
+async function formatNote(rawText) {
+    try {
+        const model = genAI.getGenerativeModel({
+            model: LITE_MODEL,
+            generationConfig: { temperature: 0.3, maxOutputTokens: 512 },
+        });
+        const prompt = `Bạn là trợ lý học tập. Định dạng lại đoạn ghi chú sau thành markdown ngắn gọn, rõ ràng. Sau đó gắn một tag phân loại (ví dụ: "Định nghĩa", "Công thức", "Ví dụ", "Quy trình", "So sánh", "Tóm tắt").
+
+Trả về CHÍNH XÁC dạng JSON, không giải thích:
+{"formatted": "nội dung markdown", "tag": "tên tag"}
+
+Ghi chú gốc:
+${rawText.slice(0, 1500)}`;
+        const result = await model.generateContent(prompt);
+        let text = result.response.text().trim();
+        const match = text.match(/\{[\s\S]*\}/);
+        if (match) text = match[0];
+        const parsed = JSON.parse(text);
+        return {
+            formatted: String(parsed.formatted || rawText).slice(0, 3000),
+            tag: String(parsed.tag || 'Ghi chú').slice(0, 30),
+        };
+    } catch (err) {
+        console.warn('[formatNote] Failed:', err.message);
+        return { formatted: rawText, tag: 'Ghi chú' };
+    }
+}
+
+module.exports = { embedTexts, embedQuery, generateText, generateStream, chatStream, generateTitle, generateSuggestions, describeDocumentImages, describeDocxImages, browserTool, formatNote };

@@ -648,3 +648,39 @@ export async function deleteShareLink(shareId) {
   if (!res.ok) throw new Error('Không thể xóa link chia sẻ');
   return safeJson(res);
 }
+
+// ── Notes ─────────────────────────────────────────────────────────────────────
+
+export async function fetchNotes(documentId) {
+  const res = await authFetch(`${API_BASE}/notes/${documentId}`);
+  if (!res.ok) throw new Error('Không thể tải ghi chú');
+  return safeJson(res);
+}
+
+export async function createNote(documentId, content, sessionId) {
+  const res = await authFetch(`${API_BASE}/notes/${documentId}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ content, session_id: sessionId }),
+  });
+  if (!res.ok) throw new Error('Không thể tạo ghi chú');
+  return safeJson(res);
+}
+
+export async function updateNote(noteId, content) {
+  const res = await authFetch(`${API_BASE}/notes/${noteId}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ content }),
+  });
+  if (!res.ok) throw new Error('Không thể cập nhật ghi chú');
+  return safeJson(res);
+}
+
+export async function deleteNote(noteId) {
+  const res = await authFetch(`${API_BASE}/notes/${noteId}`, {
+    method: 'DELETE',
+  });
+  if (!res.ok) throw new Error('Không thể xóa ghi chú');
+  return safeJson(res);
+}

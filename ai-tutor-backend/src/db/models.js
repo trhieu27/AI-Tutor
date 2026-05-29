@@ -254,6 +254,21 @@ const shareLinkSchema = new mongoose.Schema({
 });
 shareLinkSchema.index({ owner_id: 1, resource_type: 1, resource_id: 1 });
 
+// ── Note ──────────────────────────────────────────────────────────────────────
+
+const noteSchema = new mongoose.Schema({
+  id: { type: String, required: true, unique: true, index: true },
+  user_id: { type: String, required: true, index: true },
+  document_id: { type: String, required: true, index: true },
+  content: { type: String, required: true },
+  formatted: { type: String, default: null },
+  tag: { type: String, default: null },
+  source_session_id: { type: String, default: null },
+  created_at: { type: Date, default: Date.now },
+  updated_at: { type: Date, default: Date.now },
+});
+noteSchema.index({ user_id: 1, document_id: 1, created_at: -1 });
+
 const User = mongoose.model('User', userSchema, 'users');
 const UserSession = mongoose.model('UserSession', userSessionSchema, 'user_sessions');
 const Document = mongoose.model('Document', documentSchema, 'documents');
@@ -267,6 +282,7 @@ const UserSubscription = mongoose.model('UserSubscription', userSubscriptionSche
 const PaymentTransaction = mongoose.model('PaymentTransaction', paymentTransactionSchema, 'payment_transactions');
 const AdminAuditLog = mongoose.model('AdminAuditLog', adminAuditLogSchema, 'admin_audit_logs');
 const ShareLink = mongoose.model('ShareLink', shareLinkSchema, 'share_links');
+const Note = mongoose.model('Note', noteSchema, 'notes');
 
 module.exports = {
   User,
@@ -282,4 +298,5 @@ module.exports = {
   AdminAuditLog,
   PendingPayment,
   ShareLink,
+  Note,
 };

@@ -1,7 +1,9 @@
 
+import { useState } from "react";
 import Button from "@/shared/ui/Button";
 import StatusBadge from "@/shared/ui/StatusBadge";
 import QuickActionBar from "@/features/user/components/chat/QuickActionBar";
+import NotesPanel from "@/features/user/components/chat/NotesPanel";
 import { Skeleton } from "@/shared/ui/States";
 import { CHAT_WORKSPACE_TEXTS } from "@/shared/constants/texts";
 import {
@@ -35,7 +37,6 @@ function PipelineDebugPanel({ pipeline }) {
     { label: "Thời gian", value: pipeline.totalTimeMs ? `${pipeline.totalTimeMs}ms` : "—", icon: "timer" },
   ];
 
-  // Thông tin debug mở rộng
   const debugRows = pipeline.rewrittenQuery ? [
     { label: "Truy vấn gốc", value: pipeline.originalQuery },
     { label: "Truy vấn đã viết lại", value: pipeline.rewrittenQuery },
@@ -68,7 +69,6 @@ function PipelineDebugPanel({ pipeline }) {
         </div>
       </div>
 
-      {/* Chi tiết debug mở rộng */}
       {debugRows.length > 0 && (
         <details className="rounded-[var(--radius-panel)] border border-[var(--border-subtle)] bg-[var(--surface)]">
           <summary className="cursor-pointer px-2.5 py-2 text-[10.5px] font-bold text-[var(--foreground)]">
@@ -85,7 +85,6 @@ function PipelineDebugPanel({ pipeline }) {
         </details>
       )}
 
-      {/* Thời gian từng bước */}
       {timingRows.length > 0 && (
         <details className="rounded-[var(--radius-panel)] border border-[var(--border-subtle)] bg-[var(--surface)]">
           <summary className="cursor-pointer px-2.5 py-2 text-[10.5px] font-bold text-[var(--foreground)]">
@@ -105,7 +104,14 @@ function PipelineDebugPanel({ pipeline }) {
   );
 }
 
-export default function DocumentContextPanel({ document, quota, onQuickAction, lastPipeline }) {
+const TABS = [
+  { id: "document", label: "Tài liệu", icon: "description" },
+  { id: "notes", label: "Ghi chú", icon: "sticky_note_2" },
+];
+
+export default function DocumentContextPanel({ document, quota, onQuickAction, lastPipeline, notes, notesLoading, onDeleteNote, onEditNote, onAddNote, noteCount }) {
+  const [activeTab, setActiveTab] = useState("document");
+
   const quotaRows = quota && !quota.isPro
     ? [
         { label: T.chatMessages, remaining: quota.chatRemaining?.() },
@@ -114,73 +120,110 @@ export default function DocumentContextPanel({ document, quota, onQuickAction, l
     : [];
 
   return (
-    <aside className="flex h-full flex-col border-l border-[var(--border-color)] bg-[var(--card-bg)]">
-      <div className="border-b border-[var(--border-subtle)] p-3">
-        <p className="font-mono text-[10px] font-semibold uppercase tracking-normal text-[var(--muted)]">{T.selectedSource}</p>
-        {document ? (
-          <div className="mt-2.5 flex items-start gap-2.5">
-            <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-[var(--border-color)] bg-[var(--surface)] text-[var(--brand-primary)]">
-              <span className="material-symbols-outlined icon-thin text-[16px]" aria-hidden="true">{getDocumentIcon(document)}</span>
-            </span>
-            <div className="min-w-0 flex-1">
-              <h2 className="truncate text-[12px] font-semibold leading-5 text-[var(--foreground)]" title={getDocumentName(document)}>{getDocumentName(document)}</h2>
-              <p className="mt-0.5 truncate text-[10.5px] font-medium text-[var(--muted)]">
-                {getDocumentExt(document)} · {getDocumentSize(document)} · {getDocumentDate(document)}
-              </p>
-            </div>
-          </div>
-        ) : (
-          <div className="mt-2.5 flex items-start gap-2.5" role="status" aria-label={T.loadingDocument} aria-busy="true">
-            <Skeleton className="h-8 w-8 shrink-0 rounded-lg" />
-            <div className="min-w-0 flex-1 space-y-2">
-              <Skeleton className="h-3.5 w-5/6" />
-              <Skeleton className="h-2.5 w-2/3" />
-            </div>
-          </div>
-        )}
-
-        {document && (
-          <div className="mt-3 flex flex-wrap items-center gap-1.5">
-            <StatusBadge status={normalizeDocumentStatus(document.status)} />
-            <span className="inline-flex max-w-[90px] items-center truncate rounded-[var(--radius-chip)] border border-[var(--border-subtle)] bg-[var(--surface)] px-2 py-1 text-[10.5px] font-semibold leading-none text-[var(--muted)]">
-              {getDocumentPages(document)}
-            </span>
-          </div>
-        )}
-
-        <div className="mt-3 flex flex-wrap gap-1.5">
-          <Button to="/chat" variant="outline" size="sm" icon="swap_horiz" className="max-w-[128px] px-2.5 text-[11px]" iconClassName="text-[15px]">
-            {T.switchSource}
-          </Button>
-          {document && (
-            <Button to="/learning" variant="ghost" size="sm" icon="library_books" className="max-w-[110px] px-2.5 text-[11px]" iconClassName="text-[15px]">
-              {T.library}
-            </Button>
-          )}
-        </div>
+    <aside className="flex h-full min-h-0 flex-col overflow-hidden border-l border-[var(--border-color)] bg-[var(--card-bg)]">
+      {/* Tab switcher */}
+      <div className="flex border-b border-[var(--border-subtle)]">
+        {TABS.map((tab) => (
+          <button
+            key={tab.id}
+            type="button"
+            onClick={() => setActiveTab(tab.id)}
+            className={`flex flex-1 items-center justify-center gap-1.5 py-2.5 text-[11px] font-bold transition ${
+              activeTab === tab.id
+                ? "border-b-2 border-[var(--brand-primary)] text-[var(--brand-primary)]"
+                : "text-[var(--muted)] hover:text-[var(--foreground)]"
+            }`}
+          >
+            <span className="material-symbols-outlined icon-thin text-[15px]">{tab.icon}</span>
+            {tab.label}
+            {tab.id === "notes" && noteCount > 0 && (
+              <span className="flex h-4 min-w-[16px] items-center justify-center rounded-full bg-[var(--brand-primary)] px-1 text-[9px] font-bold text-white">
+                {noteCount}
+              </span>
+            )}
+          </button>
+        ))}
       </div>
 
-      <div className="min-h-0 flex-1 overflow-y-auto p-3 custom-scrollbar">
-        <section>
-          <h3 className="mb-1.5 text-[11.5px] font-semibold text-[var(--foreground)]">{T.quickActions}</h3>
-          <QuickActionBar compact onAction={onQuickAction} />
-        </section>
-
-
-        {quotaRows.length > 0 && (
-          <section className="mt-4 rounded-[var(--radius-panel)] border border-[var(--border-subtle)] bg-[var(--surface)] p-2.5">
-            <h3 className="text-[11.5px] font-semibold text-[var(--foreground)]">{T.usage}</h3>
-            <div className="mt-2 space-y-1.5 text-[10.5px] font-semibold text-[var(--muted)]">
-              {quotaRows.map((row) => (
-                <div key={row.label} className="flex items-center justify-between gap-3">
-                  <span className="min-w-0 truncate">{row.label}</span>
-                  <span className="shrink-0">{T.remaining(row.remaining)}</span>
+      {activeTab === "document" ? (
+        <>
+          <div className="border-b border-[var(--border-subtle)] p-3">
+            <p className="font-mono text-[10px] font-semibold uppercase tracking-normal text-[var(--muted)]">{T.selectedSource}</p>
+            {document ? (
+              <div className="mt-2.5 flex items-start gap-2.5">
+                <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-[var(--border-color)] bg-[var(--surface)] text-[var(--brand-primary)]">
+                  <span className="material-symbols-outlined icon-thin text-[16px]" aria-hidden="true">{getDocumentIcon(document)}</span>
+                </span>
+                <div className="min-w-0 flex-1">
+                  <h2 className="truncate text-[12px] font-semibold leading-5 text-[var(--foreground)]" title={getDocumentName(document)}>{getDocumentName(document)}</h2>
+                  <p className="mt-0.5 truncate text-[10.5px] font-medium text-[var(--muted)]">
+                    {getDocumentExt(document)} · {getDocumentSize(document)} · {getDocumentDate(document)}
+                  </p>
                 </div>
-              ))}
+              </div>
+            ) : (
+              <div className="mt-2.5 flex items-start gap-2.5" role="status" aria-label={T.loadingDocument} aria-busy="true">
+                <Skeleton className="h-8 w-8 shrink-0 rounded-lg" />
+                <div className="min-w-0 flex-1 space-y-2">
+                  <Skeleton className="h-3.5 w-5/6" />
+                  <Skeleton className="h-2.5 w-2/3" />
+                </div>
+              </div>
+            )}
+
+            {document && (
+              <div className="mt-3 flex flex-wrap items-center gap-1.5">
+                <StatusBadge status={normalizeDocumentStatus(document.status)} />
+                <span className="inline-flex max-w-[90px] items-center truncate rounded-[var(--radius-chip)] border border-[var(--border-subtle)] bg-[var(--surface)] px-2 py-1 text-[10.5px] font-semibold leading-none text-[var(--muted)]">
+                  {getDocumentPages(document)}
+                </span>
+              </div>
+            )}
+
+            <div className="mt-3 flex flex-wrap gap-1.5">
+              <Button to="/chat" variant="outline" size="sm" icon="swap_horiz" className="max-w-[128px] px-2.5 text-[11px]" iconClassName="text-[15px]">
+                {T.switchSource}
+              </Button>
+              {document && (
+                <Button to="/learning" variant="ghost" size="sm" icon="library_books" className="max-w-[110px] px-2.5 text-[11px]" iconClassName="text-[15px]">
+                  {T.library}
+                </Button>
+              )}
             </div>
-          </section>
-        )}
-      </div>
+          </div>
+
+          <div className="min-h-0 flex-1 overflow-y-auto p-3 custom-scrollbar">
+            <section>
+              <h3 className="mb-1.5 text-[11.5px] font-semibold text-[var(--foreground)]">{T.quickActions}</h3>
+              <QuickActionBar compact onAction={onQuickAction} />
+            </section>
+
+            {quotaRows.length > 0 && (
+              <section className="mt-4 rounded-[var(--radius-panel)] border border-[var(--border-subtle)] bg-[var(--surface)] p-2.5">
+                <h3 className="text-[11.5px] font-semibold text-[var(--foreground)]">{T.usage}</h3>
+                <div className="mt-2 space-y-1.5 text-[10.5px] font-semibold text-[var(--muted)]">
+                  {quotaRows.map((row) => (
+                    <div key={row.label} className="flex items-center justify-between gap-3">
+                      <span className="min-w-0 truncate">{row.label}</span>
+                      <span className="shrink-0">{T.remaining(row.remaining)}</span>
+                    </div>
+                  ))}
+                </div>
+              </section>
+            )}
+          </div>
+        </>
+      ) : (
+        <div className="min-h-0 flex-1">
+          <NotesPanel
+            notes={notes || []}
+            loading={notesLoading}
+            onDelete={onDeleteNote}
+            onEdit={onEditNote}
+            onAdd={onAddNote}
+          />
+        </div>
+      )}
     </aside>
   );
 }

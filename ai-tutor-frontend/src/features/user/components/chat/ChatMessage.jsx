@@ -1,4 +1,4 @@
-import { memo } from "react";
+import { memo, useCallback } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import SourceCitationList from "@/features/user/components/chat/SourceCitationList";
@@ -29,10 +29,19 @@ function PipelineStatus({ step }) {
   );
 }
 
-const ChatMessage = memo(function ChatMessage({ message, onRetry, onOpenSource, streaming }) {
+const ChatMessage = memo(function ChatMessage({ message, onRetry, onOpenSource, streaming, onTextSelect }) {
   const isUser = message.role === "user" || message.isUser;
   const content = typeof message.content === "string" ? message.content : String(message.content || "");
 
+  const handleMouseUp = useCallback(() => {
+    if (!onTextSelect) return;
+    const sel = window.getSelection();
+    const text = sel?.toString().trim();
+    if (!text || text.length < 3) return;
+    const range = sel.getRangeAt(0);
+    const rect = range.getBoundingClientRect();
+    onTextSelect(text, rect.left + rect.width / 2, rect.top);
+  }, [onTextSelect]);
 
   return (
     <article className={cx("flex", isUser && "justify-end")}>
@@ -55,7 +64,7 @@ const ChatMessage = memo(function ChatMessage({ message, onRetry, onOpenSource, 
               <span className="inline-block h-4 w-0.5 translate-y-0.5 animate-pulse bg-[var(--brand-primary)]" />
             </div>
           ) : (
-            <div className="prose-saas max-w-none text-[13px] leading-7">
+            <div className="prose-saas max-w-none text-[13px] leading-7" onMouseUp={handleMouseUp}>
               <ReactMarkdown remarkPlugins={[remarkGfm]}>{content}</ReactMarkdown>
             </div>
           )}

@@ -20,7 +20,12 @@ import {
   fetchSessionDetail,
   locateDocumentCitation,
   QuotaError,
+  fetchNotes,
+  createNote,
+  updateNote,
+  deleteNote,
 } from "@/shared/services/api.service";
+import SelectionPopup from "@/features/user/components/chat/SelectionPopup";
 import ConfirmDialog from "@/shared/ui/ConfirmDialog";
 import Button, { IconButton } from "@/shared/ui/Button";
 import LiquidGlassButton from "@/shared/ui/LiquidGlassButton";
@@ -771,6 +776,9 @@ export default function ChatPage() {
   const [deleteSessionId, setDeleteSessionId] = useState(null);
   const [suggestions, setSuggestions] = useState([]);
   const [shareOpen, setShareOpen] = useState(null); // sessionId or null
+  const [notes, setNotes] = useState([]);
+  const [notesLoading, setNotesLoading] = useState(false);
+  const [selectionPopup, setSelectionPopup] = useState(null); // { text, x, y }
 
   const refreshSessions = useCallback(async () => {
     try {
@@ -855,6 +863,55 @@ export default function ChatPage() {
     observer.observe(sentinel);
     return () => observer.disconnect();
   }, [hasMore, loadOlderMessages]);
+
+  // ── Notes ───────────────────────────────────────────────────────────────────
+
+  useEffect(() => {
+    if (!documentId) return;
+    setNotesLoading(true);
+    fetchNotes(documentId)
+      .then(setNotes)
+      .catch(() => setNotes([]))
+      .finally(() => setNotesLoading(false));
+  }, [documentId]);
+
+  const handleDeleteNote = useCallback(async (noteId) => {
+    try {
+      await deleteNote(noteId);
+      setNotes((prev) => prev.filter((n) => n.id !== noteId));
+    } catch (err) {
+      console.error("Delete note failed:", err);
+    }
+  }, []);
+
+  const handleEditNote = useCallback(async (noteId, content) => {
+    try {
+      const updated = await updateNote(noteId, content);
+      setNotes((prev) => prev.map((n) => (n.id === noteId ? { ...n, ...updated } : n)));
+    } catch (err) {
+      console.error("Edit note failed:", err);
+    }
+  }, []);
+
+  const handleAddNote = useCallback(async (content) => {
+    try {
+      const note = await createNote(documentId, content, currentSessionId);
+      setNotes((prev) => [note, ...prev]);
+    } catch (err) {
+      console.error("Add note failed:", err);
+    }
+  }, [documentId, currentSessionId]);
+
+  const handleSaveNoteFromSelection = useCallback(async (text) => {
+    try {
+      const note = await createNote(documentId, text, currentSessionId);
+      setNotes((prev) => [note, ...prev]);
+      // Auto-open context panel to show notes tab
+      setContextOpen(true);
+    } catch (err) {
+      console.error("Save note from selection failed:", err);
+    }
+  }, [documentId, currentSessionId]);
 
   useEffect(() => {
     let active = true;
@@ -1299,6 +1356,7 @@ export default function ChatPage() {
                     message={message}
                     onOpenSource={(source) => setPdfPreviewSource(source)}
                     streaming={message._streaming}
+                    onTextSelect={(text, x, y) => setSelectionPopup({ text, x, y })}
                   />
                 ))}
                 {suggestions.length > 0 && !isSending && (
@@ -1341,7 +1399,7 @@ export default function ChatPage() {
 
         {contextOpen && (
           <div className="hidden min-h-0 lg:block">
-            <DocumentContextPanel document={docData} sources={lastSources} quota={quota} onQuickAction={handleQuickAction} lastPipeline={lastPipeline} />
+            <DocumentContextPanel document={docData} sources={lastSources} quota={quota} onQuickAction={handleQuickAction} lastPipeline={lastPipeline} notes={notes} notesLoading={notesLoading} onDeleteNote={handleDeleteNote} onEditNote={handleEditNote} onAddNote={handleAddNote} noteCount={notes.length} />
           </div>
         )}
       </div>
@@ -1382,7 +1440,7 @@ export default function ChatPage() {
               aria-label={TEXTS.page.closeContext}
             />
             <div className="absolute inset-y-0 right-0 w-[min(88vw,360px)] bg-[var(--card-bg)] shadow-2xl">
-              <DocumentContextPanel document={docData} sources={lastSources} quota={quota} onQuickAction={handleQuickAction} lastPipeline={lastPipeline} />
+              <DocumentContextPanel document={docData} sources={lastSources} quota={quota} onQuickAction={handleQuickAction} lastPipeline={lastPipeline} notes={notes} notesLoading={notesLoading} onDeleteNote={handleDeleteNote} onEditNote={handleEditNote} onAddNote={handleAddNote} noteCount={notes.length} />
             </div>
           </div>,
           document.body
@@ -1426,6 +1484,15 @@ export default function ChatPage() {
         <ShareDialog
           sessionId={shareOpen}
           onClose={() => setShareOpen(null)}
+        />
+      )}
+      {selectionPopup && (
+        <SelectionPopup
+          x={selectionPopup.x}
+          y={selectionPopup.y}
+          text={selectionPopup.text}
+          onSave={handleSaveNoteFromSelection}
+          onClose={() => setSelectionPopup(null)}
         />
       )}
     </>
