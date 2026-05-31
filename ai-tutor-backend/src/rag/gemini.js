@@ -206,7 +206,7 @@ async function* generateStream(prompt, { temperature = 0.3, maxTokens = 8192, si
             try {
                 const text = chunk.text();
                 if (!text) continue;
-                if (signal ? .aborted) return;
+                if (signal?.aborted) return;
                 yield text;
             } catch (chunkErr) {
                 console.warn('[generateStream] skipping chunk:', chunkErr.message);
@@ -252,7 +252,7 @@ async function* chatStream(systemInstruction, history, userMessage, opts = {}) {
             try {
                 const text = chunk.text();
                 if (!text) continue;
-                if (signal ? .aborted) return;
+                if (signal?.aborted) return;
                 yield text;
             } catch (chunkErr) {
                 console.warn('[chatStream] skipping chunk:', chunkErr.message);
