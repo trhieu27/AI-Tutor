@@ -92,16 +92,6 @@ export default function ProfileSection({
         </div>
         <div>
           <label className="block text-[11px] font-semibold text-[var(--muted)] mb-1.5">
-            {TEXTS.profile.fields.studentId}
-          </label>
-          <input
-            value={profile.student_id}
-            disabled={true}
-            className={disabledCls}
-          />
-        </div>
-        <div>
-          <label className="block text-[11px] font-semibold text-[var(--muted)] mb-1.5">
             {TEXTS.profile.fields.email}
           </label>
           <input
