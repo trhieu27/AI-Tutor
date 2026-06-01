@@ -102,14 +102,3 @@ Hoặc chạy toàn bộ stack:
 docker compose up -d
 ```
 
----
-
-## 👥 Tác giả
-
-- **Trần Trung Hiếu** — [@trhieu27](https://github.com/trhieu27)
-
----
-
-## 📄 License
-
-Dự án này được phát triển cho mục đích học tập và nghiên cứu.
