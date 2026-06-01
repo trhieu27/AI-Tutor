@@ -81,7 +81,7 @@ export default function Sidebar({ onClose }) {
         {/* Thẻ nâng cấp — chỉ hiển với user miễn phí */}
         {!isPro && (
           <Link to="/pricing" onClick={() => onClose?.()} className="block">
-            <div className="rounded-lg bg-gradient-to-r from-[hsl(166_61%_35%)] to-[hsl(218_82%_45%)] p-3 text-white transition-transform duration-200 hover:-translate-y-0.5">
+            <div className="rounded-lg bg-[var(--brand-primary)] p-3 text-white transition-transform duration-200 hover:-translate-y-0.5">
               <div className="flex items-center gap-2">
                 <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-white/15">
                   <span className="material-symbols-outlined text-[16px]">rocket_launch</span>

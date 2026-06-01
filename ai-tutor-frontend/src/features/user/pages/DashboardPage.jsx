@@ -7,7 +7,7 @@ import Button from "@/shared/ui/Button";
 import LiquidGlassButton from "@/shared/ui/LiquidGlassButton";
 import StatusBadge from "@/shared/ui/StatusBadge";
 import { Skeleton } from "@/shared/ui/States";
-import { PageFrame, StatCard, Surface, cx } from "@/shared/ui/Premium";
+import { PageFrame, Surface, cx } from "@/shared/ui/Premium";
 
 import {
   getDocumentDate,
@@ -259,13 +259,6 @@ export default function DashboardPage() {
     };
   }, []);
 
-  const stats = useMemo(() => {
-    const ready = documents.filter((doc) => doc.status === "READY").length;
-    const processing = documents.filter((doc) => doc.status === "PROCESSING" || doc.status === "UPLOADING").length;
-    const failed = documents.filter((doc) => doc.status === "FAILED").length;
-    const pages = documents.reduce((sum, doc) => sum + (Number(doc.page_count) || 0), 0);
-    return { ready, processing, failed, pages };
-  }, [documents]);
 
   const readyDocuments = useMemo(
     () =>
@@ -411,12 +404,6 @@ export default function DashboardPage() {
         </Surface>
       </section>
 
-      <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
-        <StatCard label={T.stats.ready.label} value={stats.ready} icon="task_alt" tone="green" helper={T.stats.ready.helper} />
-        <StatCard label={T.stats.processing.label} value={stats.processing} icon="progress_activity" tone="blue" helper={T.stats.processing.helper} />
-        <StatCard label={T.stats.sessions.label} value={recentSessions.length} icon="forum" tone="warm" helper={T.stats.sessions.helper} />
-        <StatCard label={T.stats.pages.label} value={stats.pages} icon="article" tone="rose" helper={stats.failed ? T.stats.pages.failedHelper(stats.failed) : T.stats.pages.helper} />
-      </div>
 
       <Surface className="p-4 sm:p-5">
         <div className="mb-4 flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">

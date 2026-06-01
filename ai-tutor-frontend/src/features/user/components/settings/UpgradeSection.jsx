@@ -15,7 +15,7 @@ export default function UpgradeSection({ profile }) {
           <p className="text-[13px] text-[var(--muted)] mb-2">{U.currentPlanLabel}</p>
           <div className="flex items-center gap-2">
             {isPro ? (
-              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg bg-gradient-to-r from-[var(--brand-primary)] to-[var(--brand-secondary)] text-white text-[12px] font-bold">
+              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg bg-[var(--brand-primary)] text-white text-[12px] font-bold">
                 <span className="material-symbols-outlined text-[13px]" style={{ fontVariationSettings: "'FILL' 1" }}>workspace_premium</span>
                 {U.proPlan}
               </span>

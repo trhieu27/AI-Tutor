@@ -3,7 +3,7 @@ import { cx } from "@/shared/ui/Premium";
 
 const VARIANT_CLASS = {
   primary:
-    "bg-[var(--brand-primary)] text-[var(--on-primary)] border-transparent shadow-[0_10px_24px_var(--shadow-primary)] hover:bg-[var(--brand-primary-strong)]",
+    "bg-[var(--brand-primary)] text-[var(--on-primary)] border-transparent hover:bg-[var(--brand-primary-strong)]",
   secondary:
     "bg-[var(--surface-raised)] text-[var(--foreground)] border-[var(--border-color)] shadow-[var(--premium-shadow-sm)] hover:bg-[var(--card-bg-hover)] hover:border-[var(--border-emphasis)]",
   outline:

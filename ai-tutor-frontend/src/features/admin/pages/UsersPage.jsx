@@ -155,30 +155,34 @@ function UserMobileCard({ user, onDetail, onPatch, patchingId }) {
 
 function UserDetailSkeleton() {
   return (
-    <div className="grid gap-5 p-4 sm:p-5 xl:grid-cols-[0.78fr_1.22fr]">
-      <div className="space-y-5">
-        <section className="space-y-3">
-          <Skeleton className="h-4 w-24" />
-          <Skeleton className="h-5 w-44" />
-          <Skeleton className="h-4 w-32" />
-          <div className="flex gap-2">
-            <Skeleton className="h-7 w-20 rounded-[var(--radius-chip)]" />
-            <Skeleton className="h-7 w-24 rounded-[var(--radius-chip)]" />
-          </div>
-        </section>
-        <section className="space-y-3 border-t border-[var(--border-subtle)] pt-4">
-          <Skeleton className="h-4 w-20" />
-          <Skeleton className="h-10 w-full rounded-[var(--radius-chip)]" />
-          <Skeleton className="h-10 w-full rounded-[var(--radius-chip)]" />
-          <Skeleton className="h-10 w-full rounded-[var(--radius-chip)]" />
-        </section>
-      </div>
-      <div className="space-y-5">
-        <Skeleton className="h-4 w-24" />
-        <Skeleton className="h-40 w-full rounded-[var(--radius-panel)]" />
+    <div className="space-y-5 p-4 sm:p-5">
+      <section className="space-y-3">
+        <Skeleton className="h-3 w-16" />
+        <Skeleton className="h-5 w-44" />
         <Skeleton className="h-4 w-32" />
-        <Skeleton className="h-44 w-full rounded-[var(--radius-panel)]" />
-      </div>
+        <div className="flex gap-2">
+          <Skeleton className="h-7 w-20 rounded-[var(--radius-chip)]" />
+          <Skeleton className="h-7 w-24 rounded-[var(--radius-chip)]" />
+          <Skeleton className="h-7 w-20 rounded-[var(--radius-chip)]" />
+        </div>
+      </section>
+      <section className="space-y-2 border-t border-[var(--border-subtle)] pt-4">
+        <Skeleton className="h-3 w-16" />
+        <Skeleton className="h-10 w-full rounded-[var(--radius-chip)]" />
+        <Skeleton className="h-10 w-full rounded-[var(--radius-chip)]" />
+        <Skeleton className="h-10 w-full rounded-[var(--radius-chip)]" />
+      </section>
+      <section className="space-y-3 border-t border-[var(--border-subtle)] pt-4">
+        <Skeleton className="h-3 w-24" />
+        <div className="flex gap-2">
+          <Skeleton className="h-10 w-40 rounded-[var(--radius-control)]" />
+          <Skeleton className="h-10 w-32 rounded-[var(--radius-control)]" />
+        </div>
+        <div className="flex gap-2">
+          <Skeleton className="h-9 w-20 rounded-[var(--radius-control)]" />
+          <Skeleton className="h-9 w-20 rounded-[var(--radius-control)]" />
+        </div>
+      </section>
     </div>
   );
 }
@@ -232,7 +236,7 @@ function UserDetailDialog({ detail, loading, onClose, onPatch, onAssignPlan, sav
     <div className="admin-dialog-root fixed inset-0 z-[120] flex items-center justify-center p-3 sm:p-5" role="presentation">
       <button type="button" className="admin-dialog-backdrop absolute inset-0" aria-label="Đóng chi tiết người dùng" onClick={onClose} />
       <section
-        className="admin-user-dialog relative flex w-full max-w-6xl flex-col overflow-hidden rounded-[var(--radius-panel)] border border-[var(--border-color)] bg-[var(--card-bg)] shadow-[var(--premium-shadow-md)]"
+        className="admin-user-dialog relative flex w-full max-w-lg flex-col overflow-hidden rounded-[var(--radius-panel)] border border-[var(--border-color)] bg-[var(--card-bg)] shadow-[var(--premium-shadow-md)]"
         role="dialog"
         aria-modal="true"
         aria-labelledby="admin-user-detail-title"
@@ -266,8 +270,8 @@ function UserDetailDialog({ detail, loading, onClose, onPatch, onAssignPlan, sav
 
         <div className="admin-user-dialog-body min-h-0 flex-1 overflow-hidden">
           {loading ? <div className="overflow-y-auto custom-scrollbar p-4 sm:p-5"><UserDetailSkeleton /></div> : (
-      <div className="flex h-full flex-col overflow-y-auto custom-scrollbar xl:flex-row xl:overflow-hidden">
-        <div className="min-w-0 shrink-0 space-y-5 p-4 sm:p-5 xl:w-[38%] xl:overflow-y-auto xl:custom-scrollbar">
+      <div className="overflow-y-auto custom-scrollbar">
+        <div className="space-y-5 p-4 sm:p-5">
           <section>
             <p className="text-[12px] font-bold text-[var(--muted)]">{ADMIN_TEXTS.users.detail.profile}</p>
             <div className="mt-3 space-y-2 text-[13px] font-semibold">
@@ -350,44 +354,6 @@ function UserDetailDialog({ detail, loading, onClose, onPatch, onAssignPlan, sav
                   {user.status === "deleted" ? "Đã xóa" : "Xóa tài khoản"}
                 </Button>
               </div>
-            </div>
-          </section>
-        </div>
-
-        <div className="min-w-0 flex-1 space-y-5 border-t border-[var(--border-subtle)] p-4 sm:p-5 xl:border-l xl:border-t-0 xl:overflow-y-auto xl:custom-scrollbar">
-          <section>
-            <p className="text-[12px] font-bold text-[var(--muted)]">{ADMIN_TEXTS.users.detail.documents}</p>
-            <div className="mt-3 overflow-auto rounded-[var(--radius-panel)] border border-[var(--border-subtle)] custom-scrollbar">
-              {(detail.documents || []).length ? detail.documents.slice(0, 5).map((doc) => (
-                <div key={doc.id} className="flex items-center justify-between gap-3 border-b border-[var(--border-subtle)] px-3 py-2 last:border-0">
-                  <span className="min-w-0 truncate text-[12px] font-bold text-[var(--foreground)]">{doc.file_name}</span>
-                  <AdminStatusPill tone={doc.status === "READY" ? "green" : doc.status === "FAILED" ? "rose" : "warm"}>{formatAdminStatus(doc.status)}</AdminStatusPill>
-                </div>
-              )) : <AdminEmpty icon="folder_open" title="Chưa có tài liệu" subtitle="" />}
-            </div>
-          </section>
-
-          <section>
-            <p className="text-[12px] font-bold text-[var(--muted)]">{ADMIN_TEXTS.users.detail.sessions}</p>
-            <div className="mt-3 overflow-auto rounded-[var(--radius-panel)] border border-[var(--border-subtle)] custom-scrollbar">
-              {(detail.sessions || []).length ? detail.sessions.slice(0, 5).map((session) => (
-                <div key={session.id} className="border-b border-[var(--border-subtle)] px-3 py-2 last:border-0">
-                  <p className="truncate text-[12px] font-bold text-[var(--foreground)]">{parseUserAgent(session.user_agent)}</p>
-                  <p className="truncate text-[11px] font-semibold text-[var(--muted)]">{session.ip_address || "IP không rõ"} · {formatDateTime(session.last_active)}</p>
-                </div>
-              )) : <AdminEmpty icon="devices" title="Chưa có phiên đăng nhập" subtitle="" />}
-            </div>
-          </section>
-
-          <section>
-            <p className="text-[12px] font-bold text-[var(--muted)]">{ADMIN_TEXTS.users.detail.usage}</p>
-            <div className="mt-3 overflow-auto rounded-[var(--radius-panel)] border border-[var(--border-subtle)] custom-scrollbar">
-              {(detail.usage_logs || []).length ? detail.usage_logs.slice(0, 5).map((log, index) => (
-                <div key={`${log.feature}-${log.created_at}-${index}`} className="flex justify-between gap-3 border-b border-[var(--border-subtle)] px-3 py-2 text-[12px] font-bold last:border-0">
-                  <span className="truncate text-[var(--foreground)]">{log.feature}</span>
-                  <span className="shrink-0 text-[var(--muted)]">{formatDate(log.created_at)}</span>
-                </div>
-              )) : <AdminEmpty icon="history" title="Chưa có lượt dùng" subtitle="" />}
             </div>
           </section>
         </div>

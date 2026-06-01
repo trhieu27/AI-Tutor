@@ -859,13 +859,9 @@ router.get('/users/:id', async (req, res) => {
     const user = await User.findOne({ id: req.params.id }).lean();
     if (!user) return res.status(404).json({ detail: 'Người dùng không tồn tại' });
 
-    const [subscription, docs, sessions, chatCount, usageLogs, recentUsage, chatUsed, aiUsed, docCount, presenceByUser] = await Promise.all([
+    const [subscription, chatCount, chatUsed, aiUsed, docCount, presenceByUser] = await Promise.all([
       UserSubscription.findOne({ user_id: user.id }).lean(),
-      Document.find({ owner_id: user.id }).select(DOCUMENT_LIST_PROJECTION).sort({ uploaded_at: -1 }).limit(30).lean(),
-      UserSession.find({ user_id: user.id }).sort({ last_active: -1 }).limit(20).lean(),
       ChatSession.countDocuments({ user_id: user.id }),
-      UsageLog.find({ user_id: user.id }).sort({ created_at: -1 }).limit(40).lean(),
-      UsageLog.find({ user_id: user.id }).sort({ created_at: -1 }).limit(10).lean(),
       usageToday(user.id, 'chat_messages'),
       usageToday(user.id, 'ai_features'),
       Document.countDocuments({ owner_id: user.id }),
@@ -874,7 +870,6 @@ router.get('/users/:id', async (req, res) => {
 
     const planMap = await getPlanMap();
     const plan = subscription ? planMap.get(subscription.plan_id) : planMap.get('free');
-    const owner = serializeUser(user);
     const presence = presenceByUser.get(user.id) || {};
 
     res.json({
@@ -892,15 +887,7 @@ router.get('/users/:id', async (req, res) => {
         ai_generations: aiUsed,
         limits: plan?.quota || null,
       },
-      documents: docs.map((doc) => serializeDocumentListItem(doc, owner)),
-      sessions: sessions.map(stripMongo),
       chat_sessions_count: chatCount,
-      usage_logs: usageLogs.map(stripMongo),
-      recent_activity: [
-        ...recentUsage.map((log) => ({ type: 'usage', at: log.created_at, feature: log.feature, date: log.date })),
-        ...sessions.slice(0, 5).map((session) => ({ type: 'session', at: session.last_active, session_id: session.id })),
-        ...docs.slice(0, 5).map((doc) => ({ type: 'document', at: doc.uploaded_at, document_id: doc.id, status: doc.status })),
-      ].sort((a, b) => new Date(b.at || 0) - new Date(a.at || 0)).slice(0, 15),
     });
   } catch (err) {
     console.error('Admin user detail error:', err);

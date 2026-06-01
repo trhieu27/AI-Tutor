@@ -1276,8 +1276,8 @@ select:focus-visible {
 
 .premium-icon-button-solid {
   color: white;
-  background: linear-gradient(135deg, var(--brand-primary), var(--brand-secondary));
-  box-shadow: 0 10px 24px hsl(166 61% 35% / 0.20);
+  background: var(--brand-primary);
+  box-shadow: 0 10px 24px var(--shadow-primary);
 }
 
 .premium-icon-button-danger:hover {
@@ -1287,7 +1287,6 @@ select:focus-visible {
 
 .premium-kicker-icon,
 .premium-feature-icon,
-.premium-stat-icon,
 .premium-empty-icon {
   display: inline-flex;
   align-items: center;
@@ -1332,55 +1331,38 @@ select:focus-visible {
   background: var(--surface-raised);
 }
 
-.premium-feature-icon,
-.premium-stat-icon {
+.premium-feature-icon {
   width: 42px;
   height: 42px;
   border-radius: 8px;
 }
 
 .tone-blue .premium-feature-icon,
-.tone-blue .premium-stat-icon,
-.premium-feature-icon.tone-blue,
-.premium-stat-icon.tone-blue {
+.premium-feature-icon.tone-blue {
   color: var(--brand-secondary);
   background: hsl(218 82% 55% / 0.10);
   border-color: hsl(218 82% 55% / 0.22);
 }
 
 .tone-green .premium-feature-icon,
-.tone-green .premium-stat-icon,
-.premium-feature-icon.tone-green,
-.premium-stat-icon.tone-green {
+.premium-feature-icon.tone-green {
   color: var(--brand-primary);
   background: hsl(166 61% 35% / 0.10);
   border-color: hsl(166 61% 35% / 0.22);
 }
 
 .tone-warm .premium-feature-icon,
-.tone-warm .premium-stat-icon,
-.premium-feature-icon.tone-warm,
-.premium-stat-icon.tone-warm {
+.premium-feature-icon.tone-warm {
   color: var(--brand-warm);
   background: hsl(32 92% 52% / 0.11);
   border-color: hsl(32 92% 52% / 0.24);
 }
 
 .tone-rose .premium-feature-icon,
-.tone-rose .premium-stat-icon,
-.premium-feature-icon.tone-rose,
-.premium-stat-icon.tone-rose {
+.premium-feature-icon.tone-rose {
   color: var(--brand-rose);
   background: hsl(346 78% 53% / 0.10);
   border-color: hsl(346 78% 53% / 0.22);
-}
-
-.premium-stat-card {
-  border: 1px solid var(--border-color);
-  border-radius: 8px;
-  background: var(--card-bg);
-  padding: 16px;
-  box-shadow: var(--premium-shadow-sm);
 }
 
 .premium-segmented {
@@ -1646,17 +1628,17 @@ select:focus-visible {
   --danger-border: oklch(58% 0.190 20 / 0.26);
   --info-soft: oklch(58% 0.165 250 / 0.10);
   --info-border: oklch(58% 0.165 250 / 0.24);
-  --liquid-text: oklch(98% 0.006 205);
-  --liquid-primary: oklch(49% 0.115 175 / 0.92);
-  --liquid-secondary: oklch(58% 0.165 250 / 0.88);
-  --liquid-bold-a: oklch(42% 0.105 175 / 0.96);
-  --liquid-bold-b: oklch(52% 0.150 250 / 0.96);
-  --liquid-soft: oklch(49% 0.115 175 / 0.68);
-  --liquid-clear: oklch(58% 0.165 250 / 0.52);
+  --liquid-text: oklch(99% 0.006 175);
+  --liquid-primary: oklch(49% 0.115 175);
+  --liquid-secondary: oklch(49% 0.115 175);
+  --liquid-bold-a: oklch(43% 0.105 175);
+  --liquid-bold-b: oklch(43% 0.105 175);
+  --liquid-soft: oklch(49% 0.115 175 / 0.78);
+  --liquid-clear: oklch(49% 0.115 175 / 0.62);
   --liquid-ghost: oklch(99% 0.006 205 / 0.58);
-  --liquid-border: oklch(99% 0.006 205 / 0.35);
-  --liquid-sheen: oklch(99% 0.006 205 / 0.34);
-  --liquid-shadow: 0 14px 32px oklch(22% 0.026 238 / 0.16), inset 0 1px 0 oklch(99% 0.006 205 / 0.35);
+  --liquid-border: oklch(99% 0.006 175 / 0.15);
+  --liquid-sheen: oklch(99% 0.006 175 / 0.14);
+  --liquid-shadow: 0 8px 22px oklch(49% 0.115 175 / 0.30), inset 0 1px 0 oklch(99% 0.006 175 / 0.20);
 }
 
 .dark {
@@ -1673,17 +1655,17 @@ select:focus-visible {
   --danger-border: oklch(67% 0.170 20 / 0.28);
   --info-soft: oklch(69% 0.135 250 / 0.13);
   --info-border: oklch(69% 0.135 250 / 0.26);
-  --liquid-text: oklch(12% 0.016 238);
-  --liquid-primary: oklch(72% 0.120 175 / 0.94);
-  --liquid-secondary: oklch(73% 0.125 250 / 0.90);
-  --liquid-bold-a: oklch(65% 0.115 175 / 0.96);
-  --liquid-bold-b: oklch(68% 0.145 250 / 0.96);
-  --liquid-soft: oklch(66% 0.105 175 / 0.74);
-  --liquid-clear: oklch(68% 0.135 250 / 0.56);
+  --liquid-text: oklch(99% 0.006 175);
+  --liquid-primary: oklch(63% 0.105 175);
+  --liquid-secondary: oklch(63% 0.105 175);
+  --liquid-bold-a: oklch(58% 0.100 175);
+  --liquid-bold-b: oklch(58% 0.100 175);
+  --liquid-soft: oklch(63% 0.105 175 / 0.82);
+  --liquid-clear: oklch(63% 0.105 175 / 0.66);
   --liquid-ghost: oklch(28% 0.024 238 / 0.62);
-  --liquid-border: oklch(99% 0.006 205 / 0.18);
-  --liquid-sheen: oklch(99% 0.006 205 / 0.22);
-  --liquid-shadow: 0 18px 44px oklch(6% 0.012 238 / 0.42), inset 0 1px 0 oklch(99% 0.006 205 / 0.16);
+  --liquid-border: oklch(99% 0.006 175 / 0.12);
+  --liquid-sheen: oklch(99% 0.006 175 / 0.10);
+  --liquid-shadow: 0 8px 22px oklch(6% 0.012 238 / 0.44), inset 0 1px 0 oklch(99% 0.006 175 / 0.14);
 }
 
 .liquid-glass-button {
@@ -2080,17 +2062,15 @@ select:focus-visible {
 
 /* ── ADMIN OPERATIONS UI ───────────────────────────────────────────────── */
 :root {
-  --admin-canvas-bg: oklch(91.5% 0.020 214);
-  --admin-canvas-top: oklch(94.5% 0.020 210);
+  --admin-canvas-bg: oklch(96.5% 0.011 215);
+  --admin-canvas-top: oklch(96.5% 0.011 215);
   --admin-canvas-grid: oklch(60% 0.030 220 / 0.22);
   --admin-canvas-spot-a: oklch(49% 0.115 175 / 0.16);
   --admin-canvas-spot-b: oklch(58% 0.165 250 / 0.13);
 
   --admin-sidebar-top: oklch(98% 0.010 210);
-  --admin-sidebar-base: oklch(94.5% 0.016 215);
-  --admin-sidebar-bg:
-    radial-gradient(circle at 12% 0%, oklch(49% 0.115 175 / 0.10), transparent 34%),
-    linear-gradient(180deg, var(--admin-sidebar-top), var(--admin-sidebar-base));
+  --admin-sidebar-base: oklch(98% 0.010 210);
+  --admin-sidebar-bg: var(--admin-sidebar-top);
   --admin-sidebar-fg: var(--foreground);
   --admin-sidebar-muted: var(--muted);
   --admin-sidebar-soft: var(--surface);
@@ -2102,10 +2082,10 @@ select:focus-visible {
   --admin-sidebar-brand-bg: var(--surface-raised);
   --admin-sidebar-brand-fg: var(--brand-primary);
 
-  --admin-section-bg: linear-gradient(180deg, oklch(96.5% 0.014 210), oklch(94% 0.016 214));
-  --admin-section-header-bg: linear-gradient(180deg, oklch(91.5% 0.020 214), oklch(94% 0.016 214));
-  --admin-card-gradient: linear-gradient(135deg, oklch(96% 0.015 210), oklch(93.5% 0.018 214) 58%, oklch(90.5% 0.020 215));
-  --admin-accent-line: linear-gradient(90deg, var(--brand-primary), var(--brand-secondary), var(--brand-warm));
+  --admin-section-bg: var(--card-bg);
+  --admin-section-header-bg: var(--surface);
+  --admin-card-gradient: var(--card-bg);
+  --admin-accent-line: var(--brand-primary);
   --admin-table-head-bg: var(--surface);
   --admin-table-row-base: var(--card-bg);
   --admin-table-row-alt: oklch(96.6% 0.008 215 / 0.55);
@@ -2136,9 +2116,9 @@ select:focus-visible {
   --admin-sidebar-shadow: 0 24px 70px oklch(5% 0.014 238 / 0.56);
   --admin-sidebar-brand-bg: var(--admin-sidebar-fg);
   --admin-sidebar-brand-fg: var(--admin-sidebar-base);
-  --admin-section-bg: linear-gradient(180deg, oklch(19.5% 0.024 238), oklch(16.5% 0.022 238));
-  --admin-section-header-bg: linear-gradient(180deg, oklch(22% 0.024 238), oklch(18.5% 0.022 238));
-  --admin-card-gradient: linear-gradient(135deg, oklch(20.5% 0.024 238), oklch(16.5% 0.020 238) 58%, oklch(14.5% 0.018 238));
+  --admin-section-bg: var(--card-bg);
+  --admin-section-header-bg: var(--surface);
+  --admin-card-gradient: var(--card-bg);
   --admin-table-row-base: oklch(16.5% 0.020 238);
   --admin-table-row-alt: oklch(19% 0.020 238 / 0.64);
   --admin-table-row-hover: oklch(23% 0.022 238 / 0.74);
@@ -2184,24 +2164,7 @@ select:focus-visible {
   position: relative;
   isolation: isolate;
   min-height: 100vh;
-  background:
-    linear-gradient(180deg, var(--admin-canvas-top), var(--admin-canvas-bg) 38%),
-    var(--admin-canvas-bg);
-}
-
-.admin-shell::before {
-  content: "";
-  position: fixed;
-  inset: 0;
-  z-index: -1;
-  pointer-events: none;
-  background:
-    radial-gradient(circle at 18% 9%, var(--admin-canvas-spot-a), transparent 30%),
-    radial-gradient(circle at 84% 2%, var(--admin-canvas-spot-b), transparent 26%),
-    linear-gradient(to right, var(--admin-canvas-grid) 1px, transparent 1px),
-    linear-gradient(to bottom, var(--admin-canvas-grid) 1px, transparent 1px);
-  background-size: auto, auto, 28px 28px, 28px 28px;
-  opacity: 0.78;
+  background: var(--admin-canvas-bg);
 }
 
 .admin-sidebar {
@@ -2295,7 +2258,7 @@ select:focus-visible {
 
 .admin-topbar,
 .admin-mobile-nav {
-  background: color-mix(in oklch, var(--admin-canvas-top) 88%, var(--surface-raised));
+  background: var(--admin-canvas-bg);
   border-color: var(--border-color);
 }
 
@@ -2309,7 +2272,7 @@ select:focus-visible {
 }
 
 .admin-page-intro {
-  background: linear-gradient(180deg, color-mix(in oklch, var(--surface-raised) 82%, var(--admin-canvas-bg)), transparent);
+  background: transparent;
 }
 
 .admin-breadcrumb {
@@ -2430,8 +2393,8 @@ select:focus-visible {
   position: absolute;
   inset: 0;
   pointer-events: none;
-  background: radial-gradient(circle at 100% 0%, var(--admin-tone-soft), transparent 42%);
-  opacity: 0.7;
+  background: transparent;
+  opacity: 0;
 }
 
 .admin-metric > * {
@@ -2452,7 +2415,7 @@ select:focus-visible {
   overflow: hidden;
   border-radius: var(--radius-panel);
   border: 1px solid var(--border-color);
-  background: linear-gradient(135deg, var(--surface-raised), var(--card-bg) 62%, var(--surface));
+  background: var(--card-bg);
   box-shadow: var(--premium-shadow-sm);
 }
 

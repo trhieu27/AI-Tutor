@@ -249,7 +249,7 @@ export default function DocumentPicker({
               const actionControlClassName = cx(
                 "inline-flex h-11 w-full shrink-0 items-center justify-center gap-2 rounded-[var(--radius-control)] border px-4 text-[13px] font-semibold leading-snug transition-[background,border-color,color,box-shadow,transform] duration-150 group-hover:-translate-y-0.5 md:ml-auto md:h-10 md:w-auto",
                 liquidAction
-                  ? "border-transparent bg-[linear-gradient(135deg,var(--brand-primary),var(--brand-secondary))] text-[var(--on-primary)] shadow-[0_12px_26px_var(--shadow-primary)]"
+                  ? "border-transparent bg-[var(--brand-primary)] text-[var(--on-primary)] shadow-[0_12px_26px_var(--shadow-primary)]"
                   : isSelected
                     ? "border-transparent bg-[var(--brand-primary)] text-[var(--on-primary)] shadow-[0_10px_24px_var(--shadow-primary)]"
                     : "border-[var(--border-color)] bg-[var(--surface-raised)] text-[var(--foreground)] shadow-[var(--premium-shadow-sm)] group-hover:border-[var(--border-emphasis)] group-hover:bg-[var(--card-bg-hover)]"

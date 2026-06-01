@@ -166,54 +166,7 @@ export function FeatureCard({ icon, title, desc, tone = "blue", to, action = PRE
   );
 }
 
-export function StatCard({ label, value, icon, tone = "blue", helper }) {
-  return (
-    <div className={cx("premium-stat-card", `tone-${tone}`)}>
-      <div className="flex items-start justify-between gap-4">
-        <div>
-          <p className="text-[11px] font-semibold text-[var(--muted)]">{label}</p>
-          <p className="mt-2 text-[24px] font-semibold leading-none text-[var(--foreground)]">
-            <AnimatedValue value={value} />
-          </p>
-        </div>
-        <span className="premium-stat-icon" aria-hidden="true">
-          <span className="material-symbols-outlined text-[18px]">{icon}</span>
-        </span>
-      </div>
-      {helper && <p className="mt-4 text-[11px] font-medium text-[var(--muted-light)]">{helper}</p>}
-    </div>
-  );
-}
 
-function AnimatedValue({ value }) {
-  const numericValue = typeof value === "number" && Number.isFinite(value) ? value : null;
-  const [display, setDisplay] = useState(numericValue ?? value);
-
-  useEffect(() => {
-    if (numericValue === null) {
-      setDisplay(value);
-      return;
-    }
-
-    let frame = 0;
-    const start = performance.now();
-    const duration = 520;
-    const from = 0;
-    const to = numericValue;
-
-    const tick = (time) => {
-      const progress = Math.min((time - start) / duration, 1);
-      const eased = 1 - Math.pow(1 - progress, 4);
-      setDisplay(Math.round(from + (to - from) * eased));
-      if (progress < 1) frame = requestAnimationFrame(tick);
-    };
-
-    frame = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(frame);
-  }, [numericValue, value]);
-
-  return display;
-}
 
 export function SegmentedControl({ options, value, onChange, className = "" }) {
   const containerRef = useRef(null);

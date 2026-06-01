@@ -154,11 +154,11 @@ export default function SecuritySection() {
                   ...prevState,
                   [k]: !prevState[k]
                 }))}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--muted)] hover:text-[var(--foreground)] transition-colors"
+                className="absolute right-0 top-0 h-full flex items-center px-3 text-[var(--muted)] hover:text-[var(--foreground)] transition-colors"
               >
                 <span
-                  className="material-symbols-outlined"
-                  style={{ fontSize: 16 }}
+                  className="material-symbols-outlined leading-none"
+                  style={{ fontSize: 18 }}
                 >
                   {show[k] ? "visibility_off" : "visibility"}
                 </span>
