@@ -168,8 +168,14 @@ export default function AdminAuditPage() {
               <option value="document">{formatAuditTarget("document")}</option>
               <option value="plan">{formatAuditTarget("plan")}</option>
             </AdminSelect>
-            <AdminInput type="date" value={filters.from} onChange={(event) => setFilter("from", event.target.value)} aria-label={ADMIN_TEXTS.audit.filters.from} />
-            <AdminInput type="date" value={filters.to} onChange={(event) => setFilter("to", event.target.value)} aria-label={ADMIN_TEXTS.audit.filters.to} />
+            <label className="grid gap-1 text-[11px] font-bold text-[var(--muted)]">
+              Từ ngày
+              <AdminInput type="date" value={filters.from} onChange={(event) => setFilter("from", event.target.value)} aria-label={ADMIN_TEXTS.audit.filters.from} />
+            </label>
+            <label className="grid gap-1 text-[11px] font-bold text-[var(--muted)]">
+              Đến ngày
+              <AdminInput type="date" value={filters.to} onChange={(event) => setFilter("to", event.target.value)} aria-label={ADMIN_TEXTS.audit.filters.to} />
+            </label>
           </div>
         </AdminSection>
 

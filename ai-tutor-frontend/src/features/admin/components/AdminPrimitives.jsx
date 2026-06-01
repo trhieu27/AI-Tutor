@@ -227,7 +227,7 @@ export function AdminSection({ title, subtitle, action, children, className = ""
   );
 }
 
-export function AdminMetric({ icon, label, value, helper, tone = "neutral" }) {
+export function AdminMetric({ icon, label, value, helper, tone = "neutral", className }) {
   const toneClass = {
     green: "admin-tone-green",
     blue: "admin-tone-blue",
@@ -237,7 +237,7 @@ export function AdminMetric({ icon, label, value, helper, tone = "neutral" }) {
   }[tone];
 
   return (
-    <article className={cx("admin-metric min-w-0 p-4", toneClass)}>
+    <article className={cx("admin-metric min-w-0 p-4", toneClass, className)}>
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <p className="text-[12px] font-bold leading-5 text-[var(--muted)]">{label}</p>
@@ -273,7 +273,7 @@ export function AdminStatusPill({ children, tone = "neutral", icon }) {
 
 export function AdminInput({ icon, className = "", ...props }) {
   return (
-    <label className={cx("relative block", className)}>
+    <label className={cx("relative block min-w-0", className)}>
       {icon && (
         <span className="material-symbols-outlined pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[17px] text-[var(--muted)]" aria-hidden="true">
           {icon}
@@ -698,16 +698,16 @@ function LimitDropdown({ value, onChange, options }) {
   );
 }
 
-function AdminMetricLoadingGrid({ count = 6 }) {
+function AdminMetricLoadingGrid({ count = 6, className = "grid-cols-2 sm:grid-cols-3", firstSpanFull = false }) {
   return (
-    <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+    <div className={`grid gap-3 ${className}`}>
       {Array.from({ length: count }).map((_, index) => (
-        <div key={index} className="admin-metric-skeleton p-4">
+        <div key={index} className={cx("admin-metric-skeleton p-4", firstSpanFull && index === 0 && "col-span-2 sm:col-span-1")}>
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0 flex-1 space-y-3">
-              <Skeleton className="h-4 w-28" />
-              <Skeleton className="h-7 w-24" />
-              <Skeleton className="h-3 w-20" />
+              <Skeleton className="h-4 w-4/5 max-w-28" />
+              <Skeleton className="h-7 w-3/5 max-w-24" />
+              <Skeleton className="h-3 w-1/2 max-w-20" />
             </div>
             <Skeleton className="h-[46px] w-[46px] shrink-0 rounded-[var(--radius-panel)]" />
           </div>
@@ -960,7 +960,7 @@ function AdminPlansLoading() {
 function AdminDashboardLoading() {
   return (
     <>
-      <AdminMetricLoadingGrid count={3} />
+      <AdminMetricLoadingGrid count={3} firstSpanFull />
       <AdminChartLoading />
       <AdminPanelListLoading count={3} />
     </>
@@ -970,7 +970,7 @@ function AdminDashboardLoading() {
 function AdminRevenueLoading() {
   return (
     <>
-      <AdminMetricLoadingGrid count={5} />
+      <AdminMetricLoadingGrid count={2} className="sm:grid-cols-2" />
       <div className="grid gap-5 xl:grid-cols-[1.45fr_0.85fr]">
         <AdminChartLoading />
         <AdminBarListLoading />

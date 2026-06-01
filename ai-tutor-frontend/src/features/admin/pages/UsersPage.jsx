@@ -141,10 +141,9 @@ function UserMobileCard({ user, onDetail, onPatch, patchingId }) {
           {user.last_active && <p className="mt-1 text-[10px] font-semibold text-[var(--muted)]">{formatDateTime(user.last_active)}</p>}
         </div>
       </div>
-      <div className="mt-3 grid grid-cols-3 gap-2 text-[11px] font-bold">
+      <div className="mt-3 grid grid-cols-2 gap-2 text-[11px] font-bold">
         <span className="rounded-[var(--radius-chip)] bg-[var(--surface)] px-2 py-2 text-[var(--muted)]">{planLabel(user)}</span>
         <span className="rounded-[var(--radius-chip)] bg-[var(--surface)] px-2 py-2 text-[var(--muted)]">{formatNumber(user.document_count)} tài liệu</span>
-        <span className="rounded-[var(--radius-chip)] bg-[var(--surface)] px-2 py-2 text-[var(--muted)]">{formatNumber(user.ai_usage_today)} AI</span>
       </div>
       <div className="mt-3">
         <UserActions user={user} onDetail={onDetail} onPatch={onPatch} patchingId={patchingId} />
@@ -660,7 +659,7 @@ export default function AdminUsersPage() {
                         <div className="min-w-0 space-y-1">
                           <p className="truncate text-[12px] font-[780] text-[var(--foreground)]">{planLabel(user)}</p>
                           <p className="truncate text-[11px] font-semibold text-[var(--muted)]">
-                            {formatNumber(user.document_count)} tài liệu · {formatNumber(user.ai_usage_today)} AI
+                            {formatNumber(user.document_count)} tài liệu
                           </p>
                         </div>
                       </td>

@@ -85,7 +85,7 @@ export default function AdminLayout() {
         <button
           type="button"
           className="fixed inset-0 z-50 backdrop-blur-sm md:hidden"
-          style={{ background: "color-mix(in oklch, var(--foreground) 72%, transparent)" }}
+          style={{ background: "oklch(0% 0 0 / 0.6)" }}
           aria-label={ADMIN_TEXTS.shell.closeMenu}
           onClick={() => setOpen(false)}
         />
@@ -106,10 +106,7 @@ export default function AdminLayout() {
           <span className="material-symbols-outlined text-[20px]">menu</span>
         </button>
 
-        {/* Brand on mobile */}
-        <div className="md:hidden">
-          <BrandLockup to="/admin" title={ADMIN_TEXTS.shell.brand} subtitle={ADMIN_TEXTS.shell.subtitle} size="sm" />
-        </div>
+        {/* Spacer */}
 
         <div className="min-w-0 flex-1" />
 
@@ -156,8 +153,8 @@ export default function AdminLayout() {
         </div>
       </header>
 
-      <div className="min-w-0 pt-16 md:ml-72">
-        <main className="min-w-0">
+      <div className="min-w-0 max-w-full overflow-x-clip pt-16 md:ml-72">
+        <main className="min-w-0 max-w-full">
           <Outlet />
         </main>
       </div>

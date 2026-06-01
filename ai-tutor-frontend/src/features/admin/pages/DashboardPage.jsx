@@ -136,7 +136,7 @@ export default function AdminDashboardPage() {
         ) : (
           <>
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-          <AdminMetric icon="payments" label={ADMIN_TEXTS.dashboard.metrics.revenueMonth} value={formatVnd(data.monthlyRevenue)} helper={`Hôm nay ${formatVnd(data.revenueToday)}`} tone="green" />
+          <AdminMetric icon="payments" label={ADMIN_TEXTS.dashboard.metrics.revenueMonth} value={formatVnd(data.monthlyRevenue)} helper={`Hôm nay ${formatVnd(data.revenueToday)}`} tone="green" className="col-span-2 sm:col-span-1" />
           <AdminMetric icon="online_prediction" label={ADMIN_TEXTS.dashboard.metrics.activeUsers} value={formatNumber(data.activeUsers)} helper={`${formatNumber(data.totalUsers)} tài khoản`} tone="blue" />
           <AdminMetric icon="person_add" label={ADMIN_TEXTS.dashboard.metrics.newUsers} value={formatNumber(data.newUsersThisMonth)} helper={`Hôm nay ${formatNumber(data.newUsersToday)}`} />
         </div>

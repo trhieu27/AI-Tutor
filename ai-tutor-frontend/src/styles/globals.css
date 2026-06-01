@@ -69,6 +69,13 @@
   --duration-xslow: 700ms;
 }
 
+
+/* ── GLOBAL OVERFLOW FIX (iOS Safari) ─────────────────────────────────── */
+html, body {
+  overflow-x: clip;
+  max-width: 100%;
+}
+
 /* ── 2. AUTOFILL RESET ────────────────────────────────────────────────── */
 input:-webkit-autofill,
 input:-webkit-autofill:hover,
@@ -1569,6 +1576,8 @@ select:focus-visible {
 
 .premium-input {
   width: 100%;
+  min-width: 0;
+  max-width: 100%;
   border: 1px solid var(--border-color);
   border-radius: 10px;
   background: oklch(96% 0.012 212);
@@ -1582,6 +1591,14 @@ select:focus-visible {
     border-color 150ms ease,
     box-shadow 150ms ease,
     background 150ms ease;
+}
+
+/* Force date/time inputs to respect container width on iOS Safari */
+input[type="date"].premium-input,
+input[type="time"].premium-input,
+input[type="datetime-local"].premium-input {
+  width: -webkit-fill-available;
+  width: stretch;
 }
 
 .premium-input:focus {
@@ -2318,7 +2335,8 @@ select:focus-visible {
 
 .admin-section {
   position: relative;
-  overflow: hidden;
+  overflow: visible;
+  max-width: 100%;
   border-radius: var(--radius-panel);
   border: 1px solid var(--border-color);
   background: var(--admin-section-bg);
@@ -2330,16 +2348,15 @@ select:focus-visible {
     background 200ms var(--ease-reveal);
 }
 
-.admin-section:hover {
-  border-color: var(--border-emphasis);
-  box-shadow: var(--premium-shadow-md);
-  transform: translateY(-2px);
+@media (hover: hover) {
+  .admin-section:hover {
+    border-color: var(--border-emphasis);
+    box-shadow: var(--premium-shadow-md);
+    transform: translateY(-2px);
+  }
 }
 
-.admin-section:has(.admin-select.is-open) {
-  overflow: visible;
-  z-index: 120;
-}
+
 
 .admin-section-header {
   background: var(--admin-section-header-bg);

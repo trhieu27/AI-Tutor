@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { fetchAdminActivity, readCachedAdminActivity } from "@/features/admin/services/admin.service";
 import { useAdminRealtime } from "@/features/admin/hooks/useAdminRealtime";
 import { ADMIN_TEXTS } from "@/shared/constants/texts";
@@ -50,7 +50,13 @@ function ActivityCard({ item }) {
   );
 }
 
-const INITIAL_FILTERS = { page: 1, limit: 5, activeWithinMinutes: 15 };
+function formatWindow(minutes) {
+  if (minutes >= 1440) return `${Math.round(minutes / 1440)} ngày`;
+  if (minutes >= 60) return `${Math.round(minutes / 60)} giờ`;
+  return `${minutes} phút`;
+}
+
+const INITIAL_FILTERS = { page: 1, limit: 5, activeWithinMinutes: 30 };
 
 /** Theo dõi phiên chat real-time — bảng hoạt động người dùng */
 export default function AdminActivityPage() {
@@ -92,7 +98,7 @@ export default function AdminActivityPage() {
     const handleVisibility = () => {
       if (document.visibilityState === "visible") load();
     };
-    const intervalId = window.setInterval(load, 60_000);
+    const intervalId = window.setInterval(load, 30_000);
     document.addEventListener("visibilitychange", handleVisibility);
     return () => {
       window.clearInterval(intervalId);
@@ -106,7 +112,21 @@ export default function AdminActivityPage() {
     load();
   }, [load]));
 
+
   const setFilter = (key, value) => setFilters((current) => ({ ...current, [key]: value, page: key === "page" ? value : 1 }));
+
+  // Dedupe by user ID — keep most recent session per user
+  const uniqueItems = useMemo(() => {
+    const map = new Map();
+    for (const item of data?.items || []) {
+      const uid = item.user?.id || item.id;
+      const existing = map.get(uid);
+      if (!existing || new Date(item.last_active) > new Date(existing.last_active)) {
+        map.set(uid, item);
+      }
+    }
+    return [...map.values()];
+  }, [data?.items]);
 
   return (
     <div>
@@ -131,11 +151,11 @@ export default function AdminActivityPage() {
           <AdminError message={error} onRetry={load} />
         ) : (
           <div style={fetching && !loading ? { opacity: 0.5, pointerEvents: 'none', transition: 'opacity 150ms ease' } : { transition: 'opacity 150ms ease' }}>
-          <AdminSection title="Phiên hoạt động" subtitle={`${formatNumber(data?.pagination?.total || 0)} phiên trong ${data?.activeWithinMinutes || filters.activeWithinMinutes} phút`}>
-            {(data?.items || []).length ? (
+          <AdminSection title="Phiên hoạt động" subtitle={`${formatNumber(uniqueItems.length)} người dùng trong ${formatWindow(data?.activeWithinMinutes || filters.activeWithinMinutes)}`}>
+            {uniqueItems.length ? (
               <>
                 <AdminTable columns={Object.values(ADMIN_TEXTS.activity.columns)} minWidth="900px" widths={["26%", "34%", "22%", "18%"]} aligns={[null, "center", "center", null]}>
-                  {data.items.map((item) => (
+                  {uniqueItems.map((item) => (
                     <tr key={item.id} className="border-b border-[var(--border-subtle)] last:border-0 hover:bg-[var(--surface)]">
                       <td className="px-4 py-4">
                         <div className="min-w-0 space-y-1.5">
@@ -168,7 +188,7 @@ export default function AdminActivityPage() {
                   ))}
                 </AdminTable>
                 <div className="space-y-3 p-3 md:hidden">
-                  {data.items.map((item) => <ActivityCard key={item.id} item={item} />)}
+                  {uniqueItems.map((item) => <ActivityCard key={item.id} item={item} />)}
                 </div>
                 <AdminPagination pagination={data.pagination} onPageChange={(page) => setFilter("page", page)} onLimitChange={(limit) => setFilter("limit", limit)} />
               </>

@@ -97,6 +97,25 @@ function TransactionsSection({ from, to }) {
               </tr>
             ))}
           </AdminTable>
+          {/* Mobile card view — AdminTable is hidden md:block */}
+          <div className="space-y-3 p-3 md:hidden">
+            {items.map((tx) => (
+              <article key={tx.id} className="rounded-[var(--radius-panel)] border border-[var(--border-color)] bg-[var(--card-bg)] p-4 shadow-[var(--premium-shadow-sm)]">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="truncate text-[13px] font-bold text-[var(--foreground)]">{tx.user?.full_name || "Người dùng"}</p>
+                    <p className="truncate text-[11px] font-semibold text-[var(--muted)]">{tx.user?.email}</p>
+                  </div>
+                  <span className="shrink-0 text-[14px] font-[780] text-[var(--foreground)]">{formatVnd(tx.amount_vnd)}</span>
+                </div>
+                <div className="mt-2 flex items-center gap-2 text-[11px] font-semibold text-[var(--muted)]">
+                  <span>{tx.plan?.display_name || tx.plan_id}</span>
+                  <span>·</span>
+                  <span>{formatDate(tx.paid_at)}</span>
+                </div>
+              </article>
+            ))}
+          </div>
           <AdminPagination
             pagination={pagination}
             onPageChange={(p) => setFilter("page", p)}
@@ -213,16 +232,16 @@ export default function AdminRevenuePage() {
 
       <div className="space-y-5 p-4 sm:p-6">
         <AdminSection>
-          <div className="grid gap-3 p-4 sm:grid-cols-3">
-            <label className="grid gap-1 text-[11px] font-bold text-[var(--muted)]">
+          <div className="grid min-w-0 gap-3 p-4 sm:grid-cols-3">
+            <label className="grid min-w-0 gap-1 text-[11px] font-bold text-[var(--muted)]">
               Từ ngày
               <AdminInput type="date" value={filters.from} onChange={(event) => setFilters((current) => ({ ...current, from: event.target.value }))} />
             </label>
-            <label className="grid gap-1 text-[11px] font-bold text-[var(--muted)]">
+            <label className="grid min-w-0 gap-1 text-[11px] font-bold text-[var(--muted)]">
               Đến ngày
               <AdminInput type="date" value={filters.to} onChange={(event) => setFilters((current) => ({ ...current, to: event.target.value }))} />
             </label>
-            <label className="grid gap-1 text-[11px] font-bold text-[var(--muted)]">
+            <label className="grid min-w-0 gap-1 text-[11px] font-bold text-[var(--muted)]">
               Nhóm theo
               <AdminSelect value={filters.groupBy} onChange={(event) => setFilters((current) => ({ ...current, groupBy: event.target.value }))}>
                 <option value="day">Ngày</option>
@@ -239,12 +258,9 @@ export default function AdminRevenuePage() {
           <AdminError message={error} onRetry={load} />
         ) : (
           <>
-            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-              <AdminMetric icon="payments" label={ADMIN_TEXTS.revenue.total} value={formatVnd(data.totalRevenue)} helper="Trong khoảng đã chọn" tone="green" />
+            <div className="grid gap-3 sm:grid-cols-2">
+              <AdminMetric icon="payments" label={ADMIN_TEXTS.revenue.total} value={formatVnd(data.totalRevenue)} helper={`${formatDate(filters.from)} – ${formatDate(filters.to)}`} tone="green" />
               <AdminMetric icon="calendar_month" label={ADMIN_TEXTS.revenue.month} value={formatVnd(data.monthlyRevenue)} helper="Tất cả gói" tone="blue" />
-              <AdminMetric icon="event_available" label={ADMIN_TEXTS.revenue.year} value={formatVnd(data.yearlyRevenue)} helper="Tất cả gói" />
-              <AdminMetric icon="repeat" label={ADMIN_TEXTS.revenue.monthlyPlan} value={formatVnd(data.monthlyPlanRevenue)} helper="Doanh thu gói tháng" tone="warm" />
-              <AdminMetric icon="workspace_premium" label={ADMIN_TEXTS.revenue.annualPlan} value={formatVnd(data.annualPlanRevenue)} helper="Doanh thu gói năm" tone="green" />
             </div>
 
             <div className="grid gap-5 xl:grid-cols-[1.45fr_0.85fr]">
