@@ -557,7 +557,11 @@ export default function AdminUsersPage() {
     try {
       await updateAdminSubscription(id, { plan_id });
       await load();
-      await openDetail(id);
+      // Chỉ refresh detail nếu dialog vẫn đang mở
+      if (detail?.user?.id === id) {
+        const updated = await fetchAdminUserDetail(id);
+        setDetail(updated);
+      }
     } catch (err) {
       console.error(err.message);
     } finally {

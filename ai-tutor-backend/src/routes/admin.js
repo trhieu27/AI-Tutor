@@ -599,7 +599,11 @@ async function buildRevenueSeries(from, to, groupBy) {
 }
 
 async function buildOverviewRevenueSeries() {
-  return buildRevenueSeries(startOfMonth(), new Date(), 'day');
+  const now = new Date();
+  const from = new Date(now);
+  from.setDate(from.getDate() - 29); // Luôn hiển thị 30 ngày gần nhất
+  from.setHours(0, 0, 0, 0);
+  return buildRevenueSeries(from, now, 'day');
 }
 
 let overviewCache = null;

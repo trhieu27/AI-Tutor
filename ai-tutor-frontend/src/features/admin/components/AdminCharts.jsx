@@ -42,10 +42,17 @@ export function RevenueAreaChart({ series = [], height = 340 }) {
   const areaGradientId = `admin-revenue-area-${gradientKey}`;
   const hasData = series.length > 0 && series.some((d) => d.revenue > 0);
 
-  const { xLabels, revenueData } = useMemo(() => ({
-    xLabels: series.map((d) => d.date),
-    revenueData: series.map((d) => d.revenue ?? 0),
-  }), [series]);
+  const { xLabels, revenueData } = useMemo(() => {
+    let items = series;
+    // Nếu chỉ có 1 điểm, thêm điểm 0 phía trước để line chart vẽ được đường
+    if (items.length === 1) {
+      items = [{ date: "", revenue: 0 }, ...items];
+    }
+    return {
+      xLabels: items.map((d) => d.date),
+      revenueData: items.map((d) => d.revenue ?? 0),
+    };
+  }, [series]);
 
   if (!hasData) {
     return <AdminEmpty icon="show_chart" subtitle="Chưa có dữ liệu doanh thu" />;

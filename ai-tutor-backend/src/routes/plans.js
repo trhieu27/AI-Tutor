@@ -158,7 +158,20 @@ router.post('/subscribe', authMiddleware, async (req, res) => {
       return res.status(400).json({ detail: 'Gói miễn phí không cần thanh toán' });
     }
 
-    // Tạo orderCode duy nhất (payOS yêu cầu số nguyên dương)
+    // ── Idempotency: nếu đã có pending payment cho cùng user+plan, trả lại link cũ ──
+    const existing = await PendingPayment.findOne({
+      user_id: req.userId,
+      plan_id: plan.id,
+    });
+    if (existing && existing.checkout_url) {
+      return res.json({
+        checkout_url: existing.checkout_url,
+        qr_code: existing.qr_code || null,
+        order_code: existing.order_code,
+        amount,
+      });
+    }
+
     // Tạo orderCode duy nhất: timestamp 8 chữ số cuối + 4 random digits
     const orderCode = Number(String(Date.now()).slice(-8) + String(Math.floor(1000 + Math.random() * 9000)));
 
@@ -182,9 +195,16 @@ router.post('/subscribe', authMiddleware, async (req, res) => {
     const qrImageUrl = `https://img.vietqr.io/image/${paymentLink.bin}-${paymentLink.accountNumber}-compact2.png?amount=${paymentLink.amount}&addInfo=${encodeURIComponent(paymentLink.description)}&accountName=${encodeURIComponent(paymentLink.accountName)}`;
 
     // Lưu pending payment vào MongoDB (tự xóa sau 30 phút nhờ TTL index)
+    // Lưu thêm checkout_url và qr_code để idempotency trả lại link cũ
     await PendingPayment.findOneAndUpdate(
-      { order_code: orderCode },
-      { order_code: orderCode, user_id: req.userId, plan_id: plan.id },
+      { user_id: req.userId, plan_id: plan.id },
+      {
+        order_code: orderCode,
+        user_id: req.userId,
+        plan_id: plan.id,
+        checkout_url: paymentLink.checkoutUrl,
+        qr_code: qrImageUrl,
+      },
       { upsert: true }
     );
 

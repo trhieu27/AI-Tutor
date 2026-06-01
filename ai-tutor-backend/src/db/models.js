@@ -234,8 +234,11 @@ const pendingPaymentSchema = new mongoose.Schema({
   order_code: { type: Number, required: true, unique: true, index: true },
   user_id: { type: String, required: true },
   plan_id: { type: String, required: true },
+  checkout_url: { type: String, default: null },
+  qr_code: { type: String, default: null },
   created_at: { type: Date, default: Date.now },
 });
+pendingPaymentSchema.index({ user_id: 1, plan_id: 1 });
 pendingPaymentSchema.index({ created_at: 1 }, { expireAfterSeconds: 30 * 60 }); // TTL 30 phút
 const PendingPayment = mongoose.model('PendingPayment', pendingPaymentSchema, 'pending_payments');
 
