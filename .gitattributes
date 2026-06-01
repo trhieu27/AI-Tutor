@@ -1,0 +1,4 @@
+# Fix GitHub Linguist language detection
+*.jsx linguist-language=JavaScript
+*.js linguist-language=JavaScript
+*.mjs linguist-language=JavaScript
