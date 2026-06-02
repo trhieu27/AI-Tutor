@@ -18,6 +18,8 @@ const { parsePagination } = require('../utils/pagination');
 const { usageToday } = require('../utils/quota');
 const { refreshConnections } = require('../db/mongoose');
 const { sendAdminRealtimeEvent, notificationManager } = require('../utils/notifications');
+const { clearPlanCache } = require('./plans');
+const { cacheAuthUser, invalidateAuthCache } = require('../db/authDb');
 
 const router = express.Router();
 router.use(adminMiddleware);
@@ -609,6 +611,7 @@ async function buildOverviewRevenueSeries() {
 let overviewCache = null;
 let overviewCacheTime = 0;
 let overviewInFlight = null;
+let overviewCacheRevision = 0;
 let overviewFailureUntil = 0;
 const OVERVIEW_CACHE_TTL = 30000; // 30 seconds
 const OVERVIEW_FAILURE_COOLDOWN = 30000; // 30 seconds
@@ -617,6 +620,8 @@ const overviewFallback = buildFallbackOverview();
 function clearOverviewCache() {
   overviewCache = null;
   overviewCacheTime = 0;
+  overviewFailureUntil = 0;
+  overviewCacheRevision += 1;
 }
 
 function buildFallbackOverview() {
@@ -790,6 +795,7 @@ async function buildOverviewResponse(req, now, today) {
 // GET /api/v1/admin/overview
 router.get('/overview', async (req, res) => {
   try {
+    res.set('Cache-Control', 'no-store');
     const now = new Date();
     if (overviewCache && (now.getTime() - overviewCacheTime <= OVERVIEW_CACHE_TTL)) {
       res.set('X-Admin-Overview-Cache', 'hit');
@@ -800,15 +806,20 @@ router.get('/overview', async (req, res) => {
     }
 
     const today = startOfToday();
-    if (!overviewInFlight) {
-      overviewInFlight = buildOverviewResponse(req, now, today).finally(() => {
-        overviewInFlight = null;
+    if (!overviewInFlight || overviewInFlight.revision !== overviewCacheRevision) {
+      const revision = overviewCacheRevision;
+      const promise = buildOverviewResponse(req, now, today).finally(() => {
+        if (overviewInFlight?.promise === promise) overviewInFlight = null;
       });
+      overviewInFlight = { revision, promise };
     }
 
-    const responseData = await overviewInFlight;
-    overviewCache = responseData;
-    overviewCacheTime = now.getTime();
+    const { revision, promise } = overviewInFlight;
+    const responseData = await promise;
+    if (revision === overviewCacheRevision) {
+      overviewCache = responseData;
+      overviewCacheTime = now.getTime();
+    }
     res.json(responseData);
   } catch (err) {
     if (isMongoUnavailableError(err)) {
@@ -955,12 +966,12 @@ router.patch('/users/:id', async (req, res) => {
     await User.updateOne({ id: target.id }, { $set: updates });
     // Invalidate auth cache ngay khi thay đổi status/role → middleware check mới nhất
     if (changed.status || changed.role) {
-      const { invalidateAuthCache } = require('../db/authDb');
       invalidateAuthCache(target.id, target.email);
     }
     clearOverviewCache();
     sendAdminRealtimeEvent('user_updated', { user_id: target.id, role: updates.role, status: updates.status }).catch(console.error);
     const updated = await User.findOne({ id: target.id }).lean();
+    if (updated) cacheAuthUser(updated);
 
     if (changed.status?.to === 'blocked') {
       await logAudit(req, DANGEROUS_ACTIONS.USER_BLOCKED, 'user', target.id, changed);
@@ -1298,6 +1309,7 @@ router.delete('/documents/:id', async (req, res) => {
 // GET /api/v1/admin/plans
 router.get('/plans', async (_req, res) => {
   try {
+    res.set('Cache-Control', 'no-store');
     const plans = await SubscriptionPlan.find({}).sort({ sort_order: 1 }).lean();
     res.json(plans.map(serializePlan));
   } catch (err) {
@@ -1305,14 +1317,20 @@ router.get('/plans', async (_req, res) => {
   }
 });
 
-function validateNumber(value, field, { min = 0, integer = false } = {}) {
+function validateNumber(value, field, { min = 0, max = Infinity, integer = false } = {}) {
   const number = Number(value);
-  if (!Number.isFinite(number) || number < min || (integer && !Number.isInteger(number))) {
+  if (!Number.isFinite(number) || number < min || number > max || (integer && !Number.isInteger(number))) {
     const err = new Error(`${field} không hợp lệ`);
     err.statusCode = 400;
     throw err;
   }
   return number;
+}
+
+function calculateDiscountedPrice(priceVnd, discountPercent) {
+  const price = Math.max(0, Number(priceVnd) || 0);
+  const discount = Math.min(100, Math.max(0, Number(discountPercent) || 0));
+  return Math.round(price * (100 - discount) / 100);
 }
 
 // PATCH /api/v1/admin/plans/:id
@@ -1335,10 +1353,12 @@ router.patch('/plans/:id', async (req, res) => {
       }
     });
 
-    ['price_vnd', 'discounted_price_vnd'].forEach((field) => {
-      if (req.body[field] !== undefined) updates[field] = validateNumber(req.body[field], field, { min: 0, integer: true });
-    });
-    if (req.body.discount_percent !== undefined) updates.discount_percent = validateNumber(req.body.discount_percent, 'discount_percent', { min: 0, integer: true });
+    if (req.body.price_vnd !== undefined) updates.price_vnd = validateNumber(req.body.price_vnd, 'price_vnd', { min: 0, integer: true });
+    if (req.body.discount_percent !== undefined) updates.discount_percent = validateNumber(req.body.discount_percent, 'discount_percent', { min: 0, max: 100, integer: true });
+    updates.discounted_price_vnd = calculateDiscountedPrice(
+      updates.price_vnd ?? plan.price_vnd,
+      updates.discount_percent ?? plan.discount_percent
+    );
     if (req.body.sort_order !== undefined) updates.sort_order = validateNumber(req.body.sort_order, 'sort_order', { min: 0, integer: true });
     ['is_active', 'is_popular'].forEach((field) => {
       if (req.body[field] !== undefined) updates[field] = Boolean(req.body[field]);
@@ -1355,6 +1375,7 @@ router.patch('/plans/:id', async (req, res) => {
 
     await SubscriptionPlan.updateOne({ id: plan.id }, { $set: updates });
     clearOverviewCache();
+    clearPlanCache();
     const updated = await SubscriptionPlan.findOne({ id: plan.id }).lean();
     await logAudit(req, DANGEROUS_ACTIONS.PLAN_UPDATED, 'plan', plan.id, updates);
     res.json(serializePlan(updated));

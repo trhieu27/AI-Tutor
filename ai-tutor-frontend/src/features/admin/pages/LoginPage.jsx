@@ -170,7 +170,7 @@ export default function AdminLoginPage() {
                       value={email}
                       onChange={(event) => setEmail(event.target.value)}
                       className="premium-input h-12 px-4 pr-11"
-                      placeholder="admin@aitutor.vn"
+                      placeholder={ADMIN_TEXTS.login.emailPlaceholder}
                       autoComplete="username"
                       disabled={isLoading}
                       required
@@ -188,6 +188,7 @@ export default function AdminLoginPage() {
                       value={password}
                       onChange={(event) => setPassword(event.target.value)}
                       className="premium-input h-12 px-4 pr-11"
+                      placeholder={ADMIN_TEXTS.login.passwordPlaceholder}
                       autoComplete="current-password"
                       disabled={isLoading}
                       required
@@ -205,7 +206,7 @@ export default function AdminLoginPage() {
                 </label>
               </div>
 
-              <Button type="submit" icon="login" loading={isLoading} disabled={isLoading} className="mt-5 h-12 w-full">
+              <Button type="submit" trailingIcon="login" loading={isLoading} disabled={isLoading} className="mt-5 h-12 w-full">
                 {isLoading ? ADMIN_TEXTS.login.loading : ADMIN_TEXTS.login.submit}
               </Button>
             </form>

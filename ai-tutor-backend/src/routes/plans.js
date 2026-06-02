@@ -5,6 +5,7 @@ const { PayOS } = require('@payos/node');
 const { User, UserSubscription, SubscriptionPlan, PaymentTransaction, PendingPayment } = require('../db/models');
 const { authMiddleware } = require('../middleware/auth');
 const { sendAdminRealtimeEvent } = require('../utils/notifications');
+const { clearAdminOverviewCache } = require('../utils/cacheInvalidation');
 
 // ── payOS config ────────────────────────────────────────────────────────────
 const payos = new PayOS({
@@ -30,10 +31,20 @@ async function getPlans() {
   return _planCache;
 }
 
+function clearPlanCache() {
+  _planCache = null;
+  _planCacheAt = 0;
+}
+
 // Pending payments: lưu trong MongoDB (PendingPayment model) với TTL 30 phút
 
 // ── Helper: activate subscription ────────────────────────────────────────────
-async function activateSubscription(userId, plan, transactionId) {
+function getPaidAmount(pending, providerAmount, plan) {
+  const amount = Number(pending?.amount_vnd || providerAmount);
+  return Number.isFinite(amount) && amount > 0 ? amount : plan.discounted_price_vnd;
+}
+
+async function activateSubscription(userId, plan, transactionId, amountPaidVnd = plan.discounted_price_vnd) {
   const now = new Date();
   let expires_at = null;
   if (plan.billing_cycle === 'monthly') {
@@ -55,7 +66,7 @@ async function activateSubscription(userId, plan, transactionId) {
           status: 'active',
           payment_method: 'payos',
           transaction_id: transactionId,
-          amount_paid_vnd: plan.discounted_price_vnd,
+          amount_paid_vnd: amountPaidVnd,
           started_at: now,
           expires_at,
           cancelled_at: null,
@@ -72,13 +83,13 @@ async function activateSubscription(userId, plan, transactionId) {
       status: 'active',
       payment_method: 'payos',
       transaction_id: transactionId,
-      amount_paid_vnd: plan.discounted_price_vnd,
+      amount_paid_vnd: amountPaidVnd,
       started_at: now,
       expires_at,
       cancelled_at: null,
     });
   }
-  if (plan.discounted_price_vnd > 0 && transactionId) {
+  if (amountPaidVnd > 0 && transactionId) {
     const existingTransaction = await PaymentTransaction.findOne({ transaction_id: transactionId });
     if (!existingTransaction) {
       await PaymentTransaction.create({
@@ -87,15 +98,16 @@ async function activateSubscription(userId, plan, transactionId) {
         plan_id: plan.id,
         provider: 'payos',
         transaction_id: transactionId,
-        amount_vnd: plan.discounted_price_vnd,
+        amount_vnd: amountPaidVnd,
         status: 'paid',
         paid_at: now,
       });
     }
   }
   console.log(`[payOS] ✅ Activated ${plan.id} for user ${userId}, txn: ${transactionId}`);
-  sendAdminRealtimeEvent('subscription_updated', { user_id: userId, plan_id: plan.id, amount: plan.discounted_price_vnd }).catch(console.error);
-  sendAdminRealtimeEvent('revenue_updated', { user_id: userId, amount: plan.discounted_price_vnd }).catch(console.error);
+  clearAdminOverviewCache();
+  sendAdminRealtimeEvent('subscription_updated', { user_id: userId, plan_id: plan.id, amount: amountPaidVnd }).catch(console.error);
+  sendAdminRealtimeEvent('revenue_updated', { user_id: userId, amount: amountPaidVnd }).catch(console.error);
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -105,6 +117,7 @@ async function activateSubscription(userId, plan, transactionId) {
 // GET /api/v1/plans  – Lấy danh sách gói
 router.get('/', async (_req, res) => {
   try {
+    res.set('Cache-Control', 'no-store');
     const plans = await getPlans();
     res.json(plans);
   } catch (err) {
@@ -115,6 +128,7 @@ router.get('/', async (_req, res) => {
 // GET /api/v1/plans/my  – Lấy gói hiện tại của user
 router.get('/my', authMiddleware, async (req, res) => {
   try {
+    res.set('Cache-Control', 'no-store');
     const plans = await getPlans();
     const freePlan = plans.find(p => p.id === 'free') || plans[0];
 
@@ -128,6 +142,7 @@ router.get('/my', authMiddleware, async (req, res) => {
         { user_id: req.userId },
         { $set: { status: 'expired', updated_at: new Date() } }
       );
+      clearAdminOverviewCache();
       return res.json({ plan: freePlan, subscription: { ...sub, _id: undefined, status: 'expired' } });
     }
 
@@ -158,10 +173,11 @@ router.post('/subscribe', authMiddleware, async (req, res) => {
       return res.status(400).json({ detail: 'Gói miễn phí không cần thanh toán' });
     }
 
-    // ── Idempotency: nếu đã có pending payment cho cùng user+plan, trả lại link cũ ──
+    // ── Idempotency: chỉ dùng lại link nếu giá vẫn giữ nguyên ──
     const existing = await PendingPayment.findOne({
       user_id: req.userId,
       plan_id: plan.id,
+      amount_vnd: amount,
     });
     if (existing && existing.checkout_url) {
       return res.json({
@@ -196,17 +212,14 @@ router.post('/subscribe', authMiddleware, async (req, res) => {
 
     // Lưu pending payment vào MongoDB (tự xóa sau 30 phút nhờ TTL index)
     // Lưu thêm checkout_url và qr_code để idempotency trả lại link cũ
-    await PendingPayment.findOneAndUpdate(
-      { user_id: req.userId, plan_id: plan.id },
-      {
-        order_code: orderCode,
-        user_id: req.userId,
-        plan_id: plan.id,
-        checkout_url: paymentLink.checkoutUrl,
-        qr_code: qrImageUrl,
-      },
-      { upsert: true }
-    );
+    await PendingPayment.create({
+      order_code: orderCode,
+      user_id: req.userId,
+      plan_id: plan.id,
+      amount_vnd: amount,
+      checkout_url: paymentLink.checkoutUrl,
+      qr_code: qrImageUrl,
+    });
 
     res.json({
       checkout_url: paymentLink.checkoutUrl,
@@ -235,7 +248,7 @@ router.get('/check-payment/:code', authMiddleware, async (req, res) => {
         const plans = await getPlans();
         const plan = plans.find(p => p.id === pending.plan_id);
         if (plan) {
-          await activateSubscription(pending.user_id, plan, `PAYOS_${code}`);
+          await activateSubscription(pending.user_id, plan, `PAYOS_${code}`, getPaidAmount(pending, paymentInfo.amount, plan));
         }
       }
       return res.json({ paid: true, message: 'Thanh toán thành công! Gói đã được kích hoạt.' });
@@ -264,7 +277,7 @@ router.post('/webhook/payos', async (req, res) => {
         const plans = await getPlans();
         const plan = plans.find(p => p.id === pending.plan_id);
         if (plan) {
-          await activateSubscription(pending.user_id, plan, `PAYOS_${orderCode}`);
+          await activateSubscription(pending.user_id, plan, `PAYOS_${orderCode}`, getPaidAmount(pending, webhookData.amount, plan));
         }
       }
     }
@@ -284,6 +297,7 @@ router.delete('/cancel', authMiddleware, async (req, res) => {
       { user_id: req.userId },
       { $set: { status: 'cancelled', cancelled_at: now, updated_at: now } }
     );
+    clearAdminOverviewCache();
     sendAdminRealtimeEvent('subscription_updated', { user_id: req.userId, plan_id: 'free', status: 'cancelled' }).catch(console.error);
     res.json({ message: 'Đã hủy gói thành công. Bạn đã quay lại gói Miễn phí.' });
   } catch (err) {
@@ -292,3 +306,4 @@ router.delete('/cancel', authMiddleware, async (req, res) => {
 });
 
 module.exports = router;
+module.exports.clearPlanCache = clearPlanCache;

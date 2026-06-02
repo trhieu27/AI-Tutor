@@ -3,6 +3,7 @@ const router = express.Router();
 const { v4: uuidv4 } = require('uuid');
 const { ShareLink, ChatSession, Document } = require('../db/models');
 const { authMiddleware } = require('../middleware/auth');
+const { clearAdminOverviewCache } = require('../utils/cacheInvalidation');
 
 // POST /api/v1/share — Create share link for a chat session
 router.post('/', authMiddleware, async (req, res) => {
@@ -92,6 +93,7 @@ router.get('/:id', authMiddleware, async (req, res) => {
           uploaded_at: new Date(),
           updated_at: new Date(),
         });
+        clearAdminOverviewCache();
       }
     }
     const targetDocId = userDoc ? userDoc.id : origDocId;
@@ -118,6 +120,7 @@ router.get('/:id', authMiddleware, async (req, res) => {
           updated_at: new Date(),
         },
       });
+      clearAdminOverviewCache();
       return res.json({
         document_id: targetDocId,
         session_id: existing.id,
@@ -144,6 +147,7 @@ router.get('/:id', authMiddleware, async (req, res) => {
       created_at: new Date(),
       updated_at: new Date(),
     });
+    clearAdminOverviewCache();
 
     res.json({
       document_id: targetDocId,

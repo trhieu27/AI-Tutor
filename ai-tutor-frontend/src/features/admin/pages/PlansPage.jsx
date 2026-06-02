@@ -14,12 +14,25 @@ import {
   formatVnd,
 } from "@/features/admin/components/AdminPrimitives";
 
+function calculateDiscountedPrice(priceVnd, discountPercent) {
+  const price = Math.max(0, Number(priceVnd) || 0);
+  const discount = Math.min(100, Math.max(0, Number(discountPercent) || 0));
+  return Math.round(price * (100 - discount) / 100);
+}
+
+function toUpdatePayload({ discounted_price_vnd: _discountedPriceVnd, ...draft }) {
+  return draft;
+}
+
 function toDraft(plan) {
+  const priceVnd = plan.price_vnd || 0;
+  const discountPercent = plan.discount_percent || 0;
+
   return {
     display_name: plan.display_name || "",
-    price_vnd: plan.price_vnd || 0,
-    discounted_price_vnd: plan.discounted_price_vnd || 0,
-    discount_percent: plan.discount_percent || 0,
+    price_vnd: priceVnd,
+    discounted_price_vnd: calculateDiscountedPrice(priceVnd, discountPercent),
+    discount_percent: discountPercent,
     sort_order: plan.sort_order || 0,
     is_active: Boolean(plan.is_active),
     is_popular: Boolean(plan.is_popular),
@@ -33,7 +46,13 @@ function toDraft(plan) {
 
 function PlanEditor({ plan, draft, saving, onChange, onSave }) {
   const quota = draft.quota || {};
-  const update = (key, value) => onChange(plan.id, { ...draft, [key]: value });
+  const update = (key, value) => {
+    const nextDraft = { ...draft, [key]: value };
+    if (key === "price_vnd" || key === "discount_percent") {
+      nextDraft.discounted_price_vnd = calculateDiscountedPrice(nextDraft.price_vnd, nextDraft.discount_percent);
+    }
+    onChange(plan.id, nextDraft);
+  };
   const updateQuota = (key, value) => onChange(plan.id, { ...draft, quota: { ...quota, [key]: value } });
 
   return (
@@ -63,15 +82,18 @@ function PlanEditor({ plan, draft, saving, onChange, onSave }) {
         </label>
         <label className="grid gap-1 text-[11px] font-bold text-[var(--muted)]">
           {ADMIN_TEXTS.plans.price}
-          <AdminInput type="number" value={draft.price_vnd} onChange={(event) => update("price_vnd", Number(event.target.value))} />
+          <AdminInput type="number" min="0" step="1" value={draft.price_vnd} onChange={(event) => update("price_vnd", Number(event.target.value))} />
         </label>
         <label className="grid gap-1 text-[11px] font-bold text-[var(--muted)]">
-          {ADMIN_TEXTS.plans.discountedPrice}
-          <AdminInput type="number" value={draft.discounted_price_vnd} onChange={(event) => update("discounted_price_vnd", Number(event.target.value))} />
+          <span className="flex items-center gap-2">
+            {ADMIN_TEXTS.plans.discountedPrice}
+            <span className="rounded-[var(--radius-chip)] border border-[var(--border-subtle)] bg-[var(--surface)] px-1.5 py-0.5 text-[10px] text-[var(--muted-light)]">Tự động</span>
+          </span>
+          <AdminInput type="text" value={formatNumber(draft.discounted_price_vnd)} readOnly aria-label={`${ADMIN_TEXTS.plans.discountedPrice} tự động`} />
         </label>
         <label className="grid gap-1 text-[11px] font-bold text-[var(--muted)]">
           {ADMIN_TEXTS.plans.discount}
-          <AdminInput type="number" value={draft.discount_percent} onChange={(event) => update("discount_percent", Number(event.target.value))} />
+          <AdminInput type="number" min="0" max="100" step="1" value={draft.discount_percent} onChange={(event) => update("discount_percent", Number(event.target.value))} />
         </label>
         <div className="flex flex-wrap items-center gap-2 pt-5">
           <button
@@ -160,7 +182,7 @@ export default function AdminPlansPage() {
   const savePlan = async (id) => {
     setSavingId(id);
     try {
-      await updateAdminPlan(id, drafts[id]);
+      await updateAdminPlan(id, toUpdatePayload(drafts[id]));
       await load();
     } catch (err) {
       console.error(err.message);

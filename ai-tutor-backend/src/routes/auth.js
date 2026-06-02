@@ -23,6 +23,7 @@ const { sendOtpEmail } = require('../utils/email');
 const config = require('../config');
 const { authMiddleware } = require('../middleware/auth');
 const { sendAdminRealtimeEvent } = require('../utils/notifications');
+const { clearAdminOverviewCache } = require('../utils/cacheInvalidation');
 
 function createAccessToken(data) {
   return jwt.sign(
@@ -110,6 +111,7 @@ router.post('/register', async (req, res) => {
       id: userId, student_id, full_name, email: normalizedEmail, hashed_password,
     });
     cacheAuthUser(user);
+    clearAdminOverviewCache();
     sendAdminRealtimeEvent('user_updated', { user_id: userId, status: 'registered' }).catch(console.error);
 
     const { access_token, refresh_token } = await issueTokensForUser(req, user);
@@ -329,6 +331,7 @@ router.post('/google-login', async (req, res) => {
         fullName: full_name,
         email,
       });
+      clearAdminOverviewCache();
       sendAdminRealtimeEvent('user_updated', { user_id: user.id, status: 'registered' }).catch(console.error);
     }
 

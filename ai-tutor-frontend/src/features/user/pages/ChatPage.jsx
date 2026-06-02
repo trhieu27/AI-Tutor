@@ -42,7 +42,6 @@ import ShareDialog from "@/shared/ui/ShareDialog";
 const TEXTS = CHAT_WORKSPACE_TEXTS;
 const CHAT_LAYOUT_STORAGE_KEYS = {
   historyCollapsed: "aiTutor.chat.historyCollapsed",
-  contextOpen: "aiTutor.chat.contextOpen",
 };
 let pdfJsLibrary = null;
 
@@ -762,9 +761,7 @@ export default function ChatPage() {
   const [historyCollapsed, setHistoryCollapsed] = useState(() =>
     readStoredBoolean(CHAT_LAYOUT_STORAGE_KEYS.historyCollapsed, false)
   );
-  const [contextOpen, setContextOpen] = useState(() =>
-    readStoredBoolean(CHAT_LAYOUT_STORAGE_KEYS.contextOpen, false)
-  );
+  const [contextOpen, setContextOpen] = useState(false);
   const [sessionSearch, setSessionSearch] = useState("");
   const [quota, setQuota] = useState(null);
   const [quotaExceeded, setQuotaExceeded] = useState(null);
@@ -796,8 +793,8 @@ export default function ChatPage() {
   }, [historyCollapsed]);
 
   useEffect(() => {
-    writeStoredBoolean(CHAT_LAYOUT_STORAGE_KEYS.contextOpen, contextOpen);
-  }, [contextOpen]);
+    setContextOpen(false);
+  }, [documentId]);
 
   const loadSession = useCallback(
     async (sessionId, options = {}) => {

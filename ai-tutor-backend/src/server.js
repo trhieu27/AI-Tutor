@@ -22,6 +22,7 @@ const config = require('./config');
 const { connectDB } = require('./db/mongoose');
 const { warmAuthCache, getCachedAuthUserById } = require('./db/authDb');
 const { notificationManager, sendAdminRealtimeEvent } = require('./utils/notifications');
+const { clearAdminOverviewCache } = require('./utils/cacheInvalidation');
 
 // Routes
 const authRoutes = require('./routes/auth');
@@ -125,6 +126,7 @@ wss.on('connection', (ws, userId) => {
   // Skip if: already had connections (new tab), or had pending grace timer (reconnect)
   const isNewOnline = !hadConnections && !hadPendingOffline;
   if (!isAdmin && isNewOnline) {
+    clearAdminOverviewCache();
     sendAdminRealtimeEvent('presence_changed', {
       user_id: userId,
       is_online: true,
@@ -155,6 +157,7 @@ wss.on('connection', (ws, userId) => {
     if (!remaining || remaining.size === 0) {
       if (intentionalLogout) {
         // Logout — fire offline immediately, no grace period
+        clearAdminOverviewCache();
         sendAdminRealtimeEvent('presence_changed', {
           user_id: userId,
           is_online: false,
@@ -165,6 +168,7 @@ wss.on('connection', (ws, userId) => {
           offlineTimers.delete(userId);
           const stillConnected = notificationManager._connections.get(userId);
           if (!stillConnected || stillConnected.size === 0) {
+            clearAdminOverviewCache();
             sendAdminRealtimeEvent('presence_changed', {
               user_id: userId,
               is_online: false,

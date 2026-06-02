@@ -14,6 +14,7 @@ const rag = require('../rag/pipeline');
 const { extractText } = require('../rag/extractor');
 const s3 = require('../utils/s3');
 const { ensureLocalFile, processDocumentBackground, cancelDocumentProcessing, deleteDocumentResources } = require('../utils/documentOps');
+const { clearAdminOverviewCache } = require('../utils/cacheInvalidation');
 
 const ALLOWED_EXTENSIONS = new Set(['.pdf', '.doc', '.docx']);
 
@@ -131,6 +132,7 @@ router.post('/upload', authMiddleware, requireDocQuota(), handleUpload, async(re
             }
         }
 
+        clearAdminOverviewCache();
         sendAdminRealtimeEvent('document_status_changed', { id: documentId, status: 'UPLOADING', file_name: document.file_name }).catch(console.error);
 
         // Upload to S3 (non-blocking, don't wait)
@@ -169,6 +171,7 @@ router.post('/:documentId/retry', authMiddleware, async(req, res) => {
         if (!storedFile) return res.status(400).json({ detail: 'Không tìm thấy file tài liệu trên server.' });
 
         await Document.updateOne({ id: req.params.documentId }, { $set: { status: 'PROCESSING' } });
+        clearAdminOverviewCache();
         sendAdminRealtimeEvent('document_status_changed', { id: req.params.documentId, status: 'PROCESSING', file_name: doc.file_name }).catch(console.error);
         processDocumentBackground(req.params.documentId, storedFile.filePath, req.userId).catch(console.error);
 

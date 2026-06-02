@@ -5,6 +5,7 @@ const { sendNotification, sendAdminRealtimeEvent } = require('./notifications');
 const config = require('../config');
 const rag = require('../rag/pipeline');
 const s3 = require('./s3');
+const { clearAdminOverviewCache } = require('./cacheInvalidation');
 
 /**
  * Find a stored file — checks local filesystem first, then S3.
@@ -63,6 +64,7 @@ async function processDocumentBackground(documentId, filePath, ownerId) {
 
   try {
     await Document.updateOne({ id: documentId }, { $set: { status: 'PROCESSING', updated_at: new Date() } });
+    clearAdminOverviewCache();
     sendAdminRealtimeEvent('document_status_changed', { id: documentId, status: 'PROCESSING', file_name: doc.file_name }).catch(console.error);
     const { collection_name, page_count } = await rag.ingest(filePath, documentId, { signal: ac.signal });
 
@@ -73,6 +75,7 @@ async function processDocumentBackground(documentId, filePath, ownerId) {
       { id: documentId },
       { $set: { status: 'READY', page_count, chroma_collection_id: collection_name, updated_at: new Date() } }
     );
+    clearAdminOverviewCache();
     sendAdminRealtimeEvent('document_status_changed', { id: documentId, status: 'READY', file_name: doc.file_name }).catch(console.error);
 
     try {
@@ -94,6 +97,7 @@ async function processDocumentBackground(documentId, filePath, ownerId) {
       const stillExists = await Document.findOne({ id: documentId });
       if (!stillExists) return;
       await Document.updateOne({ id: documentId }, { $set: { status: 'FAILED', updated_at: new Date() } });
+      clearAdminOverviewCache();
       sendAdminRealtimeEvent('document_status_changed', { id: documentId, status: 'FAILED', file_name: doc.file_name }).catch(console.error);
       await sendNotification(ownerId, 'document_failed', 'Xử lý thất bại',
         `Tài liệu "${doc.file_name}" gặp lỗi. Vui lòng thử lại.`,
@@ -124,6 +128,7 @@ async function retryDocumentProcessing(documentId) {
   }
 
   await Document.updateOne({ id: documentId }, { $set: { status: 'PROCESSING', updated_at: new Date() } });
+  clearAdminOverviewCache();
   sendAdminRealtimeEvent('document_status_changed', { id: documentId, status: 'PROCESSING', file_name: doc.file_name }).catch(console.error);
   processDocumentBackground(documentId, storedFile.filePath, doc.owner_id).catch(console.error);
   return Document.findOne({ id: documentId }).lean();
@@ -168,6 +173,7 @@ async function deleteDocumentResources(documentId) {
   await Document.deleteOne({ id: documentId });
   sendAdminRealtimeEvent('document_status_changed', { id: documentId, status: 'DELETED', file_name: doc.file_name }).catch(console.error);
   await ChatSession.deleteMany({ document_id: documentId });
+  clearAdminOverviewCache();
   return doc.toObject();
 }
 

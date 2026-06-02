@@ -9,6 +9,7 @@ const { isUserPro } = require('../utils/quota');
 const { presenceOfflineUpdate, presenceOnlineUpdate } = require('../utils/presence');
 const { sendAdminRealtimeEvent } = require('../utils/notifications');
 const { buildPagination, parsePagination, sendPaginated } = require('../utils/pagination');
+const { clearAdminOverviewCache } = require('../utils/cacheInvalidation');
 
 async function serializeUser(user) {
   let isPro = false;
@@ -55,6 +56,7 @@ router.put('/profile', authMiddleware, async (req, res) => {
     await User.updateOne({ id: req.userId }, { $set: updates });
     const user = await User.findOne({ id: req.userId });
     if (user) cacheAuthUser(user);
+    clearAdminOverviewCache();
     res.json(await serializeUser(user));
   } catch (err) {
     res.status(500).json({ detail: 'Lỗi server' });
@@ -107,7 +109,7 @@ router.post('/presence', authMiddleware, async (req, res) => {
 
     // Fire event when status changes OR on first online presence call
     if (wasOnline !== isOnline || (isOnline && !previousSession?.online_until)) {
-      try { require('./admin').clearOverviewCache?.(); } catch {}
+      clearAdminOverviewCache();
       sendAdminRealtimeEvent('presence_changed', {
         user_id: req.userId,
         session_id: req.sessionId,

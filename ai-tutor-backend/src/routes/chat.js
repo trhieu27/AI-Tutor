@@ -8,6 +8,7 @@ const { sendAdminRealtimeEvent } = require('../utils/notifications');
 const config = require('../config');
 const rag = require('../rag/pipeline');
 const { generateTitle, generateSuggestions } = require('../rag/gemini');
+const { clearAdminOverviewCache } = require('../utils/cacheInvalidation');
 
 function capitalize(s) { return s ? s.charAt(0).toUpperCase() + s.slice(1) : s; }
 
@@ -214,6 +215,7 @@ router.post('/:documentId/ask', authMiddleware, requireChatQuota(), async (req, 
       });
     }
 
+    clearAdminOverviewCache();
     await recordChatUsage(req.userId);
     sendAdminRealtimeEvent('chat_message_created', {
       user_id: req.userId,
@@ -401,6 +403,7 @@ router.post('/:documentId/ask-stream', authMiddleware, requireChatQuota(), async
       });
     }
 
+    clearAdminOverviewCache();
     if (!clientDisconnected) {
       sseWrite('done', {
         session_id: sessionId,
@@ -475,6 +478,7 @@ router.get('/:documentId/summarize', authMiddleware, async (req, res) => {
 
     if (fullText.trim()) {
       await Document.updateOne({ id: req.params.documentId }, { $set: { summary: fullText } });
+      clearAdminOverviewCache();
     }
   } catch (err) {
     console.error('Summarize error:', err.message);
@@ -498,6 +502,7 @@ router.get('/:documentId/quiz', authMiddleware, async (req, res) => {
 
     if (force) {
       await Document.updateOne({ id: req.params.documentId }, { $unset: { quiz: '' } });
+      clearAdminOverviewCache();
     } else if (doc.quiz) {
       const cached = readQuizCache(doc.quiz);
       if (cached.version >= QUIZ_CACHE_VERSION && cached.items.length > 0) {
@@ -531,6 +536,7 @@ router.get('/:documentId/quiz', authMiddleware, async (req, res) => {
             { id: req.params.documentId },
             { $set: { quiz: { version: QUIZ_CACHE_VERSION, items: normalized } } }
           );
+          clearAdminOverviewCache();
         }
       } catch (e) { console.error('Failed to cache quiz:', e.message); }
     }
@@ -556,6 +562,7 @@ router.get('/:documentId/mindmap', authMiddleware, async (req, res) => {
 
     if (force) {
       await Document.updateOne({ id: req.params.documentId }, { $unset: { mindmap: '' } });
+      clearAdminOverviewCache();
     } else if (doc.mindmap) {
       res.setHeader('Content-Type', 'text/plain');
       return res.send(doc.mindmap);
@@ -590,6 +597,7 @@ router.get('/:documentId/mindmap', authMiddleware, async (req, res) => {
 
     if (fullText.trim()) {
       await Document.updateOne({ id: req.params.documentId }, { $set: { mindmap: fullText } });
+      clearAdminOverviewCache();
     }
   } catch (err) {
     console.error('[Mindmap] Outer error:', err.message, err.stack);
@@ -619,6 +627,7 @@ router.put('/:documentId/mindmap', authMiddleware, async (req, res) => {
       if (!doc) return res.status(404).json({ detail: 'Không tìm thấy tài liệu' });
       return res.status(403).json({ detail: 'Bạn không có quyền chỉnh sửa tài liệu này' });
     }
+    clearAdminOverviewCache();
     res.json({ status: 'success' });
   } catch (err) {
     res.status(500).json({ detail: err.message });
@@ -637,6 +646,7 @@ router.get('/:documentId/study-questions', authMiddleware, async (req, res) => {
       res.setHeader('Content-Type', 'text/plain');
       if (questions.length && questions.length !== doc.study_questions.length) {
         await Document.updateOne({ id: req.params.documentId }, { $set: { study_questions: questions } });
+        clearAdminOverviewCache();
       }
       return res.send(formatStudyQuestions(questions.length ? questions : doc.study_questions));
     }
@@ -657,6 +667,7 @@ router.get('/:documentId/study-questions', authMiddleware, async (req, res) => {
     if (fullText.trim()) {
       const questions = normalizeStudyQuestions(fullText);
       await Document.updateOne({ id: req.params.documentId }, { $set: { study_questions: questions } });
+      clearAdminOverviewCache();
     }
   } catch (err) {
     console.error('StudyQuestions error:', err.message);
@@ -810,6 +821,7 @@ router.delete('/sessions/:sessionId', authMiddleware, async (req, res) => {
   try {
     const result = await ChatSession.deleteOne({ id: req.params.sessionId, user_id: req.userId });
     if (result.deletedCount === 0) return res.status(404).json({ detail: 'Không thể xóa phiên chat' });
+    clearAdminOverviewCache();
     res.json({ status: 'success' });
   } catch (err) {
     res.status(500).json({ detail: 'Lỗi server' });

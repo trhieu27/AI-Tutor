@@ -1607,6 +1607,12 @@ input[type="datetime-local"].premium-input {
   outline: 0;
 }
 
+.premium-input:read-only {
+  background: var(--surface);
+  color: var(--muted);
+  cursor: default;
+}
+
 .bento-card {
   border-radius: 8px;
   background: var(--card-bg);
@@ -1712,12 +1718,17 @@ input[type="datetime-local"].premium-input {
 }
 
 .premium-input::placeholder {
-  color: var(--muted);
-  opacity: 0.82;
+  color: var(--muted-light);
+  font-weight: 500;
+  opacity: 1;
 }
 
 .dark .premium-input {
   background: oklch(22% 0.024 238);
+}
+
+.dark .premium-input:read-only {
+  background: var(--surface);
 }
 
 /* ── DOCUMENT PICKER LIST ─────────────────────────────────────────────── */

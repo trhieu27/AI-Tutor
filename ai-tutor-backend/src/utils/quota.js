@@ -1,5 +1,6 @@
 const { UsageLog, User, UserSubscription, SubscriptionPlan } = require('../db/models');
 const config = require('../config');
+const { clearAdminOverviewCache } = require('./cacheInvalidation');
 
 async function getUserQuotaLimit(userId, field, defaultValue) {
   try {
@@ -60,7 +61,7 @@ async function usageToday(userId, feature) {
 
 async function recordUsage(userId, feature) {
   await UsageLog.create({ user_id: userId, feature, date: todayUTC() });
-  try { require('../routes/admin').clearOverviewCache(); } catch {}
+  clearAdminOverviewCache();
   const { sendAdminRealtimeEvent } = require('./notifications');
   sendAdminRealtimeEvent('usage_recorded', { user_id: userId, feature })
     .catch((err) => console.warn('[AdminRealtime] usage_recorded failed:', err.message));
