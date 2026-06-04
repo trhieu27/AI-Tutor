@@ -33,11 +33,11 @@ export function useNotifications({
   token,
   onNotification,
 }) {
-  const wsRef = useRef(null);
-  const reconnectTimerRef = useRef(null);
-  const pingIntervalRef = useRef(null);
-  const connectTimerRef = useRef(null);
-  const isUnmountedRef = useRef(false);
+  const wsRef = useRef(null); // Giữ kết nối WebSocket hiện tại
+  const reconnectTimerRef = useRef(null); // Lưu ID bộ hẹn giờ phục vụ tự động kết nối lại (reconnect)
+  const pingIntervalRef = useRef(null); // Lưu ID chu kỳ gửi gói tin ping giữ mạng (Keep-Alive)
+  const connectTimerRef = useRef(null); // Lưu ID bộ hẹn giờ trì hoãn kết nối ban đầu (StrictMode safe)
+  const isUnmountedRef = useRef(false); // Đánh dấu trạng thái component đã unmount hay chưa
   const cleanup = useCallback(() => {
     if (reconnectTimerRef.current) clearTimeout(reconnectTimerRef.current);
     if (pingIntervalRef.current) clearInterval(pingIntervalRef.current);

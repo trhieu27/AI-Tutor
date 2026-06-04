@@ -6,7 +6,7 @@ import { Notification, Quota } from '@/shared/models/Notification';
 const API_BASE = '/api/v1';
 const UPLOAD_BASE = import.meta.env.VITE_API_URL ?? 'http://localhost:8081/api/v1';
 
-/** Custom error class for quota exceeded (HTTP 429) */
+/** Lớp lỗi cho trường hợp vượt giới hạn sử dụng (HTTP 429) */
 export class QuotaError extends Error {
   status = 429;
   constructor(message) {
@@ -56,7 +56,7 @@ export async function authFetch(url, options = {}) {
       if (window.location.pathname !== '/login') window.location.href = '/login';
     }
   }
-  // Account blocked/locked → force logout
+  // Tài khoản bị khoá → buộc đăng xuất
   if (response.status === 403) {
     authService.logout();
     if (window.location.pathname !== '/login') {
@@ -65,7 +65,7 @@ export async function authFetch(url, options = {}) {
   }
   return response;
 }
-/** Normalise curly quotes, replace non-ASCII chars and whitespace with underscores */
+/** Chuẩn hóa dấu ngoặc cong, thay ký tự non-ASCII và khoảng trắng bằng dấu gạch dưới */
 const sanitizeFileName = fileName => fileName.replace(/[''\"]/g, "'").replace(/[^\x00-\x7F]/g, '_').replace(/\s+/g, '_');
 export async function uploadDocument(file) {
   const sanitizedName = sanitizeFileName(file.name);
@@ -159,8 +159,6 @@ export async function retryDocument(documentId) {
 }
 export async function askQuestion(documentId, request, signal) {
   const headers = { 'Content-Type': 'application/json' };
-  // Gửi header debug nếu bật chế độ nâng cao
-  if (request.debug) headers['X-Debug'] = 'true';
 
   const res = await authFetch(`${API_BASE}/chat/${documentId}/ask`, {
     method: 'POST',
@@ -171,7 +169,7 @@ export async function askQuestion(documentId, request, signal) {
   if (!res.ok) {
     if (res.status === 429) {
       const errorData = await safeJson(res, {});
-      throw new QuotaError(errorData.detail || 'Quota exceeded');
+      throw new QuotaError(errorData.detail || 'Đã vượt giới hạn sử dụng');
     }
     const error = await safeJson(res, { detail: 'Hỏi thất bại' });
     throw new Error(error.detail || 'Hỏi thất bại');
@@ -184,16 +182,15 @@ export async function askQuestion(documentId, request, signal) {
 }
 
 /**
- * Stream chat answer via SSE.
+ * Stream câu trả lời chat qua SSE.
  * @param {string} documentId
  * @param {object} request - { question, session_id }
- * @param {function} onChunk - called with each text chunk string
+ * @param {function} onChunk - gọi với từng đoạn text
  * @param {AbortSignal} signal
- * @returns {Promise<object>} final data { session_id, message, sources, pipeline }
+ * @returns {Promise<object>} dữ liệu cuối { session_id, message, sources, pipeline }
  */
 export async function askQuestionStream(documentId, request, onChunk, signal, onStatus, onSession, onSuggestions) {
   const headers = { 'Content-Type': 'application/json', 'Accept': 'text/event-stream' };
-  if (request.debug) headers['X-Debug'] = 'true';
 
   const res = await authFetch(`${API_BASE}/chat/${documentId}/ask-stream`, {
     method: 'POST',
@@ -205,20 +202,20 @@ export async function askQuestionStream(documentId, request, onChunk, signal, on
   if (!res.ok) {
     if (res.status === 429) {
       const errorData = await safeJson(res, {});
-      throw new QuotaError(errorData.detail || 'Quota exceeded');
+      throw new QuotaError(errorData.detail || 'Đã vượt giới hạn sử dụng');
     }
     const error = await safeJson(res, { detail: 'Hỏi thất bại' });
     throw new Error(error.detail || 'Hỏi thất bại');
   }
 
   const reader = res.body && res.body.getReader();
-  if (!reader) throw new Error('Streaming not supported');
+  if (!reader) throw new Error('Trình duyệt không hỗ trợ streaming');
 
   const decoder = new TextDecoder();
   let buffer = '';
   let finalData = null;
 
-  // ── Read SSE stream ──────────────────────────────────────────────────
+  // ── Đọc luồng SSE ──────────────────────────────────────────────────
   while (true) {
     const { done, value } = await reader.read();
     if (done) break;
@@ -247,7 +244,7 @@ export async function askQuestionStream(documentId, request, onChunk, signal, on
           try {
             const parsed = JSON.parse(dataStr);
             if (parsed.text) onChunk(parsed.text);
-          } catch (e) { /* skip malformed */ }
+          } catch (e) { /* bỏ qua dữ liệu lỗi */ }
         } else if (currentEvent === 'done') {
           try {
             finalData = JSON.parse(dataStr);
@@ -275,7 +272,7 @@ export async function askQuestionStream(documentId, request, onChunk, signal, on
     }
   }
 
-  if (!finalData) throw new Error('Stream ended without completion');
+  if (!finalData) throw new Error('Luồng dữ liệu kết thúc bất thường');
   return finalData;
 }
 export async function fetchChatSessions(documentId, params = {}) {
@@ -358,7 +355,7 @@ async function readStream(res, onChunk) {
       if (done) break;
       const chunk = decoder.decode(value, { stream: true });
       buffer += chunk;
-      // Detect error marker written by backend mid-stream
+      // Phát hiện dấu hiệu lỗi từ backend giữa luồng
       if (buffer.includes('__ERROR__:')) {
         const errMsg = buffer.split('__ERROR__:')[1]?.trim() || 'Đã xảy ra lỗi';
         if (errMsg.includes('quá tải') || errMsg.includes('quota') || errMsg.includes('429')) {
@@ -377,7 +374,7 @@ export async function fetchDocumentSummaryStream(documentId, onChunk, signal) {
   if (!res.ok) {
     if (res.status === 429) {
       const errorData = await safeJson(res, {});
-      throw new QuotaError(errorData.detail || 'Quota exceeded');
+      throw new QuotaError(errorData.detail || 'Đã vượt giới hạn sử dụng');
     }
     throw new Error('Không thể tạo bản tóm tắt');
   }
@@ -397,7 +394,7 @@ export async function fetchDocumentQuizStream(documentId, onChunk, force = false
   if (!res.ok) {
     if (res.status === 429) {
       const errorData = await safeJson(res, {});
-      throw new QuotaError(errorData.detail || 'Quota exceeded');
+      throw new QuotaError(errorData.detail || 'Đã vượt giới hạn sử dụng');
     }
     throw new Error('Không thể tạo bài kiểm tra');
   }
@@ -405,7 +402,7 @@ export async function fetchDocumentQuizStream(documentId, onChunk, force = false
 }
 
 /**
- * Stream quiz generation với incremental parsing.
+ * Stream tạo quiz với phân tích tăng dần.
  * Dùng brace-depth tracking để phát hiện từng object JSON hoàn chỉnh
  * ngay khi dấu } cuối cùng của object đó xuất hiện trong stream.
  * @param {string} documentId
@@ -420,22 +417,22 @@ export async function streamDocumentQuiz(documentId, { onQuestion, onDone }, for
   if (!res.ok) {
     if (res.status === 429) {
       const errorData = await safeJson(res, {});
-      throw new QuotaError(errorData.detail || 'Quota exceeded');
+      throw new QuotaError(errorData.detail || 'Đã vượt giới hạn sử dụng');
     }
     throw new Error('Không thể tạo bài kiểm tra');
   }
 
   const reader = res.body?.getReader();
-  if (!reader) throw new Error('Streaming not supported');
+  if (!reader) throw new Error('Trình duyệt không hỗ trợ streaming');
 
   const decoder = new TextDecoder();
   let accumulated = '';
   const allQuestions = [];
   let questionIndex = 0;
 
-  // Tìm tất cả object JSON hoàn chỉnh trong text bằng brace-depth
+  // Tìm tất cả object JSON hoàn chỉnh trong text bằng đếm ngoặc nhọn
   function extractCompleteObjects(text) {
-    // Bỏ markdown code fence
+    // Bỏ khối mã markdown
     let str = text.trim();
     if (str.includes('```json')) str = str.split('```json')[1]?.split('```')[0] || str;
     else if (str.includes('```')) str = str.split('```')[1]?.split('```')[0] || str;
@@ -460,7 +457,7 @@ export async function streamDocumentQuiz(documentId, { onQuestion, onDone }, for
       } else if (ch === '}') {
         depth--;
         if (depth === 0 && objStart >= 0) {
-          // Object hoàn chỉnh — thử parse
+          // Object hoàn chỉnh — thử phân tích
           try {
             const obj = JSON.parse(str.slice(objStart, i + 1));
             objects.push(obj);
@@ -479,7 +476,7 @@ export async function streamDocumentQuiz(documentId, { onQuestion, onDone }, for
     const chunk = decoder.decode(value, { stream: true });
     accumulated += chunk;
 
-    // Phát hiện lỗi mid-stream
+    // Phát hiện lỗi giữa luồng
     if (accumulated.includes('__ERROR__:')) {
       const errMsg = accumulated.split('__ERROR__:')[1]?.trim() || 'Đã xảy ra lỗi';
       if (errMsg.includes('quá tải') || errMsg.includes('quota') || errMsg.includes('429')) {
@@ -488,13 +485,13 @@ export async function streamDocumentQuiz(documentId, { onQuestion, onDone }, for
       throw new Error(errMsg);
     }
 
-    // Parse tất cả object hoàn chỉnh từ text tích lũy
+    // Phân tích tất cả object hoàn chỉnh từ text tích lũy
     const found = extractCompleteObjects(accumulated);
-    // Emit những câu mới (chưa emit)
+    // Gửi những câu mới (chưa gửi)
     for (let i = questionIndex; i < found.length; i++) {
       const q = found[i];
       if (q?.question && Array.isArray(q?.options) && q.options.length > 0) {
-        // Yield để React render từng câu riêng
+        // Tạm dừng để React render từng câu riêng
         if (i > questionIndex) await new Promise(r => setTimeout(r, 100));
         allQuestions.push(q);
         onQuestion?.(q, allQuestions.length - 1);
@@ -503,7 +500,7 @@ export async function streamDocumentQuiz(documentId, { onQuestion, onDone }, for
     questionIndex = found.length;
   }
 
-  // Parse cuối cùng — bắt câu hỏi còn sót
+  // Phân tích cuối cùng — bắt câu hỏi còn sót
   const finalFound = extractCompleteObjects(accumulated);
   for (let i = questionIndex; i < finalFound.length; i++) {
     const q = finalFound[i];
@@ -533,7 +530,7 @@ export async function fetchDocumentMindmapStream(documentId, onChunk, signal, fo
   if (!res.ok) {
     if (res.status === 429) {
       const errorData = await safeJson(res, {});
-      throw new QuotaError(errorData.detail || 'Quota exceeded');
+      throw new QuotaError(errorData.detail || 'Đã vượt giới hạn sử dụng');
     }
     throw new Error('Không thể tạo sơ đồ tư duy');
   }
@@ -568,7 +565,7 @@ export async function fetchDocumentStudyQuestionsStream(documentId, onChunk, sig
   if (!res.ok) {
     if (res.status === 429) {
       const errorData = await safeJson(res, {});
-      throw new QuotaError(errorData.detail || 'Quota exceeded');
+      throw new QuotaError(errorData.detail || 'Đã vượt giới hạn sử dụng');
     }
     throw new Error('Không thể tạo câu hỏi ôn tập');
   }
@@ -624,7 +621,7 @@ export async function clearAllNotifications() {
   });
 }
 
-// ── Share Links ───────────────────────────────────────────────────────────────
+// ── Chia sẻ ──────────────────────────────────────────────────────────────────
 
 export async function createChatShareLink(sessionId) {
   const res = await authFetch(`${API_BASE}/share`, {
@@ -649,7 +646,7 @@ export async function deleteShareLink(shareId) {
   return safeJson(res);
 }
 
-// ── Notes ─────────────────────────────────────────────────────────────────────
+// ── Ghi chú ──────────────────────────────────────────────────────────────────
 
 export async function fetchNotes(documentId) {
   const res = await authFetch(`${API_BASE}/notes/${documentId}`);
