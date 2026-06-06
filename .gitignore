@@ -91,6 +91,7 @@ DESIGN.md
 **/DESIGN.md
 COMMIT_CONVENTION.md
 **/.codex-vite.log
+**/docs/
 
 skills-lock.json
 start-chrome-debug.bat
