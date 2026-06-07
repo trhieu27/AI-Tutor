@@ -530,11 +530,12 @@ export default function DocumentTable({
   const rangeEnd = Math.min(currentPage * pageSize, totalItems);
 
   const stats = useMemo(() => {
-    const ready = documents.filter((doc) => doc.status === "READY").length;
-    const processing = documents.filter((doc) => doc.status === "PROCESSING" || doc.status === "UPLOADING").length;
-    const failed = documents.filter((doc) => doc.status === "FAILED").length;
-    return { ready, processing, failed, total: totalItems };
-  }, [documents, totalItems]);
+    const ready = pagination.stats?.ready ?? 0;
+    const processing = pagination.stats?.processing ?? 0;
+    const failed = pagination.stats?.failed ?? 0;
+    const total = ready + processing + failed;
+    return { ready, processing, failed, total };
+  }, [pagination.stats]);
 
   const confirmDelete = async () => {
     if (!pendingDelete) return;

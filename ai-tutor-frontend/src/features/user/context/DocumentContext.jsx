@@ -16,7 +16,7 @@ export const DocumentProvider = ({
   // Trạng thái bảng thư viện chính
   const [documents, setDocuments] = useState([]);
   const [pagination, setPagination] = useState({
-    page: 1, limit: 5, total: 0, totalPages: 1,
+    page: 1, limit: 5, total: 0, totalPages: 1, stats: { ready: 0, processing: 0, failed: 0 }
   });
   const [loading, setLoading] = useState(true);
   const [fetching, setFetching] = useState(false);

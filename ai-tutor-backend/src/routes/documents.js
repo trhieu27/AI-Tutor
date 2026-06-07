@@ -217,7 +217,7 @@ router.get('/', authMiddleware, async(req, res) => {
             if (Object.keys(mappedSort).length) sortSpec = mappedSort;
         }
 
-        const [total, docs] = await Promise.all([
+        const [total, docs, readyCount, processingCount, failedCount] = await Promise.all([
             Document.countDocuments(query),
             Document.find(query)
             .select('-summary -quiz -mindmap -study_questions')
@@ -225,10 +225,19 @@ router.get('/', authMiddleware, async(req, res) => {
             .skip(skip)
             .limit(limit)
             .lean(),
+            Document.countDocuments({ owner_id: req.userId, ...(query.file_name && { file_name: query.file_name }), status: 'READY' }),
+            Document.countDocuments({ owner_id: req.userId, ...(query.file_name && { file_name: query.file_name }), status: { $in: ['PROCESSING', 'UPLOADING'] } }),
+            Document.countDocuments({ owner_id: req.userId, ...(query.file_name && { file_name: query.file_name }), status: 'FAILED' }),
         ]);
 
         const items = docs.map(d => ({...d, _id: undefined }));
-        sendPaginated(res, items, buildPagination({ page, limit, total }), req.query);
+        const paginationResult = buildPagination({ page, limit, total });
+        paginationResult.stats = {
+            ready: readyCount,
+            processing: processingCount,
+            failed: failedCount,
+        };
+        sendPaginated(res, items, paginationResult, req.query);
     } catch (err) {
         res.status(500).json({ detail: 'Lỗi server' });
     }
