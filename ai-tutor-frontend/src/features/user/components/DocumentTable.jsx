@@ -467,7 +467,16 @@ export default function DocumentTable({
 }) {
   const navigate = useNavigate();
   const { lastUploadTime } = useUpload();
-  const { documents, pagination, loading, fetching, refreshDocuments, filters, setFilters } = useDocuments();
+  const {
+    documents,
+    pagination,
+    loading,
+    fetching,
+    refreshDocuments,
+    filters,
+    setFilters,
+    refreshPicker,
+  } = useDocuments();
   
   const [searchTerm, setSearchTerm] = useState(filters.search);
   const [deletingId, setDeletingId] = useState(null);
@@ -533,6 +542,7 @@ export default function DocumentTable({
     setPendingDelete(null);
     try {
       await deleteDocument(pendingDelete.id);
+      refreshPicker().catch((err) => console.error("Failed to refresh picker:", err));
       if (pagination.page > 1 && documents.length === 1) {
         setFilters((prev) => ({ ...prev, page: pagination.page - 1 }));
       } else {
