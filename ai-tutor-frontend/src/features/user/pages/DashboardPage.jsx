@@ -147,7 +147,7 @@ function LearningContextSkeleton() {
 function ReadyDocumentPanel({ document }) {
   return (
     <div className="space-y-3">
-      <div className="rounded-[var(--radius-panel)] border border-[var(--border-subtle)] bg-[var(--surface)] p-4">
+      <div className="rounded-[var(--radius-panel)] border border-[var(--border-subtle)] bg-[var(--surface)] px-4 pt-4 pb-5">
         <div className="flex items-start gap-3">
           <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[var(--radius-panel)] border border-[var(--success-border)] bg-[var(--success-soft)] text-[var(--brand-primary)]">
             <span className="material-symbols-outlined icon-thin text-[21px]" aria-hidden="true">
@@ -163,19 +163,19 @@ function ReadyDocumentPanel({ document }) {
           <StatusBadge status="ready" />
         </div>
         <div className="mt-4 grid grid-cols-1 gap-2 sm:grid-cols-3">
-          <Button to={`/chat/${document.id}`} icon="forum" size="sm" className="w-full">
+          <Button to={`/chat/${document.id}`} icon="forum" size="md" className="w-full">
             {T.context.chat}
           </Button>
-          <Button to={`/quiz/${document.id}`} variant="secondary" icon="quiz" size="sm" className="w-full">
+          <Button to={`/quiz/${document.id}`} variant="secondary" icon="quiz" size="md" className="w-full">
             Trắc nghiệm
           </Button>
-          <Button to={`/mindmap/${document.id}`} variant="outline" icon="account_tree" size="sm" className="w-full">
+          <Button to={`/mindmap/${document.id}`} variant="outline" icon="account_tree" size="md" className="w-full">
             Sơ đồ
           </Button>
         </div>
       </div>
-      <div className="flex items-start gap-2 rounded-[var(--radius-panel)] border border-dashed border-[var(--border-color)] bg-[var(--card-bg)] px-3 py-2.5 text-[11px] font-medium leading-5 text-[var(--muted)]">
-        <span className="material-symbols-outlined icon-thin mt-0.5 text-[16px] text-[var(--brand-primary)]" aria-hidden="true">
+      <div className="flex items-center gap-2 rounded-[var(--radius-panel)] border border-dashed border-[var(--border-color)] bg-[var(--card-bg)] px-3 py-2.5 text-[11px] font-medium leading-5 text-[var(--muted)]">
+        <span className="material-symbols-outlined icon-thin text-[16px] text-[var(--brand-primary)]" aria-hidden="true">
           auto_awesome
         </span>
         <span>Tài liệu đã sẵn sàng. Bắt đầu hỏi AI hoặc tạo một bài ôn tập ngắn để giữ nhịp học.</span>
@@ -186,7 +186,7 @@ function ReadyDocumentPanel({ document }) {
 
 function EmptyLearningPanel() {
   return (
-    <div className="rounded-[var(--radius-panel)] border border-dashed border-[var(--border-color)] bg-[var(--surface)] px-4 py-8 text-center">
+    <div className="flex-1 flex flex-col items-center justify-center rounded-[var(--radius-panel)] border border-dashed border-[var(--border-color)] bg-[var(--surface)] px-4 py-8 text-center">
       <span className="mx-auto flex h-12 w-12 items-center justify-center rounded-[var(--radius-panel)] border border-[var(--border-color)] bg-[var(--card-bg)] text-[var(--muted)]">
         <span className="material-symbols-outlined icon-thin text-[25px]" aria-hidden="true">
           library_add
@@ -378,29 +378,31 @@ export default function DashboardPage() {
           </div>
         </Surface>
 
-        <Surface className="p-4 sm:p-5">
-          <div className="mb-4 flex items-center justify-between gap-3">
+        <Surface className="p-4 sm:p-5 flex flex-col">
+          <div className="mb-4 flex items-center justify-between gap-3 shrink-0">
             <h2 className="text-[15px] font-semibold text-[var(--foreground)]">{T.context.title}</h2>
             <Button to="/chat" variant="ghost" icon="forum" size="sm">
               {T.context.chat}
             </Button>
           </div>
-          {recentSessions.length > 0 ? (
-            <div className="space-y-2">
-              {recentSessions.slice(0, 3).map((session) => (
-                <SessionRow
-                  key={session.id || `${session.documentId}-${session.updatedAt}`}
-                  session={session}
-                />
-              ))}
-            </div>
-          ) : loading || recentSessionsLoading ? (
-            <LearningContextSkeleton />
-          ) : latestReady ? (
-            <ReadyDocumentPanel document={latestReady} />
-          ) : (
-            <EmptyLearningPanel />
-          )}
+          <div className="flex-1 flex flex-col">
+            {recentSessions.length > 0 ? (
+              <div className="space-y-2">
+                {recentSessions.slice(0, 3).map((session) => (
+                  <SessionRow
+                    key={session.id || `${session.documentId}-${session.updatedAt}`}
+                    session={session}
+                  />
+                ))}
+              </div>
+            ) : loading || recentSessionsLoading ? (
+              <LearningContextSkeleton />
+            ) : latestReady ? (
+              <ReadyDocumentPanel document={latestReady} />
+            ) : (
+              <EmptyLearningPanel />
+            )}
+          </div>
         </Surface>
       </section>
 
