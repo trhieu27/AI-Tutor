@@ -37,17 +37,26 @@ export default function LoginPage() {
 
   useEffect(() => {
     if (lockoutTimer <= 0) return undefined;
-    const interval = setInterval(() => {
-      setLockoutTimer((prev) => {
-        const next = prev - 1;
-        if (next <= 0) {
-          localStorage.removeItem("login_lockout_until");
-          setFailedAttempts(0);
-          return 0;
-        }
-        return next;
-      });
-    }, 1000);
+
+    const updateTimer = () => {
+      const storedLockoutUntil = localStorage.getItem("login_lockout_until");
+      if (!storedLockoutUntil) {
+        setLockoutTimer(0);
+        return;
+      }
+
+      const remaining = Math.ceil((parseInt(storedLockoutUntil, 10) - Date.now()) / 1000);
+
+      if (remaining <= 0) {
+        setLockoutTimer(0);
+        setFailedAttempts(0);
+        localStorage.removeItem("login_lockout_until");
+      } else {
+        setLockoutTimer(remaining);
+      }
+    };
+
+    const interval = setInterval(updateTimer, 1000);
     return () => clearInterval(interval);
   }, [lockoutTimer]);
 
@@ -59,15 +68,33 @@ export default function LoginPage() {
       await login(email, password);
       navigate(redirectUrl, { replace: true });
     } catch (err) {
-      const newAttempts = failedAttempts + 1;
-      setFailedAttempts(newAttempts);
-      if (newAttempts >= MAX_LOGIN_ATTEMPTS) {
-        const lockoutUntil = Date.now() + LOCKOUT_DURATION_MS;
+      const errorMsg = err.message || "";
+      const secondsMatch = errorMsg.match(/thử lại sau (\d+)\s*giây/i);
+      const minutesMatch = errorMsg.match(/tạm khóa trong (\d+)\s*phút/i);
+
+      if (secondsMatch) {
+        const seconds = parseInt(secondsMatch[1], 10);
+        const lockoutUntil = Date.now() + seconds * 1000;
         localStorage.setItem("login_lockout_until", lockoutUntil.toString());
-        setLockoutTimer(LOCKOUT_DURATION_MS / 1000);
+        setLockoutTimer(seconds);
+        setFailedAttempts(MAX_LOGIN_ATTEMPTS);
+      } else if (minutesMatch) {
+        const minutes = parseInt(minutesMatch[1], 10);
+        const lockoutUntil = Date.now() + minutes * 60 * 1000;
+        localStorage.setItem("login_lockout_until", lockoutUntil.toString());
+        setLockoutTimer(minutes * 60);
+        setFailedAttempts(MAX_LOGIN_ATTEMPTS);
       } else {
-        const errorMessage = err.message || AUTH_TEXTS.LOGIN.LOGIN_ERROR;
-        setLocalError(errorMessage === "Failed to fetch" ? AUTH_TEXTS.COMMON.networkError : errorMessage);
+        const newAttempts = failedAttempts + 1;
+        setFailedAttempts(newAttempts);
+        if (newAttempts >= MAX_LOGIN_ATTEMPTS) {
+          const lockoutUntil = Date.now() + LOCKOUT_DURATION_MS;
+          localStorage.setItem("login_lockout_until", lockoutUntil.toString());
+          setLockoutTimer(LOCKOUT_DURATION_MS / 1000);
+        } else {
+          const errorMessage = err.message || AUTH_TEXTS.LOGIN.LOGIN_ERROR;
+          setLocalError(errorMessage === "Failed to fetch" ? AUTH_TEXTS.COMMON.networkError : errorMessage);
+        }
       }
     }
   };

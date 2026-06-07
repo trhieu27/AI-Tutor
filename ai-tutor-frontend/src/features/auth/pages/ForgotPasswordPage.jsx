@@ -55,13 +55,23 @@ export default function ForgotPasswordPage() {
     const timer = setInterval(() => {
       setResendTimer((prev) => (prev > 0 ? prev - 1 : 0));
       setOtpLockoutTimer((prev) => {
+        if (prev <= 0) return 0;
         const checkEmail = step === "email" ? email : lastEmailSent;
-        if (prev <= 1 && prev > 0) {
+        if (!checkEmail) return 0;
+
+        const storedLockout = localStorage.getItem(`otp_lockout_${checkEmail}`);
+        if (!storedLockout) {
+          setFailedOtpAttempts(0);
+          return 0;
+        }
+
+        const remaining = Math.ceil((parseInt(storedLockout, 10) - Date.now()) / 1000);
+        if (remaining <= 0) {
           localStorage.removeItem(`otp_lockout_${checkEmail}`);
           setFailedOtpAttempts(0);
           return 0;
         }
-        return prev > 0 ? prev - 1 : 0;
+        return remaining;
       });
     }, 1000);
     return () => clearInterval(timer);
