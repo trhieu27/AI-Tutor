@@ -27,7 +27,7 @@ module.exports = {
   },
 
   uploadDir: process.env.UPLOAD_DIR || './storage/uploads',
-  maxFileSizeMb: parseInt(process.env.MAX_FILE_SIZE_MB || '50'),
+  maxFileSizeMb: parseInt(process.env.MAX_FILE_SIZE_MB || '25'),
 
   // AWS S3
   s3: {

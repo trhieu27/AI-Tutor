@@ -78,7 +78,7 @@ const storage = multer.diskStorage({
 
 const upload = multer({
     storage,
-    limits: { fileSize: 25 * 1024 * 1024 }, // Fixed 25MB limit for all users
+    limits: { fileSize: config.maxFileSizeMb * 1024 * 1024 }, // Read dynamically from config
     fileFilter: (req, file, cb) => {
         const ext = path.extname(file.originalname).toLowerCase();
         if (ALLOWED_EXTENSIONS.has(ext)) cb(null, true);
@@ -94,7 +94,7 @@ function handleUpload(req, res, next) {
     upload.single('file')(req, res, (err) => {
         if (err) {
             if (err.code === 'LIMIT_FILE_SIZE') {
-                return res.status(413).json({ detail: 'File qu' + '\u00e1' + ' l' + '\u1edbn' + '. T' + '\u1ed1i' + ' ' + '\u0111a' + ' 25MB.' });
+                return res.status(413).json({ detail: 'File quá lớn. Tối đa ' + config.maxFileSizeMb + 'MB.' });
             }
             return res.status(400).json({ detail: err.message || 'Loi upload' });
         }
@@ -154,7 +154,7 @@ router.post('/upload', authMiddleware, requireDocQuota(), handleUpload, async(re
             updated_at: document.updated_at,
         });
     } catch (err) {
-        if (err.code === 'LIMIT_FILE_SIZE') return res.status(413).json({ detail: 'File quá lớn. Tối đa 25MB.' });
+        if (err.code === 'LIMIT_FILE_SIZE') return res.status(413).json({ detail: 'File quá lớn. Tối đa ' + config.maxFileSizeMb + 'MB.' });
         console.error('Upload error:', err.message);
         const isTimeout = (err.message || '').includes('timed out');
         res.status(isTimeout ? 503 : 500).json({ detail: isTimeout ? 'Hệ thống tạm bận, vui lòng thử lại.' : 'Lỗi server' });
