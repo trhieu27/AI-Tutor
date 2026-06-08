@@ -153,21 +153,30 @@ export default function AdminAuditPage() {
       <div className="space-y-5 p-4 sm:p-6">
         <AdminSection>
           <div className="grid gap-3 p-4 md:grid-cols-2 xl:grid-cols-5">
-            <AdminInput icon="admin_panel_settings" placeholder={ADMIN_TEXTS.audit.filters.admin} value={filters.admin_id} onChange={(event) => setFilter("admin_id", event.target.value)} />
-            <AdminSelect value={filters.action} onChange={(event) => setFilter("action", event.target.value)}>
-              <option value="">Tất cả hành động</option>
-              {ADMIN_TEXTS.audit.actions.map((action) => {
-                const value = typeof action === "object" ? action.value : action;
-                if (!value) return null;
-                return <option key={value} value={value}>{formatAuditAction(action)}</option>;
-              })}
-            </AdminSelect>
-            <AdminSelect value={filters.target_type} onChange={(event) => setFilter("target_type", event.target.value)}>
-              <option value="">Tất cả đối tượng</option>
-              <option value="user">{formatAuditTarget("user")}</option>
-              <option value="document">{formatAuditTarget("document")}</option>
-              <option value="plan">{formatAuditTarget("plan")}</option>
-            </AdminSelect>
+            <label className="grid gap-1 text-[11px] font-bold text-[var(--muted)]">
+              Quản trị viên
+              <AdminInput icon="admin_panel_settings" placeholder={ADMIN_TEXTS.audit.filters.admin} value={filters.admin_id} onChange={(event) => setFilter("admin_id", event.target.value)} />
+            </label>
+            <label className="grid gap-1 text-[11px] font-bold text-[var(--muted)]">
+              Hành động
+              <AdminSelect value={filters.action} onChange={(event) => setFilter("action", event.target.value)}>
+                <option value="">Tất cả hành động</option>
+                {ADMIN_TEXTS.audit.actions.map((action) => {
+                  const value = typeof action === "object" ? action.value : action;
+                  if (!value) return null;
+                  return <option key={value} value={value}>{formatAuditAction(action)}</option>;
+                })}
+              </AdminSelect>
+            </label>
+            <label className="grid gap-1 text-[11px] font-bold text-[var(--muted)]">
+              Đối tượng
+              <AdminSelect value={filters.target_type} onChange={(event) => setFilter("target_type", event.target.value)}>
+                <option value="">Tất cả đối tượng</option>
+                <option value="user">{formatAuditTarget("user")}</option>
+                <option value="document">{formatAuditTarget("document")}</option>
+                <option value="plan">{formatAuditTarget("plan")}</option>
+              </AdminSelect>
+            </label>
             <label className="grid gap-1 text-[11px] font-bold text-[var(--muted)]">
               Từ ngày
               <AdminInput type="date" value={filters.from} onChange={(event) => setFilter("from", event.target.value)} aria-label={ADMIN_TEXTS.audit.filters.from} />
