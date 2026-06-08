@@ -30,7 +30,6 @@ export class User {
 export class Student extends User {
   constructor(id, full_name, email, student_id, isProUser = false, totalDocumentsUploaded = 0, totalQuizzesTaken = 0, lastActive = new Date()) {
     super(id, full_name, email, UserRole.STUDENT, isProUser, student_id);
-    this.isProUser = isProUser;
     this.totalDocumentsUploaded = totalDocumentsUploaded;
     this.totalQuizzesTaken = totalQuizzesTaken;
     this.lastActive = lastActive;
