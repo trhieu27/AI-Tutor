@@ -728,7 +728,7 @@ router.get('/:documentId/sessions', authMiddleware, async (req, res) => {
     const sessions = await ChatSession.find({
       document_id: req.params.documentId,
       user_id: req.userId,
-    }).sort({ updated_at: -1 }).limit(100).lean();
+    }).sort({ updated_at: -1 }).lean();
 
     const result = sessions.map(s => ({
       id: s.id,

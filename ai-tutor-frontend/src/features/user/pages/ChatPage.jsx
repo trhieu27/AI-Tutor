@@ -579,87 +579,7 @@ function PdfCanvasViewer({ objectUrl, page, onPageChange, onTotalPagesChange }) 
   );
 }
 
-function PdfPreviewModal({ source, fallbackDocumentId, documentName, onClose }) {
-  const [objectUrl, setObjectUrl] = useState("");
-  const [error, setError] = useState("");
-  const [resolvedPage, setResolvedPage] = useState(() => getExplicitCitationPage(source));
-  const [totalPages, setTotalPages] = useState(0);
-  const sourceDocumentId = source?.documentId || fallbackDocumentId;
-  const displayTitle = documentName || TEXTS.sources.pdfTitle;
 
-  useEffect(() => {
-    let active = true;
-    let url = "";
-    const initialPage = getExplicitCitationPage(source);
-    setObjectUrl("");
-    setError("");
-    setResolvedPage(initialPage);
-    setTotalPages(0);
-
-    if (!sourceDocumentId) {
-      setError(TEXTS.sources.pdfError);
-      return undefined;
-    }
-
-    const blobPromise = fetchDocumentFileBlob(sourceDocumentId)
-      .then((blob) => {
-        if (!active) return;
-        url = URL.createObjectURL(blob);
-        setObjectUrl(url);
-      })
-      .catch(() => {
-        if (active) setError(TEXTS.sources.pdfError);
-      });
-
-    const shouldLocatePage = !initialPage && source?.text;
-    const locatePromise = shouldLocatePage
-      ? locateDocumentCitation(sourceDocumentId, source.text)
-          .then((result) => {
-            const page = Number(result?.page_number);
-            if (active && Number.isFinite(page) && page > 0) setResolvedPage(page);
-          })
-          .catch(() => {
-            const fallbackPage = inferCitationPage(source);
-            if (active && !initialPage && fallbackPage) setResolvedPage(fallbackPage);
-          })
-      : Promise.resolve();
-
-    Promise.allSettled([blobPromise, locatePromise]);
-
-    return () => {
-      active = false;
-      if (url) URL.revokeObjectURL(url);
-    };
-  }, [source, sourceDocumentId]);
-
-  return createPortal(
-    <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-[oklch(12%_0.018_238/0.48)] p-2 backdrop-blur-md sm:p-4">
-      <section className="flex h-[min(88dvh,820px)] w-[calc(100vw-16px)] max-w-5xl flex-col overflow-hidden rounded-[var(--radius-panel)] border border-[var(--border-color)] bg-[var(--card-bg)] shadow-[0_24px_64px_oklch(12%_0.018_238/0.38)] sm:h-[min(88dvh,820px)] sm:w-full">
-        <header className="flex h-12 shrink-0 items-center justify-between gap-3 border-b border-[var(--border-subtle)] px-4">
-          <h2 className="truncate text-[13px] font-semibold text-[var(--foreground)]">
-            {displayTitle}{resolvedPage ? ` · ${totalPages ? `${resolvedPage}/${totalPages}` : TEXTS.sources.page(resolvedPage)}` : ""}
-          </h2>
-          <IconButton label={TEXTS.modal.close} icon="close" onClick={onClose} />
-        </header>
-        {error ? (
-          <div className="grid flex-1 place-items-center p-6 text-center text-[13px] font-semibold text-[var(--muted)]">
-            {error}
-          </div>
-        ) : objectUrl ? (
-          <PdfCanvasViewer
-            objectUrl={objectUrl}
-            page={resolvedPage || 1}
-            onPageChange={setResolvedPage}
-            onTotalPagesChange={setTotalPages}
-          />
-        ) : (
-          <PdfPreviewSkeleton />
-        )}
-      </section>
-    </div>,
-    document.body
-  );
-}
 
 function ChatWorkspaceSkeleton() {
   return (
@@ -769,7 +689,7 @@ export default function ChatPage() {
   const [summary, setSummary] = useState("");
   const [studyQuestions, setStudyQuestions] = useState([]);
   const [modalLoading, setModalLoading] = useState(false);
-  const [pdfPreviewSource, setPdfPreviewSource] = useState(null);
+
   const [deleteSessionId, setDeleteSessionId] = useState(null);
   const [suggestions, setSuggestions] = useState([]);
   const [shareOpen, setShareOpen] = useState(null); // sessionId or null
@@ -779,7 +699,7 @@ export default function ChatPage() {
 
   const refreshSessions = useCallback(async () => {
     try {
-      const list = await fetchChatSessions(documentId, { page: 1, limit: 100 });
+      const list = await fetchChatSessions(documentId);
       const items = Array.isArray(list) ? list : (list.items || []);
       setSessions(items);
       return items;
@@ -918,7 +838,7 @@ export default function ChatPage() {
       try {
         const [doc, sessResult] = await Promise.all([
           fetchDocument(documentId),
-          fetchChatSessions(documentId, { page: 1, limit: 100 }),
+          fetchChatSessions(documentId),
         ]);
         if (!active) return;
         const list = Array.isArray(sessResult) ? sessResult : (sessResult.items || []);
@@ -1351,7 +1271,7 @@ export default function ChatPage() {
                   <ChatMessage
                     key={message.id || `${message.role}-${message.created_at}`}
                     message={message}
-                    onOpenSource={(source) => setPdfPreviewSource(source)}
+
                     streaming={message._streaming}
                     onTextSelect={(text, x, y) => setSelectionPopup({ text, x, y })}
                   />
@@ -1469,14 +1389,7 @@ export default function ChatPage() {
         onConfirm={confirmDeleteSession}
         onCancel={() => setDeleteSessionId(null)}
       />
-      {pdfPreviewSource && (
-        <PdfPreviewModal
-          source={pdfPreviewSource}
-          fallbackDocumentId={documentId}
-          documentName={docNameRef.current}
-          onClose={() => setPdfPreviewSource(null)}
-        />
-      )}
+
       {shareOpen && (
         <ShareDialog
           sessionId={shareOpen}

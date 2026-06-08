@@ -44,17 +44,17 @@ export default function SourceCitationList({ sources = [], compact = false, inli
         <details
           key={`${source.label}-${index}`}
           className={cx(
-            "group rounded-[var(--radius-panel)] border border-[var(--border-subtle)] bg-[var(--surface)] open:bg-[var(--card-bg)]",
+            "group border border-[var(--border-subtle)] bg-[var(--surface)] open:bg-[var(--card-bg)]",
             inline
-              ? "flex-[0_1_auto] px-3 py-2 open:basis-full"
+              ? "flex-[0_1_auto] px-2.5 py-1 rounded-[var(--radius-chip)] open:rounded-[var(--radius-panel)] open:basis-full"
               : compact
-                ? "w-full px-3 py-2"
-                : "p-3"
+                ? "w-full px-3 py-2 rounded-[var(--radius-panel)]"
+                : "p-3 rounded-[var(--radius-panel)]"
           )}
           open={!compact && index === 0}
         >
           <summary className="cursor-pointer list-none text-[11px] font-semibold text-[var(--foreground)]">
-            <span className="inline-flex w-full min-w-0 items-center gap-2">
+            <span className="inline-flex w-full min-w-0 items-center justify-center gap-1.5">
               <span className="material-symbols-outlined icon-thin shrink-0 text-[15px] text-[var(--brand-primary)]">article</span>
               <span className="min-w-0 truncate" title={source.label}>{source.label}</span>
 
