@@ -12,6 +12,12 @@ export class User {
     this.student_id = student_id;
     this.createdAt = createdAt;
   }
+  get is_pro() {
+    return this.isPro;
+  }
+  get isProUser() {
+    return this.isPro;
+  }
   getProfile() {
     return {
       id: this.id,
@@ -28,6 +34,9 @@ export class Student extends User {
     this.totalDocumentsUploaded = totalDocumentsUploaded;
     this.totalQuizzesTaken = totalQuizzesTaken;
     this.lastActive = lastActive;
+  }
+  get is_pro() {
+    return this.isPro;
   }
   getDashboardUrl() {
     return '/';
