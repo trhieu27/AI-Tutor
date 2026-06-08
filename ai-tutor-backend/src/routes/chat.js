@@ -170,11 +170,6 @@ router.post('/:documentId/ask', authMiddleware, requireChatQuota(), async (req, 
       return res.status(err.statusCode || 400).json({ detail: err.message });
     }
 
-    if (!isPro && questionText.length > config.freeLimits.questionChars) {
-      return res.status(400).json({
-        detail: `Tài khoản miễn phí giới hạn câu hỏi tối đa ${config.freeLimits.questionChars} ký tự (${questionText.length} đã nhập). Nâng cấp Pro để hỏi không giới hạn.`
-      });
-    }
 
     if (isClientClosed()) return;
 
@@ -328,12 +323,6 @@ router.post('/:documentId/ask-stream', authMiddleware, requireChatQuota(), async
       return res.end();
     }
 
-    if (!isPro && questionText.length > config.freeLimits.questionChars) {
-      sseWrite('error', {
-        detail: 'T\u00e0i kho\u1ea3n mi\u1ec5n ph\u00ed gi\u1edbi h\u1ea1n c\u00e2u h\u1ecfi t\u1ed1i \u0111a ' + config.freeLimits.questionChars + ' k\u00fd t\u1ef1 (' + questionText.length + ' \u0111\u00e3 nh\u1eadp). N\u00e2ng c\u1ea5p Pro \u0111\u1ec3 h\u1ecfi kh\u00f4ng gi\u1edbi h\u1ea1n.'
-      });
-      return res.end();
-    }
 
     if (isGone()) return res.end();
 

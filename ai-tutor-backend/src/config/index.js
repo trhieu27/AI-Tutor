@@ -43,8 +43,5 @@ module.exports = {
     documents: 10,
     chatMessages: 30,
     aiFeatures: 10,
-    contextMessages: 6,
-    questionChars: 1200,
-    msgChars: 800,
   },
 };
