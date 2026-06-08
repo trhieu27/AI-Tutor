@@ -154,7 +154,7 @@ export default function AdminActivityPage() {
           <AdminSection title="Phiên hoạt động" subtitle={`${formatNumber(uniqueItems.length)} người dùng trong ${formatWindow(data?.activeWithinMinutes || filters.activeWithinMinutes)}`}>
             {uniqueItems.length ? (
               <>
-                <AdminTable columns={Object.values(ADMIN_TEXTS.activity.columns)} minWidth="900px" widths={["26%", "34%", "22%", "18%"]} aligns={[null, "center", "center", null]}>
+                <AdminTable columns={Object.values(ADMIN_TEXTS.activity.columns)} minWidth="900px" widths={["26%", "34%", "22%", "18%"]} aligns={[null, "center", "center", "center"]}>
                   {uniqueItems.map((item) => (
                     <tr key={item.id} className="border-b border-[var(--border-subtle)] last:border-0 hover:bg-[var(--surface)]">
                       <td className="px-4 py-4">
@@ -179,7 +179,7 @@ export default function AdminActivityPage() {
                         </div>
                       </td>
                       <td className="px-4 py-4">
-                        <div className="flex flex-wrap justify-end gap-2 text-[11px] font-bold">
+                        <div className="flex flex-wrap justify-center gap-2 text-[11px] font-bold">
                           <span className="rounded-[var(--radius-chip)] bg-[var(--surface)] px-2.5 py-1 text-[var(--foreground)]">{formatNumber(item.document_count)} tài liệu</span>
                           <AdminStatusPill tone={item.recent_usage_count > 0 ? "blue" : "neutral"}>{formatNumber(item.recent_usage_count)} lượt dùng</AdminStatusPill>
                         </div>
