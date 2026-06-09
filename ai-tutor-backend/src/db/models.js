@@ -3,11 +3,6 @@ const { presenceOnlineUntil } = require('../utils/presence');
 
 // ── User ──────────────────────────────────────────────────────────────────────
 
-const userPreferencesSchema = new mongoose.Schema({
-  email_notifications: { type: Boolean, default: true },
-  ai_response_detail: { type: String, default: 'balanced', enum: ['concise', 'balanced', 'detailed'] },
-}, { _id: false });
-
 const userSchema = new mongoose.Schema({
   id: { type: String, required: true, unique: true, index: true },
   student_id: { type: String, required: true },
@@ -19,7 +14,6 @@ const userSchema = new mongoose.Schema({
 
 
   provider: { type: String, default: 'local' },
-  preferences: { type: userPreferencesSchema, default: () => ({}) },
   created_at: { type: Date, default: Date.now },
   updated_at: { type: Date, default: Date.now },
 });

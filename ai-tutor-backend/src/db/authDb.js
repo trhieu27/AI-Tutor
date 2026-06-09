@@ -213,10 +213,6 @@ async function createGoogleAuthUser({ id, studentId, fullName, email }) {
         hashed_password: '',
 
         provider: 'google',
-        preferences: {
-            email_notifications: true,
-            ai_response_detail: 'balanced',
-        },
         created_at: now,
         updated_at: now,
     };

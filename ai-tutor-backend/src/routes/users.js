@@ -27,7 +27,6 @@ async function serializeUser(user) {
     role: user.role || 'STUDENT',
     status: user.status || 'active',
     is_pro: isPro,
-    preferences: user.preferences || { email_notifications: true, ai_response_detail: 'balanced' },
     created_at: user.created_at ? String(user.created_at) : '',
   };
 }
@@ -128,28 +127,7 @@ router.post('/presence', authMiddleware, async (req, res) => {
   }
 });
 
-// PUT /api/v1/users/preferences
-router.put('/preferences', authMiddleware, async (req, res) => {
-  try {
-    const { email_notifications, ai_response_detail } = req.body;
-    const updates = {};
-    if (email_notifications !== undefined) updates['preferences.email_notifications'] = email_notifications;
-    if (ai_response_detail !== undefined) {
-      const valid = ['concise', 'balanced', 'detailed'];
-      if (!valid.includes(ai_response_detail)) return res.status(400).json({ detail: 'Giá trị không hợp lệ' });
-      updates['preferences.ai_response_detail'] = ai_response_detail;
-    }
-    if (Object.keys(updates).length) {
-      updates.updated_at = new Date();
-      await User.updateOne({ id: req.userId }, { $set: updates });
-    }
-    const user = await User.findOne({ id: req.userId });
-    if (user) cacheAuthUser(user);
-    res.json(await serializeUser(user));
-  } catch (err) {
-    res.status(500).json({ detail: 'Lỗi server' });
-  }
-});
+
 
 // GET /api/v1/users/sessions
 router.get('/sessions', authMiddleware, async (req, res) => {

@@ -10,7 +10,6 @@ import { Skeleton } from "@/features/user/components/settings/SettingsShared";
 import ProfileSection from "@/features/user/components/settings/ProfileSection";
 import SecuritySection from "@/features/user/components/settings/SecuritySection";
 import AppearanceSection from "@/features/user/components/settings/AppearanceSection";
-import PreferencesSection from "@/features/user/components/settings/PreferencesSection";
 import SessionsSection from "@/features/user/components/settings/SessionsSection";
 import UpgradeSection from "@/features/user/components/settings/UpgradeSection";
 import UsageQuotaCard from "@/features/user/components/settings/UsageQuotaCard";
@@ -29,7 +28,6 @@ function profileFromAuthUser(user) {
     email: user.email || "",
     bio: user.bio ?? "",
     is_pro: user.is_pro ?? user.isPro ?? user.isProUser ?? false,
-    preferences: user.preferences || { email_notifications: true, ai_response_detail: "balanced" },
   };
 }
 
@@ -120,7 +118,6 @@ export default function SettingsPage() {
               {tab === "profile" && <ProfileSection profile={profile} onRefresh={fetchProfile} />}
               {tab === "security" && <SecuritySection />}
               {tab === "appearance" && <AppearanceSection />}
-              {tab === "preferences" && <PreferencesSection profile={profile} onRefresh={fetchProfile} />}
               {tab === "usage" && (
                 <div className="space-y-6">
                   <div>
