@@ -59,11 +59,9 @@ services:
     ports:
       - "3000:3000"
     volumes:
-      # Mount source code để HMR hot-reload khi thay đổi
-      - ./ai-tutor-frontend/src:/app/src
-      - ./ai-tutor-frontend/public:/app/public
-      - ./ai-tutor-frontend/index.html:/app/index.html
-      - ./ai-tutor-frontend/vite.config.js:/app/vite.config.js
+      # Mount toàn bộ folder để tránh lỗi ENODEV/inode break trên Windows khi sửa đổi file đơn lẻ
+      - ./ai-tutor-frontend:/app
+      - /app/node_modules
     environment:
       - VITE_PROXY_TARGET=http://backend:8081
       - VITE_API_URL=http://localhost:8081/api/v1
