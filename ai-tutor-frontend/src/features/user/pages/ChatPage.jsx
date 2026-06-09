@@ -337,7 +337,7 @@ function getExplicitCitationPage(source) {
 }
 
 function inferCitationPageFromText(text) {
-  const pageHint = String(text || "").match(/\bOOAD\s+(\d{1,4})\b/i) || String(text || "").match(/\b(?:trang|slide|page)\s+(\d{1,4})\b/i);
+  const pageHint = String(text || "").match(/\b(?:trang|slide|page)\s+(\d{1,4})\b/i);
   return pageHint ? readPositivePage(pageHint[1]) : null;
 }
 

@@ -57,7 +57,7 @@ function pageMatchScore(pageText, snippetText) {
 
 function inferPageNumberFromSnippet(snippetText) {
     const text = String(snippetText || '');
-    const match = text.match(/\bOOAD\s+(\d{1,4})\b/i) || text.match(/\b(?:trang|slide|page)\s+(\d{1,4})\b/i);
+    const match = text.match(/\b(?:trang|slide|page)\s+(\d{1,4})\b/i);
     if (!match) return null;
     const page = Number(match[1]);
     return Number.isFinite(page) && page > 0 ? page : null;
