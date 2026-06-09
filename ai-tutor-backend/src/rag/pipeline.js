@@ -353,6 +353,112 @@ Hãy trả lời:`;
   return result;
 }
 
+// ── Whole-document context ────────────────────────────────────────────────────
+
+// Send short documents directly. Longer documents are compressed hierarchically
+// so every chunk contributes without overflowing the final generation prompt.
+const DIRECT_DOCUMENT_CONTEXT_CHARS = 60_000;
+const DOCUMENT_BATCH_CHARS = 30_000;
+const REDUCED_DOCUMENT_CONTEXT_CHARS = 60_000;
+const DOCUMENT_SUMMARY_CONCURRENCY = 3;
+
+function formatDocumentParts(parts, label = 'Phân mảnh') {
+  return parts
+    .map((part, index) => `[${label} ${index + 1}/${parts.length}]\n${part}`)
+    .join('\n\n---\n\n');
+}
+
+function splitIntoCharacterBatches(parts, maxChars = DOCUMENT_BATCH_CHARS) {
+  const batches = [];
+  let current = [];
+  let currentChars = 0;
+
+  for (const part of parts) {
+    const text = String(part || '').trim();
+    if (!text) continue;
+
+    if (current.length > 0 && currentChars + text.length > maxChars) {
+      batches.push(current);
+      current = [];
+      currentChars = 0;
+    }
+
+    current.push(text);
+    currentChars += text.length;
+  }
+
+  if (current.length > 0) batches.push(current);
+  return batches;
+}
+
+async function mapWithConcurrency(items, concurrency, worker) {
+  const results = new Array(items.length);
+  let nextIndex = 0;
+
+  async function runWorker() {
+    while (nextIndex < items.length) {
+      const index = nextIndex++;
+      results[index] = await worker(items[index], index);
+    }
+  }
+
+  const workerCount = Math.min(concurrency, items.length);
+  await Promise.all(Array.from({ length: workerCount }, runWorker));
+  return results;
+}
+
+async function compressDocumentParts(parts, purpose, round) {
+  const batches = splitIntoCharacterBatches(parts);
+
+  return mapWithConcurrency(batches, DOCUMENT_SUMMARY_CONCURRENCY, async (batch, index) => {
+    const batchText = formatDocumentParts(batch, round === 1 ? 'Phân mảnh' : 'Bản tổng hợp');
+    const prompt = `Bạn đang tạo bản tổng hợp trung gian để một tác vụ khác xử lý TOÀN BỘ tài liệu.
+
+MỤC ĐÍCH CUỐI: ${purpose}
+ĐÂY LÀ NHÓM ${index + 1}/${batches.length}, VÒNG TỔNG HỢP ${round}.
+
+YÊU CẦU:
+- Giữ đầy đủ chủ đề, định nghĩa, dữ kiện, quy trình, công thức, ví dụ và mối liên hệ quan trọng
+- Giữ các chi tiết có thể dùng để tạo câu hỏi kiểm tra
+- Không thêm kiến thức ngoài nội dung được cung cấp
+- Viết cô đọng bằng tiếng Việt, có cấu trúc markdown rõ ràng
+
+NỘI DUNG NHÓM:
+${batchText}`;
+
+    return generateText(prompt, {
+      temperature: 0.1,
+      maxTokens: 2048,
+      modelTier: 'lite',
+    });
+  });
+}
+
+/**
+ * Build context covering every document chunk.
+ * Short documents are returned verbatim; long documents use hierarchical
+ * compression where every chunk is included in a batch before final generation.
+ */
+async function buildWholeDocumentContext(chunks, purpose) {
+  const parts = (chunks || []).map(chunk => String(chunk || '').trim()).filter(Boolean);
+  if (parts.length === 0) return '';
+
+  const directContext = formatDocumentParts(parts);
+  if (directContext.length <= DIRECT_DOCUMENT_CONTEXT_CHARS) {
+    return directContext;
+  }
+
+  let reducedParts = parts;
+  let round = 1;
+
+  do {
+    reducedParts = await compressDocumentParts(reducedParts, purpose, round);
+    round++;
+  } while (formatDocumentParts(reducedParts, 'Bản tổng hợp').length > REDUCED_DOCUMENT_CONTEXT_CHARS);
+
+  return formatDocumentParts(reducedParts, 'Bản tổng hợp');
+}
+
 // ── Summarize ─────────────────────────────────────────────────────────────────
 
 /**
@@ -365,8 +471,7 @@ async function* summarize(collectionName) {
     yield 'Tài liệu này cần được xử lý lại. Vui lòng **xóa** tài liệu trong thư viện và **tải lại** để tạo lại dữ liệu.';
     return;
   }
-  // Use first 30 chunks to stay within token limits
-  const context = chunks.slice(0, 30).join('\n\n');
+  const context = await buildWholeDocumentContext(chunks, 'Tạo bản tóm tắt chuyên sâu, bao quát toàn bộ tài liệu');
 
   const prompt = `Bạn là giảng viên đại học có kinh nghiệm. Hãy tạo bản tóm tắt chuyên sâu cho tài liệu học tập sau.
 
@@ -404,7 +509,7 @@ async function* quiz(collectionName) {
     yield '[{"question":"Tài liệu cần được xử lý lại. Vui lòng xóa và tải lại tài liệu.","options":["---","---","---","---"],"correct_indices":[0],"explanation":"Dữ liệu vector đã bị mất."}]';
     return;
   }
-  const context = chunks.slice(0, 40).join('\n\n');
+  const context = await buildWholeDocumentContext(chunks, 'Tạo đề trắc nghiệm bao phủ toàn bộ kiến thức trong tài liệu');
   const chunkCount = chunks.length;
   const questionRange =
     chunkCount <= 4 ? '4-6' :
@@ -474,7 +579,7 @@ async function* mindmap(collectionName) {
     yield 'mindmap\n  root((Cần xử lý lại tài liệu))\n    Dữ liệu vector đã bị mất\n      Xóa và tải lại tài liệu';
     return;
   }
-  const context = chunks.slice(0, 40).join('\n\n');
+  const context = await buildWholeDocumentContext(chunks, 'Tạo sơ đồ tư duy bao quát toàn bộ tài liệu');
 
   const prompt = `Bạn là chuyên gia tổ chức kiến thức và trực quan hóa thông tin. Dựa vào tài liệu học tập bên dưới, hãy tạo sơ đồ tư duy (mindmap) bằng cú pháp Mermaid. Sơ đồ phải bao quát TOÀN BỘ nội dung chính của tài liệu.
 
@@ -539,7 +644,7 @@ async function* studyQuestions(collectionName) {
     yield '1. Tài liệu cần được xử lý lại. Vui lòng xóa tài liệu trong thư viện và tải lại để tạo lại dữ liệu.';
     return;
   }
-  const context = chunks.slice(0, 20).join('\n\n');
+  const context = await buildWholeDocumentContext(chunks, 'Tạo câu hỏi ôn tập đại diện cho toàn bộ tài liệu');
 
   const prompt = `Bạn là giảng viên đại học dày dạn kinh nghiệm. Dựa vào tài liệu bên dưới, hãy tạo 10 câu hỏi ôn tập tự luận chất lượng cao.
 
