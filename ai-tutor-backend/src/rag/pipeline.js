@@ -312,7 +312,7 @@ ${historyText ? `LỊCH SỬ CUỘC TRÒ CHUYỆN:\n${historyText}\n` : ''}CÂU 
 
 Hãy trả lời:`;
 
-  const { text: answer, toolExecuted } = await generateText(prompt, { temperature: 0.2, maxTokens: 4096, signal });
+  const answer = await generateText(prompt, { temperature: 0.2, maxTokens: 4096, signal });
   pipelineLog.timings.generate = Date.now() - generateStart;
   pipelineLog.timings.total = Date.now() - startTime;
   throwIfAborted(signal);
@@ -333,7 +333,6 @@ Hãy trả lời:`;
   const result = {
     answer,
     sources,
-    toolExecuted,
   };
 
   // Include pipeline metadata for debug/advanced mode
@@ -608,11 +607,11 @@ async function* askStream(collectionName, question, conversationHistory, options
   if (!allDocs || allDocs.length === 0) {
     yield {
       type: 'done',
-      answer: 'T\u00e0i li\u1ec7u n\u00e0y c\u1ea7n \u0111\u01b0\u1ee3c x\u1eed l\u00fd l\u1ea1i. D\u1eef li\u1ec7u t\u00ecm ki\u1ebfm kh\u00f4ng c\u00f2n trong h\u1ec7 th\u1ed1ng.\n\nVui l\u00f2ng **x\u00f3a** t\u00e0i li\u1ec7u n\u00e0y trong th\u01b0 vi\u1ec7n v\u00e0 **t\u1ea3i l\u1ea1i** \u0111\u1ec3 t\u1ea1o l\u1ea1i d\u1eef li\u1ec7u.',
+      answer: 'Tài liệu này cần được xử lý lại. Dữ liệu tìm kiếm không còn trong hệ thống.\n\nVui lòng **xóa** tài liệu này trong thư viện và **tải lại** để tạo lại dữ liệu.',
       sources: [],
       pipeline: {
         strategy: 'none',
-        strategyDescription: 'Kh\u00f4ng c\u00f3 d\u1eef li\u1ec7u',
+        strategyDescription: 'Không có dữ liệu',
         cacheHit: false,
         searchResultCount: 0,
         selectedCount: 0,
@@ -769,7 +768,7 @@ async function* askStream(collectionName, question, conversationHistory, options
   const sources = selectedChunks.map(function (chunk, index) {
     var meta = chunk.metadata || {};
     var page = meta.page_number;
-    var title = page ? ('Trang ' + page) : (meta.section || ('\u0110o\u1ea1n ' + (index + 1)));
+    var title = page ? ('Trang ' + page) : (meta.section || ('Đoạn ' + (index + 1)));
     return {
       title: title,
       text: chunk.text.slice(0, 320) + (chunk.text.length > 320 ? '...' : ''),

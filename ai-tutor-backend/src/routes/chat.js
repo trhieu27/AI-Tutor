@@ -281,7 +281,7 @@ router.post('/:documentId/ask-stream', authMiddleware, requireChatQuota(), async
 
     const doc = await Document.findOne({ id: documentId });
     if (!doc || !doc.chroma_collection_id) {
-      sseWrite('error', { detail: 'T\u00e0i li\u1ec7u kh\u00f4ng t\u1ed3n t\u1ea1i ho\u1eb7c ch\u01b0a \u0111\u01b0\u1ee3c x\u1eed l\u00fd' });
+      sseWrite('error', { detail: 'Tài liệu không tồn tại hoặc chưa được xử lý' });
       return res.end();
     }
 
@@ -292,7 +292,7 @@ router.post('/:documentId/ask-stream', authMiddleware, requireChatQuota(), async
     if (requestedSessionId) {
       sessionData = await ChatSession.findOne({ id: sessionId, user_id: req.userId, document_id: documentId }, { messages: { $slice: -10 } }).lean();
       if (!sessionData) {
-        sseWrite('error', { detail: 'Phi\u00ean chat kh\u00f4ng t\u1ed3n t\u1ea1i' });
+        sseWrite('error', { detail: 'Phiên chat không tồn tại' });
         return res.end();
       }
     } else {
@@ -428,16 +428,16 @@ router.post('/:documentId/ask-stream', authMiddleware, requireChatQuota(), async
     if (isGone()) return;
     var errName = err && err.name;
     if (errName === 'AbortError' || requestController.signal.aborted) {
-      sseWrite('error', { detail: 'Y\u00eau c\u1ea7u \u0111\u00e3 \u0111\u01b0\u1ee3c h\u1ee7y.' });
+      sseWrite('error', { detail: 'Yêu cầu đã được hủy.' });
       return res.end();
     }
     var msg = String(err && err.message || '');
     if (msg.includes('429') || msg.includes('RESOURCE_EXHAUSTED')) {
-      sseWrite('error', { detail: 'B\u1ed9 n\u00e3o AI hi\u1ec7n \u0111ang qu\u00e1 t\u1ea3i l\u01b0\u1ee3t d\u00f9ng. Vui l\u00f2ng th\u1eed l\u1ea1i sau gi\u00e2y l\u00e1t nh\u00e9.' });
+      sseWrite('error', { detail: 'Bộ não AI hiện đang quá tải lượt dùng. Vui lòng thử lại sau giây lát nhé.' });
       return res.end();
     }
     console.error('Chat Stream Error:', msg);
-    sseWrite('error', { detail: 'H\u1ec7 th\u1ed1ng \u0111ang b\u1eadn ho\u1eb7c g\u1eb7p l\u1ed7i x\u1eed l\u00fd. Vui l\u00f2ng th\u1eed l\u1ea1i sau nh\u00e9.' });
+    sseWrite('error', { detail: 'Hệ thống đang bận hoặc gặp lỗi xử lý. Vui lòng thử lại sau nhé.' });
     res.end();
   }
 });
