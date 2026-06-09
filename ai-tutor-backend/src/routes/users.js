@@ -26,7 +26,6 @@ async function serializeUser(user) {
     email: user.email || '',
     role: user.role || 'STUDENT',
     status: user.status || 'active',
-    bio: user.bio || null,
     is_pro: isPro,
     preferences: user.preferences || { email_notifications: true, ai_response_detail: 'balanced' },
     created_at: user.created_at ? String(user.created_at) : '',
@@ -45,13 +44,12 @@ router.get('/me', authMiddleware, async (req, res) => {
 // PUT /api/v1/users/profile
 router.put('/profile', authMiddleware, async (req, res) => {
   try {
-    const { full_name, bio } = req.body;
+    const { full_name } = req.body;
     const updates = { updated_at: new Date() };
     if (full_name !== undefined) {
       if (!full_name.trim()) return res.status(400).json({ detail: 'Tên không được để trống' });
       updates.full_name = full_name.trim();
     }
-    if (bio !== undefined) updates.bio = bio.trim().slice(0, 300);
 
     await User.updateOne({ id: req.userId }, { $set: updates });
     const user = await User.findOne({ id: req.userId });
