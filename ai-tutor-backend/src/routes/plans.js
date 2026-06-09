@@ -203,6 +203,7 @@ router.post('/subscribe', authMiddleware, async (req, res) => {
       description: `AI Tutor ${plan.display_name}`,
       cancelUrl,
       returnUrl,
+      expiredAt: Math.floor((Date.now() + 30 * 60 * 1000) / 1000), // Đồng bộ hết hạn sau 30 phút với MongoDB TTL
     };
 
     const paymentLink = await payos.paymentRequests.create(paymentData);
