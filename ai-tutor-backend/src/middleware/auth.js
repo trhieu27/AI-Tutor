@@ -31,6 +31,11 @@ async function authMiddleware(req, res, next) {
     cacheAuthUser(user);
 
     if (payload.sid) {
+      const activeSession = await UserSession.findOne({ id: payload.sid, user_id: payload.sub }).lean();
+      if (!activeSession) {
+        return res.status(401).json({ detail: 'Phiên đăng nhập đã hết hạn hoặc bị thu hồi' });
+      }
+
       const now = new Date();
       UserSession.updateOne(
         { id: payload.sid, user_id: payload.sub },

@@ -4,7 +4,7 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const axios = require('axios');
 const { v4: uuidv4 } = require('uuid');
-const { User, OTP } = require('../db/models');
+const { User, OTP, UserSession } = require('../db/models');
 const {
   cacheAuthUser,
   createAuthSession,
@@ -289,6 +289,13 @@ router.post('/refresh', async (req, res) => {
     const payload = jwt.verify(refresh_token, config.jwtSecret, { algorithms: [config.jwtAlgorithm] });
     if (payload.type !== 'refresh') {
       return res.status(401).json({ detail: 'Invalid token type' });
+    }
+
+    if (payload.sid) {
+      const activeSession = await UserSession.findOne({ id: payload.sid, user_id: payload.sub }).lean();
+      if (!activeSession) {
+        return res.status(401).json({ detail: 'Phiên đăng nhập đã hết hạn hoặc bị thu hồi' });
+      }
     }
 
     const user = await findAuthUserById(payload.sub, { fallbackToCache: true, preferCache: true });
