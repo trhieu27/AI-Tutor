@@ -15,6 +15,7 @@ const express = require('express');
 const cors = require('cors');
 const WebSocket = require('ws');
 const jwt = require('jsonwebtoken');
+const swaggerUi = require('swagger-ui-express');
 const path = require('path');
 const fs = require('fs');
 
@@ -35,6 +36,7 @@ const plansRoutes = require('./routes/plans');
 const adminRoutes = require('./routes/admin');
 const shareRoutes = require('./routes/share');
 const notesRoutes = require('./routes/notes');
+const { createOpenApiSpec } = require('./utils/openapi');
 
 const app = express();
 const server = http.createServer(app);
@@ -72,16 +74,22 @@ app.use((req, res, next) => {
 fs.mkdirSync(config.uploadDir, { recursive: true });
 
 // ── Routes ───────────────────────────────────────────────────────────────────
-app.use('/api/v1', authRoutes);
-app.use('/api/v1/users', usersRoutes);
-app.use('/api/v1/documents', documentsRoutes);
-app.use('/api/v1/chat', chatRoutes);
-app.use('/api/v1/quota', quotaRoutes);
-app.use('/api/v1/notifications', notificationsRoutes);
-app.use('/api/v1/plans', plansRoutes);
-app.use('/api/v1/admin', adminRoutes);
-app.use('/api/v1/share', shareRoutes);
-app.use('/api/v1/notes', notesRoutes);
+const routeGroups = [
+  { prefix: '/api/v1', tag: 'Authentication', router: authRoutes },
+  { prefix: '/api/v1/users', tag: 'Users', router: usersRoutes },
+  { prefix: '/api/v1/documents', tag: 'Documents', router: documentsRoutes },
+  { prefix: '/api/v1/chat', tag: 'Chat and Learning', router: chatRoutes },
+  { prefix: '/api/v1/quota', tag: 'Quota', router: quotaRoutes },
+  { prefix: '/api/v1/notifications', tag: 'Notifications', router: notificationsRoutes },
+  { prefix: '/api/v1/plans', tag: 'Plans and Payments', router: plansRoutes },
+  { prefix: '/api/v1/admin', tag: 'Admin', router: adminRoutes },
+  { prefix: '/api/v1/share', tag: 'Sharing', router: shareRoutes },
+  { prefix: '/api/v1/notes', tag: 'Notes', router: notesRoutes },
+];
+
+for (const { prefix, router } of routeGroups) {
+  app.use(prefix, router);
+}
 
 // ── Health check ─────────────────────────────────────────────────────────────
 app.get('/health', (req, res) => res.json({ status: 'healthy' }));
@@ -91,6 +99,17 @@ app.get('/', (req, res) => res.json({
   app: 'AI Tutor Backend (Node.js)',
   version: '1.0.0',
   updated_at: new Date().toISOString(),
+}));
+
+// ── OpenAPI / Swagger UI ─────────────────────────────────────────────────────
+const openApiSpec = createOpenApiSpec(routeGroups);
+app.get('/openapi.json', (req, res) => res.json(openApiSpec));
+app.use('/docs', swaggerUi.serve, swaggerUi.setup(openApiSpec, {
+  customSiteTitle: 'AI Tutor API Docs',
+  swaggerOptions: {
+    persistAuthorization: true,
+    displayRequestDuration: true,
+  },
 }));
 
 // ── Error handler ─────────────────────────────────────────────────────────────
