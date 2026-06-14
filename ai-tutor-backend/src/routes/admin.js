@@ -1381,7 +1381,25 @@ router.patch('/plans/:id', async (req, res) => {
     clearOverviewCache();
     clearPlanCache();
     const updated = await SubscriptionPlan.findOne({ id: plan.id }).lean();
-    await logAudit(req, DANGEROUS_ACTIONS.PLAN_UPDATED, 'plan', plan.id, updates);
+    
+    // Only log fields that actually changed
+    const logMetadata = {};
+    for (const key of Object.keys(updates)) {
+      if (key === 'updated_at') continue;
+      
+      let oldVal = plan[key];
+      if (key.startsWith('quota.')) {
+        const field = key.replace('quota.', '');
+        oldVal = plan.quota?.[field];
+      }
+      
+      const newVal = updates[key];
+      if (oldVal !== newVal) {
+        logMetadata[key] = newVal;
+      }
+    }
+    
+    await logAudit(req, DANGEROUS_ACTIONS.PLAN_UPDATED, 'plan', plan.id, logMetadata);
     res.json(serializePlan(updated));
   } catch (err) {
     res.status(err.statusCode || 500).json({ detail: err.message || 'Lỗi cập nhật gói dịch vụ' });
@@ -1423,11 +1441,23 @@ router.get('/audit', async (req, res) => {
     const admins = await User.find({ id: { $in: logs.map((log) => log.admin_id) } }).lean();
     const adminMap = new Map(admins.map((admin) => [admin.id, admin]));
 
+    const targetUserIds = logs
+      .filter((log) => log.target_type === 'user' && log.target_id)
+      .map((log) => log.target_id);
+    const targetUsers = await User.find({ id: { $in: targetUserIds } }).lean();
+    const targetUserMap = new Map(targetUsers.map((u) => [u.id, u]));
+
     res.json({
-      items: logs.map((log) => ({
-        ...stripMongo(log),
-        admin: serializeUser(adminMap.get(log.admin_id)),
-      })),
+      items: logs.map((log) => {
+        const item = {
+          ...stripMongo(log),
+          admin: serializeUser(adminMap.get(log.admin_id)),
+        };
+        if (log.target_type === 'user' && log.target_id) {
+          item.target_user = serializeUser(targetUserMap.get(log.target_id));
+        }
+        return item;
+      }),
       pagination: {
         page,
         limit,

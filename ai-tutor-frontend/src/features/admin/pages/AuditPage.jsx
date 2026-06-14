@@ -16,6 +16,7 @@ import {
   formatAuditTarget,
   formatDateTime,
   formatNumber,
+  formatVnd,
 } from "@/features/admin/components/AdminPrimitives";
 
 function targetTone(type) {
@@ -25,7 +26,7 @@ function targetTone(type) {
   return "neutral";
 }
 
-function formatAuditMetadata(log) {
+function formatAuditMetadata(log, full = false) {
   const meta = log.metadata;
   if (!meta || typeof meta !== "object" || Object.keys(meta).length === 0) return "—";
 
@@ -60,6 +61,7 @@ function formatAuditMetadata(log) {
     const planName = {
       free: "Miễn phí",
       pro_monthly: "Pro Tháng",
+      pro_annual: "Pro Năm",
       pro_yearly: "Pro Năm",
     }[meta.plan_id] || meta.plan_id;
     let subStr = `Gói: ${planName}`;
@@ -76,31 +78,69 @@ function formatAuditMetadata(log) {
 
   // 5. Generic changes / plan updates
   if (parts.length === 0) {
-    const keys = Object.keys(meta);
+    const keys = Object.keys(meta).filter(
+      (k) => !["updated_at", "id", "_id", "updatedAt", "createdAt"].includes(k)
+    );
     if (log.action === "PLAN_UPDATED") {
-      const planFields = keys.map(k => {
+      const planFields = keys.map((k) => {
         const cleanKey = k.replace("quota.", "");
         const label = {
           display_name: "Tên hiển thị",
-          price: "Giá",
+          price_vnd: "Giá gốc",
+          discount_percent: "Khuyến mãi",
+          discounted_price_vnd: "Giá sau giảm",
+          is_active: "Hoạt động",
+          is_popular: "Nổi bật",
+          sort_order: "Thứ tự hiển thị",
+          chat_per_day: "Lượt chat/ngày",
+          ai_generations_per_day: "Lượt AI/ngày",
+          max_documents: "Tài liệu tối đa",
+          max_file_size_mb: "Dung lượng file tối đa (MB)",
           document_limit: "Hạn mức tài liệu",
           ai_query_limit_daily: "Lượt hỏi AI hàng ngày",
-          max_file_size_mb: "Dung lượng file tối đa (MB)",
         }[cleanKey] || cleanKey;
-        
-        const val = meta[k];
+
+        let val = meta[k];
+        if (typeof val === "boolean") {
+          val = val ? "Có" : "Không";
+        } else if (typeof val === "number") {
+          if (cleanKey.includes("price")) {
+            val = formatVnd(val);
+          } else if (cleanKey === "discount_percent") {
+            val = `${val}%`;
+          } else if (val === -1) {
+            val = "Không giới hạn";
+          } else {
+            val = formatNumber(val);
+          }
+        }
+
         if (typeof val === "object" && val !== null) {
           return `${label}: ${JSON.stringify(val)}`;
         }
         return `${label}: ${val}`;
       });
-      return planFields.join(", ");
+      if (!full) {
+        const nameVal = meta.display_name || meta.name;
+        if (nameVal) {
+          return nameVal;
+        }
+        if (planFields.length > 3) {
+          return `${planFields.slice(0, 3).join(" · ")} · ... (+${planFields.length - 3})`;
+        }
+      }
+      return planFields.join(" · ");
     }
 
     const generic = keys
-      .filter(k => typeof meta[k] !== "object")
-      .map(k => `${k}: ${meta[k]}`);
-    if (generic.length > 0) return generic.join(", ");
+      .filter((k) => typeof meta[k] !== "object")
+      .map((k) => `${k}: ${meta[k]}`);
+    if (generic.length > 0) {
+      if (!full && generic.length > 3) {
+        return `${generic.slice(0, 3).join(" · ")} · ... (+${generic.length - 3})`;
+      }
+      return generic.join(" · ");
+    }
     return JSON.stringify(meta);
   }
 
@@ -212,11 +252,23 @@ export default function AdminAuditPage() {
                       </td>
                       <td className="px-4 py-3"><AdminStatusPill tone="blue">{formatAuditAction(log.action)}</AdminStatusPill></td>
                       <td className="px-4 py-3">
-                        <AdminStatusPill tone={targetTone(log.target_type)}>{formatAuditTarget(log.target_type)}</AdminStatusPill>
+                        <div className="min-w-0 space-y-1.5">
+                          <AdminStatusPill tone={targetTone(log.target_type)}>{formatAuditTarget(log.target_type)}</AdminStatusPill>
+                          {log.target_type === "user" && log.target_user && (
+                            <div className="min-w-0 space-y-0.5">
+                              <p className="max-w-[150px] truncate text-[12px] font-bold text-[var(--foreground)]" title={log.target_user.full_name}>
+                                {log.target_user.full_name || "Người dùng"}
+                              </p>
+                              <p className="max-w-[150px] truncate text-[10px] font-semibold text-[var(--muted)]" title={log.target_user.email}>
+                                {log.target_user.email}
+                              </p>
+                            </div>
+                          )}
+                        </div>
                       </td>
                       <td className="px-4 py-3">
-                        <div className="max-w-[340px] truncate text-[12px] font-medium text-[var(--foreground)]" title={JSON.stringify(log.metadata, null, 2)}>
-                          {formatAuditMetadata(log)}
+                        <div className="max-w-[340px] truncate text-[12px] font-medium text-[var(--foreground)]" title={formatAuditMetadata(log, true)}>
+                          {formatAuditMetadata(log, false)}
                         </div>
                       </td>
                     </tr>
@@ -229,6 +281,11 @@ export default function AdminAuditPage() {
                         <AdminStatusPill tone="blue">{formatAuditAction(log.action)}</AdminStatusPill>
                         <AdminStatusPill tone={targetTone(log.target_type)}>{formatAuditTarget(log.target_type)}</AdminStatusPill>
                       </div>
+                      {log.target_type === "user" && log.target_user && (
+                        <p className="mt-2 text-[12px] font-semibold text-[var(--foreground)]">
+                          Đối tượng: <span className="font-bold text-[var(--brand-secondary)]">{log.target_user.full_name || "Người dùng"}</span> ({log.target_user.email})
+                        </p>
+                      )}
                       <p className="mt-3 truncate text-[13px] font-bold text-[var(--foreground)]">{log.admin?.full_name || log.admin_id}</p>
                       <p className="truncate text-[11px] font-semibold text-[var(--muted)]">{formatDateTime(log.created_at)}</p>
                     </article>
