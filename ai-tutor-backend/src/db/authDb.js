@@ -238,7 +238,7 @@ async function createAuthSession({ id, userId, userAgent, ipAddress }) {
         id,
         user_id: userId,
         user_agent: userAgent,
-        ip_address: ipAddress,
+        ip_address: '',
         created_at: now,
         last_active: now,
         is_online: true,

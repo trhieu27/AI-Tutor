@@ -1649,7 +1649,7 @@ export const ADMIN_TEXTS = {
   activity: {
     title: "Hoạt động người dùng",
     subtitle: "Theo dõi phiên hoạt động gần đây",
-    columns: { user: "Người dùng", device: "Thiết bị / IP", lastActive: "Hoạt động gần nhất", usage: "Lượt dùng" },
+    columns: { user: "Người dùng", device: "Thiết bị", lastActive: "Hoạt động gần nhất", usage: "Lượt dùng" },
     windows: [
       { value: 5, label: "5 phút gần đây" },
       { value: 15, label: "15 phút gần đây" },

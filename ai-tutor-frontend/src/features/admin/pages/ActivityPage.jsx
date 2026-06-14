@@ -40,7 +40,6 @@ function ActivityCard({ item }) {
       </div>
       <div className="mt-3 grid gap-2 text-[11px] font-bold text-[var(--muted)]">
         <span className="truncate rounded-[var(--radius-chip)] bg-[var(--surface)] px-2 py-2">{compactUserAgent(item.user_agent)}</span>
-        <span className="truncate rounded-[var(--radius-chip)] bg-[var(--surface)] px-2 py-2">{item.ip_address || "IP không rõ"}</span>
         <span className="rounded-[var(--radius-chip)] bg-[var(--surface)] px-2 py-2">{formatDateTime(item.last_active)}</span>
         <span className="rounded-[var(--radius-chip)] bg-[var(--surface)] px-2 py-2">
           {formatNumber(item.document_count)} tài liệu · {formatNumber(usageCount)} lượt dùng
@@ -169,7 +168,6 @@ export default function AdminActivityPage() {
                             <span className="material-symbols-outlined text-[15px]" aria-hidden="true">devices</span>
                             <span className="truncate">{compactUserAgent(item.user_agent)}</span>
                           </span>
-                          <p className="truncate text-[11px] font-semibold text-[var(--muted)]">{item.ip_address || "IP không rõ"}</p>
                         </div>
                       </td>
                       <td className="px-4 py-4">

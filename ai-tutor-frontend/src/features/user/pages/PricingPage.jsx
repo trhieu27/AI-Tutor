@@ -454,63 +454,65 @@ export default function PricingPage() {
   };
 
   return (
-    <PageFrame className="min-h-[calc(100svh-72px)] space-y-5 py-6 lg:py-7">
+    <div className="min-h-screen bg-[var(--background)]">
+      <PageFrame className="space-y-5 py-6 lg:py-7">
 
-      <div className="flex items-center justify-between gap-4">
-        <div className="min-w-0">
-          <h1 className="text-[30px] font-semibold leading-tight text-[var(--foreground)] sm:text-[34px]">
-            {T.hero.title}
-          </h1>
-          <p className="mt-2 max-w-2xl text-[13px] font-medium leading-6 text-[var(--muted)] sm:text-[14px]">
-            {T.hero.subtitle}
-          </p>
-        </div>
-        <IconButton icon="close" label={T.payment.close} onClick={() => navigate(-1)} className="shrink-0" />
-      </div>
-
-      <div className="premium-card p-4 sm:p-5">
-        <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-          <div>
-            <h2 className="text-[15px] font-bold text-[var(--foreground)]">{T.toggle.title}</h2>
-            <p className="mt-1 text-[12px] font-medium leading-5 text-[var(--muted)]">
-              {billingAnnual ? T.toggle.annualNote : T.toggle.monthlyNote}
+        <div className="flex items-center justify-between gap-4">
+          <div className="min-w-0">
+            <h1 className="text-[30px] font-semibold leading-tight text-[var(--foreground)] sm:text-[34px]">
+              {T.hero.title}
+            </h1>
+            <p className="mt-2 max-w-2xl text-[13px] font-medium leading-6 text-[var(--muted)] sm:text-[14px]">
+              {T.hero.subtitle}
             </p>
           </div>
-          <BillingToggle billingAnnual={billingAnnual} onChange={setBillingAnnual} annualDiscount={annualDiscount} />
+          <IconButton icon="close" label={T.payment.close} onClick={() => navigate(-1)} className="shrink-0" />
         </div>
-      </div>
 
-      {loading ? (
-        <PricingSkeleton />
-      ) : visiblePlans.length === 0 ? (
-        <div className="premium-card p-10 text-center text-[13px] font-medium text-[var(--muted)]">
-          <span className="material-symbols-outlined mb-3 block text-[34px]" aria-hidden="true">info</span>
-          <p>{T.empty.noPlans}</p>
+        <div className="premium-card p-4 sm:p-5">
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+            <div>
+              <h2 className="text-[15px] font-bold text-[var(--foreground)]">{T.toggle.title}</h2>
+              <p className="mt-1 text-[12px] font-medium leading-5 text-[var(--muted)]">
+                {billingAnnual ? T.toggle.annualNote : T.toggle.monthlyNote}
+              </p>
+            </div>
+            <BillingToggle billingAnnual={billingAnnual} onChange={setBillingAnnual} annualDiscount={annualDiscount} />
+          </div>
         </div>
-      ) : (
-        <div className={cx("grid gap-4", visiblePlans.length === 2 ? "mx-auto max-w-5xl lg:grid-cols-2" : "lg:grid-cols-3")}>
-          {visiblePlans.map((plan) => (
-            <PlanCard
-              key={plan.id}
-              plan={plan}
-              featured={plan.price_vnd > 0}
-              isActive={myPlan?.id === plan.id}
-              onSelect={setSelectedPlan}
-            />
-          ))}
-        </div>
-      )}
 
-      {selectedPlan && (
-        <PaymentModal plan={selectedPlan} onClose={handleModalClose} onSuccess={handleSuccess} />
-      )}
+        {loading ? (
+          <PricingSkeleton />
+        ) : visiblePlans.length === 0 ? (
+          <div className="premium-card p-10 text-center text-[13px] font-medium text-[var(--muted)]">
+            <span className="material-symbols-outlined mb-3 block text-[34px]" aria-hidden="true">info</span>
+            <p>{T.empty.noPlans}</p>
+          </div>
+        ) : (
+          <div className={cx("grid gap-4", visiblePlans.length === 2 ? "mx-auto max-w-5xl lg:grid-cols-2" : "lg:grid-cols-3")}>
+            {visiblePlans.map((plan) => (
+              <PlanCard
+                key={plan.id}
+                plan={plan}
+                featured={plan.price_vnd > 0}
+                isActive={myPlan?.id === plan.id}
+                onSelect={setSelectedPlan}
+              />
+            ))}
+          </div>
+        )}
 
-      {bgOrderCode && (
-        <div className="fixed bottom-6 right-6 z-50 flex items-center gap-2 rounded-[var(--radius-panel)] border border-[var(--border-color)] bg-[var(--card-bg)] px-4 py-3 shadow-[var(--premium-shadow-md)]">
-          <span className="h-2 w-2 animate-pulse rounded-full bg-[var(--brand-primary)]" />
-          <span className="text-[12px] font-semibold text-[var(--muted)]">Đang chờ xác nhận thanh toán...</span>
-        </div>
-      )}
-    </PageFrame>
+        {selectedPlan && (
+          <PaymentModal plan={selectedPlan} onClose={handleModalClose} onSuccess={handleSuccess} />
+        )}
+
+        {bgOrderCode && (
+          <div className="fixed bottom-6 right-6 z-50 flex items-center gap-2 rounded-[var(--radius-panel)] border border-[var(--border-color)] bg-[var(--card-bg)] px-4 py-3 shadow-[var(--premium-shadow-md)]">
+            <span className="h-2 w-2 animate-pulse rounded-full bg-[var(--brand-primary)]" />
+            <span className="text-[12px] font-semibold text-[var(--muted)]">Đang chờ xác nhận thanh toán...</span>
+          </div>
+        )}
+      </PageFrame>
+    </div>
   );
 }

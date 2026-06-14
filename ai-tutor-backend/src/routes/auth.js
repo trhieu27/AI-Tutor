@@ -67,9 +67,8 @@ async function serializeAuthUser(user) {
 async function createSession(req, userId) {
   const sessionId = uuidv4();
   const ua = (req.headers['user-agent'] || '').slice(0, 300);
-  const ip = req.ip || req.connection?.remoteAddress || '';
   try {
-    await createAuthSession({ id: sessionId, userId, userAgent: ua, ipAddress: ip });
+    await createAuthSession({ id: sessionId, userId, userAgent: ua, ipAddress: '' });
   } catch (err) {
     console.warn(`Could not persist login session for user ${userId}:`, err.message);
     return null;

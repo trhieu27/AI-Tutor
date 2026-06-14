@@ -97,7 +97,7 @@ export default function SessionsSection() {
                   {browser} {"\xB7"} {os}
                 </p>
                 <p className="text-[11px] text-[var(--muted)] mt-0.5">
-                  {s.ip_address || WORKSPACE_TEXTS.sessions.unknownIp} · {WORKSPACE_TEXTS.sessions.lastSeen} {when}
+                  {WORKSPACE_TEXTS.sessions.lastSeen} {when}
                 </p>
               </div>
               <button

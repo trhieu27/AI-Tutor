@@ -193,7 +193,7 @@ async function logAudit(req, action, targetType, targetId, metadata = {}) {
     target_type: targetType,
     target_id: targetId || null,
     metadata,
-    ip_address: getClientIp(req),
+    ip_address: '',
   });
 }
 
@@ -1205,13 +1205,17 @@ router.get('/activity', async (req, res) => {
     const onlineUserIds = new Set(getOnlineUserIds());
 
     res.json({
-      items: sessions.map((session) => ({
-        ...stripMongo(session),
-        user: serializeUser(userMap.get(session.user_id)),
-        is_online: onlineUserIds.has(session.user_id),
-        document_count: documentCounts.get(session.user_id) || 0,
-        recent_usage_count: usageMap.get(session.user_id) || 0,
-      })),
+      items: sessions.map((session) => {
+        const clean = stripMongo(session);
+        delete clean.ip_address;
+        return {
+          ...clean,
+          user: serializeUser(userMap.get(session.user_id)),
+          is_online: onlineUserIds.has(session.user_id),
+          document_count: documentCounts.get(session.user_id) || 0,
+          recent_usage_count: usageMap.get(session.user_id) || 0,
+        };
+      }),
       activeWithinMinutes,
       pagination: {
         page,
