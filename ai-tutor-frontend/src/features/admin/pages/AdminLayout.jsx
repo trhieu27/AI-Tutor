@@ -4,7 +4,7 @@ import { ThemeToggle } from "@/shared/ui/ThemeToggle";
 import { useAuth } from "@/features/auth/context/AuthContext";
 import { ADMIN_TEXTS } from "@/shared/constants/texts";
 import { cx } from "@/shared/ui/Premium";
-import { BrandLockup } from "@/shared/ui/BrandMark";
+import { BrandMark } from "@/shared/ui/BrandMark";
 
 function AdminNavItem({ item, onNavigate }) {
   return (
@@ -31,10 +31,8 @@ function AdminSidebar({ onNavigate }) {
   return (
     <aside className="admin-sidebar flex h-full flex-col border-r border-[var(--admin-sidebar-border)]">
       <div className="flex h-16 shrink-0 items-center border-b border-[var(--admin-sidebar-border)] px-4">
-        <Link to="/admin" onClick={onNavigate} className="admin-sidebar-brand flex min-w-0 items-center gap-3" aria-label={ADMIN_TEXTS.shell.brand}>
-          <span className="admin-sidebar-brand-mark flex h-9 w-9 shrink-0 items-center justify-center rounded-[var(--radius-panel)] shadow-[var(--premium-shadow-sm)]">
-            <span className="material-symbols-outlined icon-strong text-[19px]" aria-hidden="true">school</span>
-          </span>
+        <Link to="/admin" onClick={onNavigate} className="admin-sidebar-brand group flex min-w-0 items-center gap-3" aria-label={ADMIN_TEXTS.shell.brand}>
+          <BrandMark size="sm" className="group-hover:-translate-y-0.5 transition-transform duration-200" />
           <span className="min-w-0">
             <span className="block truncate text-[14px] font-[780] leading-5">{ADMIN_TEXTS.shell.brand}</span>
             <span className="admin-sidebar-subtitle mt-0.5 block truncate text-[11px] font-bold leading-4">{ADMIN_TEXTS.shell.subtitle}</span>
