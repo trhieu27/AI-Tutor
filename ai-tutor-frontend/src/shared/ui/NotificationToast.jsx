@@ -185,6 +185,8 @@ function ToastItem({ toast, onDismiss, stackIndex }) {
                 fontSize: 12,
                 color: "var(--muted)",
                 lineHeight: 1.55,
+                wordBreak: "break-word",
+                overflowWrap: "break-word",
               }}
             >
               {toast.message}
