@@ -1673,7 +1673,6 @@ export const ADMIN_TEXTS = {
       { value: "SUBSCRIPTION_CHANGED", label: "Gán gói dịch vụ" },
       { value: "DOCUMENT_DELETED", label: "Xóa tài liệu" },
       { value: "PLAN_UPDATED", label: "Cập nhật gói" },
-      { value: "USER_UPDATED", label: "Cập nhật thông tin" },
     ],
     // _dummy: [
       // { value: "", label: "Tất cả hành động" },
