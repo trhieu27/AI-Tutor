@@ -1671,7 +1671,6 @@ export const ADMIN_TEXTS = {
       { value: "USER_UNBLOCKED", label: "Mở khóa người dùng" },
       { value: "USER_ROLE_CHANGED", label: "Thay đổi vai trò" },
       { value: "SUBSCRIPTION_CHANGED", label: "Gán gói dịch vụ" },
-      { value: "DOCUMENT_RETRIED", label: "Thử lại tài liệu" },
       { value: "DOCUMENT_DELETED", label: "Xóa tài liệu" },
       { value: "PLAN_UPDATED", label: "Cập nhật gói" },
       { value: "USER_UPDATED", label: "Cập nhật thông tin" },
