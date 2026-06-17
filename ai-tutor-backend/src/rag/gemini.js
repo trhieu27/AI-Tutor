@@ -17,31 +17,6 @@ function resolveModel(tier) {
     return CHAT_MODEL;
 }
 
-// Helper to wrap embedContent with retries for transient errors (503, 429, etc.)
-async function embedContentWithRetry(model, text, requestOptions = {}, maxAttempts = 4) {
-    let attempt = 0;
-    let delay = 1000; // 1 second base delay
-    while (true) {
-        attempt++;
-        try {
-            return await model.embedContent(text, requestOptions);
-        } catch (err) {
-            const status = err.status || 0;
-            const message = err.message || '';
-            const isTransient = status === 503 || status === 500 || status === 429 || 
-                                message.includes('503') || message.includes('429') || message.includes('Service Unavailable');
-            
-            if (isTransient && attempt < maxAttempts) {
-                console.warn(`[Gemini Embed] Attempt ${attempt} failed with transient error: ${message}. Retrying in ${delay}ms...`);
-                await new Promise(resolve => setTimeout(resolve, delay));
-                delay *= 2; // exponential backoff
-                continue;
-            }
-            throw err;
-        }
-    }
-}
-
 // ── Embeddings ────────────────────────────────────────────────────────────────
 
 /**
@@ -58,7 +33,7 @@ async function embedTexts(texts, requestOptions = {}) {
     for (let i = 0; i < texts.length; i += BATCH) {
         const batch = texts.slice(i, i + BATCH);
         const results = await Promise.all(
-            batch.map(t => embedContentWithRetry(model, t, requestOptions))
+            batch.map(t => model.embedContent(t, requestOptions))
         );
         results.forEach(r => all.push(r.embedding.values));
     }
