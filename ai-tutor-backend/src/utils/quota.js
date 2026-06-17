@@ -117,22 +117,20 @@ function requireChatQuota() {
 }
 
 async function recordChatUsage(userId) {
-  const limit = await getUserQuotaLimit(userId, 'chat_per_day', 30);
-  if (limit === -1) return;
   await recordUsage(userId, 'chat_messages');
 }
 
 async function checkAndRecordAiQuota(userId) {
   const limit = await getUserQuotaLimit(userId, 'ai_generations_per_day', 10);
-  if (limit === -1) return;
-
-  const used = await usageToday(userId, 'ai_features');
-  if (used >= limit) {
-    const err = new Error(
-      `Bạn đã dùng hết ${limit} lần tạo nội dung AI miễn phí hôm nay. Nâng cấp Pro hoặc quay lại vào ngày mai.`
-    );
-    err.statusCode = 429;
-    throw err;
+  if (limit !== -1) {
+    const used = await usageToday(userId, 'ai_features');
+    if (used >= limit) {
+      const err = new Error(
+        `Bạn đã dùng hết ${limit} lần tạo nội dung AI miễn phí hôm nay. Nâng cấp Pro hoặc quay lại vào ngày mai.`
+      );
+      err.statusCode = 429;
+      throw err;
+    }
   }
   await recordUsage(userId, 'ai_features');
 }
