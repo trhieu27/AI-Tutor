@@ -883,6 +883,7 @@ router.get('/users/:id', async (req, res) => {
       getPresenceByUser([user.id]),
     ]);
 
+    const planMap = await getPlanMap();
     const isProActive = Boolean(subscription && subscription.status === 'active' && subscription.plan_id !== 'free' && (!subscription.expires_at || new Date(subscription.expires_at) > new Date()));
     const plan = isProActive ? planMap.get(subscription.plan_id) : planMap.get('free');
     const presence = presenceByUser.get(user.id) || {};
