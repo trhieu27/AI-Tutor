@@ -883,13 +883,13 @@ router.get('/users/:id', async (req, res) => {
       getPresenceByUser([user.id]),
     ]);
 
-    const planMap = await getPlanMap();
-    const plan = subscription ? planMap.get(subscription.plan_id) : planMap.get('free');
+    const isProActive = Boolean(subscription && subscription.status === 'active' && subscription.plan_id !== 'free' && (!subscription.expires_at || new Date(subscription.expires_at) > new Date()));
+    const plan = isProActive ? planMap.get(subscription.plan_id) : planMap.get('free');
     const presence = presenceByUser.get(user.id) || {};
 
     res.json({
       user: serializeUser(user, {
-        is_pro: Boolean(subscription && subscription.status === 'active' && subscription.plan_id !== 'free' && (!subscription.expires_at || new Date(subscription.expires_at) > new Date())),
+        is_pro: isProActive,
         is_online: (user.status || 'active') === 'active' && (presence.online_sessions || 0) > 0,
         last_active: presence.last_active || null,
         online_until: presence.online_until || null,
