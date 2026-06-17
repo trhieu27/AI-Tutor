@@ -790,7 +790,15 @@ export default function DocumentTable({
       <ConfirmDialog
         open={!!pendingDelete}
         title={DOCUMENT_TABLE_TEXTS.deleteConfirm.title}
-        message={DOCUMENT_LIBRARY_TEXTS.deleteConfirm.message(pendingDelete?.file_name || pendingDelete?.fileName || "")}
+        message={
+          <>
+            Bạn có chắc muốn xóa{" "}
+            <span className="break-all font-semibold">
+              "{pendingDelete?.file_name || pendingDelete?.fileName || ""}"
+            </span>
+            ? Thao tác này không thể hoàn tác.
+          </>
+        }
         confirmLabel={DOCUMENT_LIBRARY_TEXTS.deleteConfirm.confirm}
         cancelLabel={DOCUMENT_TABLE_TEXTS.deleteConfirm.cancel}
         variant="danger"

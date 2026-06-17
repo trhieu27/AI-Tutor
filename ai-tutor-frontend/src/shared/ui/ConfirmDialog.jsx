@@ -83,7 +83,7 @@ export default function ConfirmDialog({
           </div>
           <p
             id="confirm-dialog-desc"
-            className="text-[13px] leading-relaxed pl-[52px] text-[var(--muted)] font-medium break-all"
+            className="text-[13px] leading-relaxed pl-[52px] text-[var(--muted)] font-medium break-words"
           >
             {message}
           </p>

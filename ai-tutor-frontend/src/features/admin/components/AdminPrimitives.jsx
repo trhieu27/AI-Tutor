@@ -1049,7 +1049,7 @@ export function AdminConfirmDialog({ open, title = "Xác nhận", message, confi
       <div className="fixed inset-0" style={{ background: "color-mix(in oklch, var(--foreground) 42%, transparent)" }} />
       <div className="relative w-full max-w-[400px] rounded-[var(--radius-panel)] border border-[var(--border-color)] bg-[var(--card-bg)] p-5 shadow-[var(--premium-shadow-md)]" onClick={e => e.stopPropagation()}>
         <p className="text-[15px] font-[760] text-[var(--foreground)]">{title}</p>
-        <p className="mt-2 text-[13px] font-medium leading-6 text-[var(--muted)] break-all">{message}</p>
+        <p className="mt-2 text-[13px] font-medium leading-6 text-[var(--muted)] break-words">{message}</p>
         <div className="mt-5 flex items-center justify-end gap-2">
           <button type="button" onClick={onCancel} className="h-9 rounded-[var(--radius-control)] border border-[var(--border-color)] bg-[var(--surface)] px-4 text-[12px] font-bold text-[var(--foreground)] transition hover:bg-[var(--card-bg-hover)]">{cancelLabel}</button>
           <button type="button" onClick={onConfirm} className="h-9 rounded-[var(--radius-control)] px-4 text-[12px] font-bold text-[var(--on-danger)] transition hover:opacity-90" style={{ background: toneMap[tone] || toneMap.rose }}>{confirmLabel}</button>

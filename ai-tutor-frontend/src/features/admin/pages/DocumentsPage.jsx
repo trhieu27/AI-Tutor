@@ -178,7 +178,13 @@ export default function AdminDocumentsPage() {
         <AdminConfirmDialog
           open={!!confirmDoc}
           title="Xác nhận xóa"
-          message={`Bạn có chắc muốn xóa tài liệu "${confirmDoc?.file_name}"? Hành động này không thể hoàn tác.`}
+          message={
+            <>
+              Bạn có chắc muốn xóa tài liệu{" "}
+              <span className="break-all font-semibold">"{confirmDoc?.file_name}"</span>
+              ? Hành động này không thể hoàn tác.
+            </>
+          }
           confirmLabel="Xóa"
           cancelLabel="Hủy"
           onConfirm={confirmDelete}
