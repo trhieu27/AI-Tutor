@@ -13,6 +13,7 @@ function getSessionTitle(session) {
 
 function SessionMenu({ sessionId, onDelete, onShare, anchorRect, onClose }) {
   const menuRef = useRef(null);
+  const [position, setPosition] = useState(null);
 
   useEffect(() => {
     const handleClick = (e) => { if (!menuRef.current?.contains(e.target)) onClose(); };
@@ -25,13 +26,28 @@ function SessionMenu({ sessionId, onDelete, onShare, anchorRect, onClose }) {
     };
   }, [onClose]);
 
+  useEffect(() => {
+    if (!anchorRect || !menuRef.current) return;
+    const menu = menuRef.current;
+    const menuH = menu.offsetHeight;
+    const menuW = menu.offsetWidth;
+    const gap = 4;
+    const spaceBelow = window.innerHeight - anchorRect.bottom - gap;
+    const top = spaceBelow >= menuH
+      ? anchorRect.bottom + gap
+      : anchorRect.top - menuH - gap;
+    const left = Math.min(anchorRect.left, window.innerWidth - menuW - 8);
+    setPosition({ top, left });
+  }, [anchorRect]);
+
   if (!anchorRect) return null;
 
   const style = {
     position: "fixed",
-    top: anchorRect.bottom + 4,
-    left: anchorRect.left,
+    top: position?.top ?? -9999,
+    left: position?.left ?? -9999,
     zIndex: 9999,
+    visibility: position ? "visible" : "hidden",
   };
 
   return createPortal(
