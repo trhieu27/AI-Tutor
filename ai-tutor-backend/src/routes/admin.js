@@ -1020,7 +1020,7 @@ router.post('/users/:id/subscription', async (req, res) => {
       if (Number.isNaN(expiresAt.getTime())) return res.status(400).json({ detail: 'Ngày hết hạn không hợp lệ' });
     } else if (plan.billing_cycle === 'monthly') {
       expiresAt = new Date();
-      expiresAt.setMinutes(expiresAt.getMinutes() + 1); // TEST: 1 phút
+      expiresAt.setMonth(expiresAt.getMonth() + 1);
     } else if (plan.billing_cycle === 'annual') {
       expiresAt = new Date();
       expiresAt.setFullYear(expiresAt.getFullYear() + 1);
