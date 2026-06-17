@@ -414,7 +414,7 @@ async function buildUserListQuery(req, { includeSearch = true } = {}) {
   const searchQuery = userMatchesSearchQuery(req.query.search);
   const query = {
     ...(includeSearch ? searchQuery : {}),
-    role: { $in: ['STUDENT', null] },
+    role: { $in: ['STUDENT', 'ADMIN', null] },
   };
   const idConstraints = [];
 
