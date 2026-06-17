@@ -1,6 +1,7 @@
 const mammoth = require('mammoth');
 const fs = require('fs');
 const path = require('path');
+const { execFileSync } = require('child_process');
 
 // Cache the ESM import (pdfjs-dist v4 is ESM-only)
 let _pdfjs = null;
@@ -9,6 +10,43 @@ async function getPdfjs() {
     _pdfjs = await import('pdfjs-dist/legacy/build/pdf.mjs');
   }
   return _pdfjs;
+}
+
+/**
+ * Convert DOCX/DOC to PDF using LibreOffice headless.
+ * Returns the path to the converted PDF, or null if LibreOffice is unavailable.
+ *
+ * @param {string} filePath - Absolute path to the DOCX/DOC file
+ * @returns {string|null} - Path to converted PDF, or null on failure
+ */
+function convertDocxToPdf(filePath) {
+  const dir = path.dirname(filePath);
+  const baseName = path.basename(filePath, path.extname(filePath));
+  const pdfPath = path.join(dir, `${baseName}.pdf`);
+
+  // If PDF already exists (previous conversion), reuse it
+  if (fs.existsSync(pdfPath)) return pdfPath;
+
+  try {
+    execFileSync('libreoffice', [
+      '--headless',
+      '--norestore',
+      '--convert-to', 'pdf',
+      '--outdir', dir,
+      filePath,
+    ], {
+      timeout: 120_000, // 2 phút timeout cho file lớn
+      stdio: 'pipe',
+    });
+
+    if (fs.existsSync(pdfPath)) {
+      console.log(`[Extractor] Converted DOCX → PDF: ${pdfPath}`);
+      return pdfPath;
+    }
+  } catch (err) {
+    console.warn('[Extractor] LibreOffice conversion failed (falling back to mammoth):', err.message);
+  }
+  return null;
 }
 
 /**
@@ -35,8 +73,26 @@ async function extractPdfText(buffer) {
 }
 
 /**
+ * Fallback: extract text from DOCX using mammoth (no page boundaries).
+ */
+async function extractDocxTextFallback(buffer) {
+  const result = await mammoth.extractRawText({ buffer });
+  const text = result.value || '';
+  const pageCount = Math.max(1, Math.ceil(text.length / 3000));
+  const pages = Array.from({ length: pageCount }, (_, index) => ({
+    page_number: index + 1,
+    text: text.slice(index * 3000, (index + 1) * 3000),
+  }));
+  return { text, pageCount, pages };
+}
+
+/**
  * Extract plain text from PDF or DOCX/DOC file.
- * Returns { text: string, pageCount: number }
+ *
+ * For DOCX/DOC: converts to PDF via LibreOffice first for accurate page numbers.
+ * Falls back to mammoth if LibreOffice is not available (local dev).
+ *
+ * Returns { text: string, pageCount: number, pages: Array }
  */
 async function extractText(filePath) {
   const ext = path.extname(filePath).toLowerCase();
@@ -47,14 +103,14 @@ async function extractText(filePath) {
   }
 
   if (ext === '.docx' || ext === '.doc') {
-    const result = await mammoth.extractRawText({ buffer });
-    const text = result.value || '';
-    const pageCount = Math.max(1, Math.ceil(text.length / 3000));
-    const pages = Array.from({ length: pageCount }, (_, index) => ({
-      page_number: index + 1,
-      text: text.slice(index * 3000, (index + 1) * 3000),
-    }));
-    return { text, pageCount, pages };
+    // Try converting to PDF first for accurate page-level extraction
+    const pdfPath = convertDocxToPdf(filePath);
+    if (pdfPath) {
+      const pdfBuffer = fs.readFileSync(pdfPath);
+      return extractPdfText(pdfBuffer);
+    }
+    // Fallback: mammoth (no page boundaries)
+    return extractDocxTextFallback(buffer);
   }
 
   throw new Error(`Định dạng file không hỗ trợ: ${ext}`);

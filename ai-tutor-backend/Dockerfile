@@ -1,5 +1,8 @@
 FROM node:20-alpine
 
+# LibreOffice headless for DOCX → PDF conversion (accurate page numbers)
+RUN apk add --no-cache libreoffice-writer font-noto
+
 WORKDIR /app
 
 COPY package*.json ./

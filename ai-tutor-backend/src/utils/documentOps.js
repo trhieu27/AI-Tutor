@@ -153,12 +153,11 @@ async function deleteDocumentResources(documentId) {
     }
   }
 
-  // Delete from local disk
+  // Delete from local disk (original file + converted PDF if any)
   for (const ext of ['.pdf', '.doc', '.docx']) {
     const filePath = path.join(config.uploadDir, `${documentId}${ext}`);
     if (fs.existsSync(filePath)) {
       fs.unlinkSync(filePath);
-      break;
     }
   }
 
