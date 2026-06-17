@@ -53,7 +53,14 @@ function PlanEditor({ plan, draft, saving, onChange, onSave }) {
     }
     onChange(plan.id, nextDraft);
   };
-  const updateQuota = (key, value) => onChange(plan.id, { ...draft, quota: { ...quota, [key]: value } });
+  const updateNumber = (key, raw) => {
+    const parsed = Number(raw);
+    update(key, Number.isFinite(parsed) ? parsed : 0);
+  };
+  const updateQuota = (key, raw) => {
+    const parsed = Number(raw);
+    onChange(plan.id, { ...draft, quota: { ...quota, [key]: Number.isFinite(parsed) ? parsed : 0 } });
+  };
 
   return (
     <article className="rounded-[var(--radius-panel)] border border-[var(--border-color)] bg-[var(--card-bg)] shadow-[var(--premium-shadow-sm)]">
@@ -78,11 +85,11 @@ function PlanEditor({ plan, draft, saving, onChange, onSave }) {
         </label>
         <label className="grid gap-1 text-[11px] font-bold text-[var(--muted)]">
           {ADMIN_TEXTS.plans.sortOrder}
-          <AdminInput type="number" value={draft.sort_order} onChange={(event) => update("sort_order", Number(event.target.value))} />
+          <AdminInput type="number" value={draft.sort_order} onChange={(event) => updateNumber("sort_order", event.target.value)} />
         </label>
         <label className="grid gap-1 text-[11px] font-bold text-[var(--muted)]">
           {ADMIN_TEXTS.plans.price}
-          <AdminInput type="number" min="0" step="1" value={draft.price_vnd} onChange={(event) => update("price_vnd", Number(event.target.value))} />
+          <AdminInput type="number" min="0" step="1" value={draft.price_vnd} onChange={(event) => updateNumber("price_vnd", event.target.value)} />
         </label>
         <label className="grid gap-1 text-[11px] font-bold text-[var(--muted)]">
           <span className="flex items-center gap-2">
@@ -93,7 +100,7 @@ function PlanEditor({ plan, draft, saving, onChange, onSave }) {
         </label>
         <label className="grid gap-1 text-[11px] font-bold text-[var(--muted)]">
           {ADMIN_TEXTS.plans.discount}
-          <AdminInput type="number" min="0" max="100" step="1" value={draft.discount_percent} onChange={(event) => update("discount_percent", Number(event.target.value))} />
+          <AdminInput type="number" min="0" max="100" step="1" value={draft.discount_percent} onChange={(event) => updateNumber("discount_percent", event.target.value)} />
         </label>
         <div className="flex flex-wrap items-center gap-2 pt-5">
           <button
@@ -118,15 +125,15 @@ function PlanEditor({ plan, draft, saving, onChange, onSave }) {
       <div className="grid gap-3 border-t border-[var(--border-subtle)] p-4 sm:grid-cols-2 xl:grid-cols-3">
         <label className="grid gap-1 text-[11px] font-bold text-[var(--muted)]">
           {ADMIN_TEXTS.plans.chatQuota}
-          <AdminInput type="number" value={quota.chat_per_day} onChange={(event) => updateQuota("chat_per_day", Number(event.target.value))} aria-label={ADMIN_TEXTS.plans.chatQuota} />
+          <AdminInput type="number" value={quota.chat_per_day} onChange={(event) => updateQuota("chat_per_day", event.target.value)} aria-label={ADMIN_TEXTS.plans.chatQuota} />
         </label>
         <label className="grid gap-1 text-[11px] font-bold text-[var(--muted)]">
           {ADMIN_TEXTS.plans.generationQuota}
-          <AdminInput type="number" value={quota.ai_generations_per_day} onChange={(event) => updateQuota("ai_generations_per_day", Number(event.target.value))} aria-label={ADMIN_TEXTS.plans.generationQuota} />
+          <AdminInput type="number" value={quota.ai_generations_per_day} onChange={(event) => updateQuota("ai_generations_per_day", event.target.value)} aria-label={ADMIN_TEXTS.plans.generationQuota} />
         </label>
         <label className="grid gap-1 text-[11px] font-bold text-[var(--muted)]">
           {ADMIN_TEXTS.plans.documentLimit}
-          <AdminInput type="number" value={quota.max_documents} onChange={(event) => updateQuota("max_documents", Number(event.target.value))} aria-label={ADMIN_TEXTS.plans.documentLimit} />
+          <AdminInput type="number" value={quota.max_documents} onChange={(event) => updateQuota("max_documents", event.target.value)} aria-label={ADMIN_TEXTS.plans.documentLimit} />
         </label>
         <p className="text-[11px] font-semibold leading-5 text-[var(--muted)] sm:col-span-2 xl:col-span-3">
           Nhập -1 cho các hạn mức không giới hạn.
