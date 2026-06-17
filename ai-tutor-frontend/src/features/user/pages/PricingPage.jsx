@@ -247,7 +247,7 @@ function formatFeatureText(text, plan) {
   return text;
 }
 
-function PlanCard({ plan, isActive, featured, onSelect }) {
+function PlanCard({ plan, isActive, featured, onSelect, hasActivePro }) {
   const texts = T.plans[plan.name] || {};
   const isFree = Number(plan.price_vnd || 0) === 0;
   const features = visibleFeatures(plan);
@@ -307,9 +307,18 @@ function PlanCard({ plan, isActive, featured, onSelect }) {
             <span className="material-symbols-outlined text-[17px]" aria-hidden="true">verified</span>
             {texts.ctaActive || T.planFallbacks.currentPlan}
           </div>
+        ) : isFree ? (
+          <div className="flex h-11 items-center justify-center rounded-[var(--radius-control)] border border-[var(--border-subtle)] text-[13px] font-semibold text-[var(--muted)]">
+            {texts.cta || T.planFallbacks.freeCta}
+          </div>
         ) : (
-          <Button variant={featured ? "primary" : "secondary"} onClick={() => onSelect(plan)} className="w-full">
-            {texts.cta || (isFree ? T.planFallbacks.freeCta : T.planFallbacks.proCta)}
+          <Button
+            variant={featured ? "primary" : "secondary"}
+            onClick={() => onSelect(plan)}
+            disabled={hasActivePro}
+            className="w-full"
+          >
+            {texts.cta || T.planFallbacks.proCta}
           </Button>
         )}
       </div>
@@ -392,10 +401,13 @@ export default function PricingPage() {
         fetch(`${API}/plans`),
         authFetch(`${API}/plans/my`),
       ]);
-      if (plansRes.ok) setPlans(await safeJson(plansRes, []));
+      const plansData = plansRes.ok ? await safeJson(plansRes, []) : [];
+      setPlans(plansData);
       if (myRes.ok) {
         const data = await safeJson(myRes, {});
-        setMyPlan(data?.plan);
+        setMyPlan(data?.plan || plansData.find(p => p.id === 'free') || null);
+      } else {
+        setMyPlan(plansData.find(p => p.id === 'free') || null);
       }
     } finally {
       setLoading(false);
@@ -429,6 +441,8 @@ export default function PricingPage() {
   }, [bgOrderCode, refreshUser, load]);
 
 
+
+  const hasActivePro = myPlan && Number(myPlan.price_vnd || 0) > 0;
 
   const visiblePlans = useMemo(
     () => plans.filter((plan) => plan.name === "free" || (billingAnnual ? plan.billing_cycle === "annual" : plan.billing_cycle === "monthly")),
@@ -496,6 +510,7 @@ export default function PricingPage() {
                 plan={plan}
                 featured={plan.price_vnd > 0}
                 isActive={myPlan?.id === plan.id}
+                hasActivePro={hasActivePro}
                 onSelect={setSelectedPlan}
               />
             ))}
