@@ -279,9 +279,9 @@ function PlanCard({ plan, isActive, featured, onSelect, hasActivePro }) {
             <h3 className="truncate text-[18px] font-bold text-[var(--foreground)]">{plan.display_name}</h3>
           </div>
         </div>
-        {featured && (
+        {(plan.is_popular || plan.discount_percent > 0) && (
           <span className="shrink-0 rounded-[var(--radius-chip)] bg-[var(--foreground)] px-2.5 py-1 text-[10px] font-bold text-[var(--background)]">
-            {plan.billing_cycle === "annual" && plan.discount_percent > 0 ? T.toggle.saveBadge(plan.discount_percent) : texts.popularBadge || T.planFallbacks.popular}
+            {plan.is_popular ? (texts.popularBadge || T.planFallbacks.popular) : T.toggle.saveBadge(plan.discount_percent)}
           </span>
         )}
       </div>
@@ -508,7 +508,7 @@ export default function PricingPage() {
               <PlanCard
                 key={plan.id}
                 plan={plan}
-                featured={plan.price_vnd > 0}
+                featured={plan.is_popular}
                 isActive={myPlan?.id === plan.id}
                 hasActivePro={hasActivePro}
                 onSelect={setSelectedPlan}
