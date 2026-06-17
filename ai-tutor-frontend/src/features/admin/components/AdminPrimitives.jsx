@@ -271,7 +271,20 @@ export function AdminStatusPill({ children, tone = "neutral", icon }) {
   );
 }
 
-export function AdminInput({ icon, className = "", ...props }) {
+export function AdminInput({ icon, className = "", type, value, ...props }) {
+  const inputRef = useRef(null);
+
+  // Force-sync DOM value for number inputs to strip leading zeros
+  // React won't update DOM when Number("010") === Number("10")
+  useEffect(() => {
+    const el = inputRef.current;
+    if (!el || type !== "number" || document.activeElement !== el) return;
+    const expected = String(value ?? "");
+    if (el.value !== expected && Number(el.value) === Number(expected)) {
+      el.value = expected;
+    }
+  });
+
   return (
     <label className={cx("relative block min-w-0", className)}>
       {icon && (
@@ -280,6 +293,9 @@ export function AdminInput({ icon, className = "", ...props }) {
         </span>
       )}
       <input
+        ref={inputRef}
+        type={type}
+        value={value}
         {...props}
         className={cx("premium-input h-10 px-3", icon && "pl-9", props.className)}
       />
