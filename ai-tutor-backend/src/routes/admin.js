@@ -1244,7 +1244,10 @@ router.get('/documents', async (req, res) => {
       const from = parseDate(req.query.from, null);
       const to = parseDate(req.query.to, null);
       if (from) query.uploaded_at.$gte = from;
-      if (to) query.uploaded_at.$lte = to;
+      if (to) {
+        to.setHours(23, 59, 59, 999);
+        query.uploaded_at.$lte = to;
+      }
       if (!Object.keys(query.uploaded_at).length) delete query.uploaded_at;
     }
 
@@ -1432,7 +1435,13 @@ router.get('/audit', async (req, res) => {
     if (req.query.from || req.query.to) {
       query.created_at = {};
       if (req.query.from) query.created_at.$gte = parseDate(req.query.from, null);
-      if (req.query.to) query.created_at.$lte = parseDate(req.query.to, null);
+      if (req.query.to) {
+        const to = parseDate(req.query.to, null);
+        if (to) {
+          to.setHours(23, 59, 59, 999);
+          query.created_at.$lte = to;
+        }
+      }
     }
 
     const [total, logs] = await Promise.all([
