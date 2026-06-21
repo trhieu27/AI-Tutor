@@ -9,6 +9,8 @@ import StatusBadge from "@/shared/ui/StatusBadge";
 import { Skeleton } from "@/shared/ui/States";
 import { PageFrame, Surface, cx } from "@/shared/ui/Premium";
 
+import SampleDocuments from "@/features/user/components/SampleDocuments";
+
 import {
   getDocumentDate,
   getDocumentExt,
@@ -22,6 +24,7 @@ const T = DASHBOARD_WORKSPACE_TEXTS;
 
 // Module-level cache — survives tab navigation
 const sessionCache = { data: [], loaded: false };
+
 
 const STEP_STYLES = {
   done: "border-[var(--success-border)] bg-[var(--success-soft)] text-[var(--brand-success)]",
@@ -54,6 +57,7 @@ function formatSessionTime(value) {
     minute: "2-digit",
   });
 }
+
 
 function ProgressStep({ index, icon, title, meta, state }) {
   return (
@@ -285,6 +289,7 @@ export default function DashboardPage() {
   const hasDocuments = documents.length > 0;
   const primaryCtaLabel = latestReady || latestSession ? T.hero.continue : T.hero.upload;
   const primaryCtaIcon = latestReady || latestSession ? "play_arrow" : "upload_file";
+
   const studySteps = [
     {
       icon: "upload_file",
@@ -406,53 +411,29 @@ export default function DashboardPage() {
         </Surface>
       </section>
 
+      <SampleDocuments />
 
-      <Surface className="p-4 sm:p-5">
-        <div className="mb-4 flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
-          <div>
-            <h2 className="text-[15px] font-semibold text-[var(--foreground)]">{T.actions.title}</h2>
-            {T.actions.subtitle && (
-              <p className="mt-1 text-[12px] font-medium text-[var(--muted)]">{T.actions.subtitle}</p>
-            )}
-          </div>
-        </div>
-        <div className="grid grid-cols-2 gap-2 xl:grid-cols-4">
-          {quickActions.map((action) => (
-            <QuickAction key={action.title} {...action} />
-          ))}
-        </div>
-      </Surface>
 
-      <Surface className="p-4 sm:p-5">
-        <div className="mb-4 flex items-center justify-between gap-3">
-          <div>
-            <h2 className="text-[15px] font-semibold text-[var(--foreground)]">{T.recentDocuments.title}</h2>
-            {T.recentDocuments.subtitle && (
-              <p className="mt-1 text-[12px] font-medium text-[var(--muted)]">{T.recentDocuments.subtitle}</p>
-            )}
+
+      {hasDocuments && (
+        <Surface className="p-4 sm:p-5">
+          <div className="mb-4 flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
+            <div>
+              <h2 className="text-[15px] font-semibold text-[var(--foreground)]">{T.actions.title}</h2>
+              {T.actions.subtitle && (
+                <p className="mt-1 text-[12px] font-medium text-[var(--muted)]">{T.actions.subtitle}</p>
+              )}
+            </div>
           </div>
-          <Button to="/learning" variant="ghost" trailingIcon="arrow_forward" size="sm">
-            {T.recentDocuments.viewAll}
-          </Button>
-        </div>
-        {recentDocuments.length > 0 ? (
-          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-            {recentDocuments.map((doc) => (
-              <RecentDocument key={doc.id} doc={doc} />
+          <div className="grid grid-cols-2 gap-2 xl:grid-cols-4">
+            {quickActions.map((action) => (
+              <QuickAction key={action.title} {...action} />
             ))}
           </div>
-        ) : (
-          <div className="rounded-[var(--radius-panel)] border border-dashed border-[var(--border-color)] bg-[var(--surface)] px-4 py-8 text-center">
-            <span className="mx-auto flex h-11 w-11 items-center justify-center rounded-[var(--radius-panel)] border border-[var(--border-color)] bg-[var(--card-bg)] text-[var(--muted)]">
-              <span className="material-symbols-outlined icon-thin text-[24px]" aria-hidden="true">
-                folder_open
-              </span>
-            </span>
-            <h3 className="mt-3 text-[14px] font-bold text-[var(--foreground)]">{T.recentDocuments.emptyTitle}</h3>
-            <p className="mt-1 text-[12px] font-medium text-[var(--muted)]">{T.recentDocuments.emptySubtitle}</p>
-          </div>
-        )}
-      </Surface>
+        </Surface>
+      )}
+
+
     </PageFrame>
   );
 }

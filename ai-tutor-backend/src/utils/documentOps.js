@@ -6,6 +6,53 @@ const config = require('../config');
 const rag = require('../rag/pipeline');
 const s3 = require('./s3');
 const { clearAdminOverviewCache } = require('./cacheInvalidation');
+const { generateText } = require('../rag/gemini');
+
+/**
+ * Classify a document's topic via Gemini lite and save to DB.
+ * Uses document summary + file name for best accuracy.
+ */
+async function classifyAndSaveTopic(documentId, fileName) {
+  let name = (fileName || '').replace(/\.[^.]+$/, '');
+  try { name = decodeURIComponent(name); } catch (e) { /* ignore */ }
+  name = name.replace(/[_-]/g, ' ').replace(/%20/g, ' ').replace(/\s+/g, ' ').trim();
+
+  // Gather context: summary from DB + sample text from ChromaDB
+  let context = '';
+  try {
+    const doc = await Document.findOne({ id: documentId }).select('summary chroma_collection_id').lean();
+    if (doc?.summary) {
+      context = doc.summary.slice(0, 300);
+    }
+    // Also try to get first chunks from ChromaDB for more context
+    if (!context && doc?.chroma_collection_id) {
+      try {
+        const vectorstore = require('../rag/vectorstore');
+        const allDocs = await vectorstore.getAllDocuments(doc.chroma_collection_id);
+        if (allDocs?.length) {
+          context = allDocs.slice(0, 2).join(' ').slice(0, 400);
+        }
+      } catch (e) { /* ignore chromadb errors */ }
+    }
+  } catch (e) { /* ignore */ }
+
+  const input = [
+    name ? `Tên file: "${name}"` : '',
+    context ? `Nội dung: ${context}` : '',
+  ].filter(Boolean).join('\n');
+
+  if (!input) return;
+
+  const result = await generateText(
+    `Phân loại tài liệu học thuật này vào MỘT chủ đề ngắn gọn (2-5 từ, tiếng Việt hoặc thuật ngữ gốc nếu phổ biến hơn). Chỉ trả về tên chủ đề, không giải thích.\n\n${input}`,
+    { temperature: 0.1, maxTokens: 30, modelTier: 'lite' }
+  );
+  const topic = result.trim().replace(/^["']+|["']+$/g, '').replace(/^chủ đề:\s*/i, '').slice(0, 50);
+  if (topic) {
+    await Document.updateOne({ id: documentId }, { $set: { topic } });
+    console.log(`[Topic] ${fileName} → "${topic}"`);
+  }
+}
 
 /**
  * Find a stored file — checks local filesystem first, then S3.
@@ -78,6 +125,11 @@ async function processDocumentBackground(documentId, filePath, ownerId) {
     clearAdminOverviewCache();
     sendAdminRealtimeEvent('document_status_changed', { id: documentId, status: 'READY', file_name: doc.file_name }).catch(console.error);
 
+    // Classify topic in background (non-blocking)
+    classifyAndSaveTopic(documentId, doc.file_name).catch(err =>
+      console.warn('[Topic] Classification failed:', err.message)
+    );
+
     try {
       await sendNotification(ownerId, 'document_ready', 'Xử lý thành công',
         `Tài liệu "${doc.file_name}" đã sẵn sàng để chat với AI.`,
@@ -134,7 +186,7 @@ async function retryDocumentProcessing(documentId) {
   return Document.findOne({ id: documentId }).lean();
 }
 
-async function deleteDocumentResources(documentId) {
+async function deleteDocumentResources(documentId, { cascade = false } = {}) {
   // Cancel any in-progress processing job
   cancelDocumentProcessing(documentId);
 
@@ -145,30 +197,78 @@ async function deleteDocumentResources(documentId) {
     throw err;
   }
 
-  if (doc.chroma_collection_id) {
+  // ── Cascade delete: remove all clones if this is an original doc ──
+  // Only triggered by admin delete — owner delete keeps clones alive.
+  const isOriginal = !doc._shared_doc_id;
+  if (cascade && isOriginal) {
+    const clones = await Document.find({ _shared_doc_id: documentId }).select('id').lean();
+    if (clones.length > 0) {
+      const cloneIds = clones.map(c => c.id);
+      console.log(`[Delete] Cascade deleting ${cloneIds.length} clone(s) of ${documentId}`);
+      await ChatSession.deleteMany({ document_id: { $in: cloneIds } });
+      await Document.deleteMany({ _shared_doc_id: documentId });
+      for (const cloneId of cloneIds) {
+        sendAdminRealtimeEvent('document_status_changed', { id: cloneId, status: 'DELETED', file_name: doc.file_name }).catch(console.error);
+      }
+    }
+  }
+
+  // ── Reference counting ──────────────────────────────────────────
+  // After cascade, re-count to see if shared resources can be cleaned up.
+
+  // The file ID used for storage — either this doc's own file, or the original's
+  const fileId = doc._shared_doc_id || documentId;
+
+  // Count other docs that share the same file (via _shared_doc_id or as the original)
+  const fileRefCount = await Document.countDocuments({
+    id: { $ne: documentId },
+    $or: [
+      { _shared_doc_id: fileId },          // other clones of the same original
+      { id: fileId, _shared_doc_id: null }, // the original doc itself (if we're deleting a clone)
+    ],
+  });
+
+  // Count other docs that share the same ChromaDB collection
+  const chromaRefCount = doc.chroma_collection_id
+    ? await Document.countDocuments({
+      id: { $ne: documentId },
+      chroma_collection_id: doc.chroma_collection_id,
+    })
+    : 0;
+
+  // ── Cleanup shared resources only if no other refs ───────────────
+
+  if (doc.chroma_collection_id && chromaRefCount === 0) {
     try {
       await rag.deleteDocumentCollection(doc.chroma_collection_id);
     } catch (err) {
       console.warn('RAG delete collection error (ignored):', err.message);
     }
+  } else if (chromaRefCount > 0) {
+    console.log(`[Delete] Keeping ChromaDB collection (${chromaRefCount} other docs still use it)`);
   }
 
-  // Delete from local disk (original file + converted PDF if any)
-  for (const ext of ['.pdf', '.doc', '.docx']) {
-    const filePath = path.join(config.uploadDir, `${documentId}${ext}`);
-    if (fs.existsSync(filePath)) {
-      fs.unlinkSync(filePath);
+  if (fileRefCount === 0) {
+    // Delete from local disk (original file + converted PDF if any)
+    for (const ext of ['.pdf', '.doc', '.docx']) {
+      const filePath = path.join(config.uploadDir, `${fileId}${ext}`);
+      if (fs.existsSync(filePath)) {
+        fs.unlinkSync(filePath);
+      }
     }
-  }
 
-  // Delete from S3
-  if (s3.s3Enabled) {
-    const s3File = await s3.findFile(documentId);
-    if (s3File) {
-      await s3.deleteFile(s3File.filename);
+    // Delete from S3
+    if (s3.s3Enabled) {
+      const s3File = await s3.findFile(fileId);
+      if (s3File) {
+        await s3.deleteFile(s3File.filename);
+      }
     }
+  } else {
+    console.log(`[Delete] Keeping file ${fileId} (${fileRefCount} other docs still reference it)`);
   }
 
+  // ── Always delete the document record and its chat sessions ─────
   await Document.deleteOne({ id: documentId });
   sendAdminRealtimeEvent('document_status_changed', { id: documentId, status: 'DELETED', file_name: doc.file_name }).catch(console.error);
   await ChatSession.deleteMany({ document_id: documentId });

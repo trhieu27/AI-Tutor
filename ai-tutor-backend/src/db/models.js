@@ -50,6 +50,8 @@ const documentSchema = new mongoose.Schema({
   quiz: { type: mongoose.Schema.Types.Mixed, default: null },
   study_questions: { type: [String], default: null },
   _shared_doc_id: { type: String, default: null, index: true },
+  topic: { type: String, default: null, index: true },
+  is_sample: { type: Boolean, default: false, index: true },
   uploaded_at: { type: Date, default: Date.now },
   updated_at: { type: Date, default: Date.now },
 });
@@ -57,6 +59,7 @@ documentSchema.index({ uploaded_at: -1 });
 documentSchema.index({ status: 1, uploaded_at: -1 });
 documentSchema.index({ owner_id: 1, uploaded_at: -1 });
 documentSchema.index({ owner_id: 1, status: 1, uploaded_at: -1 });
+documentSchema.index({ status: 1, topic: 1 });
 
 // ── Chat Message ──────────────────────────────────────────────────────────────
 

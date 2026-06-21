@@ -5,12 +5,49 @@ const { ShareLink, ChatSession, Document } = require('../db/models');
 const { authMiddleware } = require('../middleware/auth');
 const { clearAdminOverviewCache } = require('../utils/cacheInvalidation');
 
-// POST /api/v1/share — Create share link for a chat session
+// POST /api/v1/share — Create share link for a chat session or document
 router.post('/', authMiddleware, async (req, res) => {
   try {
-    const { session_id } = req.body;
+    const { session_id, document_id } = req.body;
+
+    // ── Document share ────────────────────────────────────────────────
+    if (document_id) {
+      const doc = await Document.findOne({ id: document_id, owner_id: req.userId });
+      if (!doc) return res.status(404).json({ detail: 'Tài liệu không tồn tại hoặc không thuộc về bạn' });
+      if (doc.status !== 'READY') return res.status(400).json({ detail: 'Tài liệu chưa sẵn sàng để chia sẻ' });
+
+      const existing = await ShareLink.findOne({
+        owner_id: req.userId,
+        resource_type: 'document',
+        resource_id: document_id,
+      });
+      if (existing) {
+        return res.json({
+          id: existing.id,
+          resource_type: 'document',
+          view_count: existing.view_count,
+          created_at: existing.created_at,
+        });
+      }
+
+      const link = await ShareLink.create({
+        id: uuidv4(),
+        owner_id: req.userId,
+        resource_type: 'document',
+        resource_id: document_id,
+      });
+
+      return res.status(201).json({
+        id: link.id,
+        resource_type: 'document',
+        view_count: 0,
+        created_at: link.created_at,
+      });
+    }
+
+    // ── Chat session share ────────────────────────────────────────────
     if (!session_id) {
-      return res.status(400).json({ detail: 'Thiếu session_id' });
+      return res.status(400).json({ detail: 'Thiếu session_id hoặc document_id' });
     }
 
     // Verify ownership
@@ -29,6 +66,7 @@ router.post('/', authMiddleware, async (req, res) => {
     if (existing) {
       return res.json({
         id: existing.id,
+        resource_type: 'chat',
         view_count: existing.view_count,
         created_at: existing.created_at,
       });
@@ -43,6 +81,7 @@ router.post('/', authMiddleware, async (req, res) => {
 
     res.status(201).json({
       id: link.id,
+      resource_type: 'chat',
       view_count: 0,
       created_at: link.created_at,
     });
@@ -52,7 +91,7 @@ router.post('/', authMiddleware, async (req, res) => {
   }
 });
 
-// GET /api/v1/share/:id — Clone shared chat into user's history, return redirect info
+// GET /api/v1/share/:id — Clone shared resource into user's account
 router.get('/:id', authMiddleware, async (req, res) => {
   try {
     const link = await ShareLink.findOne({ id: req.params.id });
@@ -62,6 +101,52 @@ router.get('/:id', authMiddleware, async (req, res) => {
       return res.status(410).json({ detail: 'Link chia sẻ đã hết hạn' });
     }
 
+    // ── Document share ────────────────────────────────────────────────
+    if (link.resource_type === 'document') {
+      const origDoc = await Document.findOne({ id: link.resource_id }).lean();
+      if (!origDoc) return res.status(404).json({ detail: 'Tài liệu không còn tồn tại' });
+
+      // Owner sees their own document
+      if (req.userId === link.owner_id) {
+        ShareLink.updateOne({ id: link.id }, { $inc: { view_count: 1 } }).catch(() => {});
+        return res.json({
+          resource_type: 'document',
+          document_id: origDoc.id,
+          is_owner: true,
+        });
+      }
+
+      // Clone document into user's library
+      let userDoc = await Document.findOne({ owner_id: req.userId, _shared_doc_id: origDoc.id });
+      if (!userDoc) {
+        userDoc = await Document.create({
+          id: uuidv4(),
+          owner_id: req.userId,
+          file_name: origDoc.file_name,
+          file_size_mb: origDoc.file_size_mb,
+          page_count: origDoc.page_count,
+          status: origDoc.status,
+          chroma_collection_id: origDoc.chroma_collection_id,
+          summary: origDoc.summary,
+          mindmap: origDoc.mindmap,
+          quiz: origDoc.quiz,
+          study_questions: origDoc.study_questions,
+          _shared_doc_id: origDoc.id,
+          uploaded_at: new Date(),
+          updated_at: new Date(),
+        });
+        clearAdminOverviewCache();
+      }
+
+      ShareLink.updateOne({ id: link.id }, { $inc: { view_count: 1 } }).catch(() => {});
+      return res.json({
+        resource_type: 'document',
+        document_id: userDoc.id,
+        is_owner: false,
+      });
+    }
+
+    // ── Chat session share ────────────────────────────────────────────
     const session = await ChatSession.findOne({ id: link.resource_id }).lean();
     if (!session) return res.status(404).json({ detail: 'Cuộc trò chuyện không còn tồn tại' });
 

@@ -3,7 +3,7 @@ import { useParams, useNavigate } from "react-router-dom";
 import { fetchSharedContent } from "@/shared/services/api.service";
 
 /**
- * ShareRedirect — clone shared chat vào history, rồi chuyển thẳng đến chat
+ * ShareRedirect — clone shared chat/document vào account, rồi chuyển đến trang tương ứng
  */
 export default function ShareRedirect() {
   const { shareId } = useParams();
@@ -15,7 +15,12 @@ export default function ShareRedirect() {
     fetchSharedContent(shareId)
       .then((data) => {
         if (!active) return;
-        if (data.document_id && data.session_id) {
+        // Document share → redirect to chat with that document
+        if (data.resource_type === "document" && data.document_id) {
+          navigate(`/chat/${data.document_id}`, { replace: true });
+        }
+        // Chat share → redirect to chat with session
+        else if (data.document_id && data.session_id) {
           navigate(`/chat/${data.document_id}?session=${data.session_id}`, { replace: true });
         } else {
           setError("Dữ liệu chia sẻ không hợp lệ");

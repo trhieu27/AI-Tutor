@@ -6,13 +6,15 @@
  * so existing component code continues to work without changes.
  */
 export class Document {
-  constructor({ id, file_name, file_size_mb, page_count, status, uploaded_at }) {
+  constructor({ id, file_name, file_size_mb, page_count, status, uploaded_at, is_sample, _shared_doc_id }) {
     this.id          = id;
     this.fileName    = file_name;
     this.fileSizeMb  = file_size_mb;
     this.pageCount   = page_count ?? 0;
     this.status      = status;           // 'READY' | 'PROCESSING' | 'UPLOADING' | 'FAILED'
     this.uploadedAt  = uploaded_at ? new Date(uploaded_at) : new Date();
+    this.is_sample   = !!is_sample;
+    this._shared_doc_id = _shared_doc_id || null;
 
     // ── snake_case aliases for backward-compat with existing JSX ──
     this.file_name    = file_name;

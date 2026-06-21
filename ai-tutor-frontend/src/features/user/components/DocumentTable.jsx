@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { getPaginationItems } from "@/shared/utils/paginationUtils";
 import { createPortal } from "react-dom";
 import { useNavigate } from "react-router-dom";
-import { deleteDocument, retryDocument } from "@/shared/services/api.service";
+import { deleteDocument, retryDocument, toggleDocumentShare } from "@/shared/services/api.service";
 import { DOCUMENT_LIBRARY_TEXTS, DOCUMENT_TABLE_TEXTS } from "@/shared/constants/texts";
 import { useUpload } from "@/features/user/context/UploadContext";
 import { useDocuments } from "@/features/user/context/DocumentContext";
@@ -188,7 +188,102 @@ function ActionIcon({ label, icon, tone = "neutral", fullMobile = false, classNa
   );
 }
 
-function DocumentActions({ doc, defaultAction, deletingId, retryingId, onDelete, onRetry }) {
+/* ── MoreMenu (3-dot dropdown) ─────────────────────────────────────── */
+function MoreMenu({ items }) {
+  const [open, setOpen] = useState(false);
+  const btnRef = useRef(null);
+  const menuRef = useRef(null);
+  const [pos, setPos] = useState({});
+
+  useEffect(() => {
+    if (!open) return;
+    // Position the dropdown above the button using absolute + scroll offsets
+    if (btnRef.current) {
+      const rect = btnRef.current.getBoundingClientRect();
+      const scrollY = window.scrollY || document.documentElement.scrollTop;
+      const scrollX = window.scrollX || document.documentElement.scrollLeft;
+      // Render above: measure menu after mount, fallback 80px
+      const menuH = menuRef.current?.offsetHeight || 80;
+      const top = rect.top + scrollY - menuH - 4;
+      const left = rect.right + scrollX - (menuRef.current?.offsetWidth || 100);
+      setPos({ top: Math.max(4, top), left: Math.max(4, left) });
+    }
+    const handler = (e) => {
+      if (
+        btnRef.current && !btnRef.current.contains(e.target) &&
+        menuRef.current && !menuRef.current.contains(e.target)
+      ) setOpen(false);
+    };
+    const escHandler = (e) => { if (e.key === "Escape") setOpen(false); };
+    document.addEventListener("pointerdown", handler);
+    document.addEventListener("keydown", escHandler);
+    return () => {
+      document.removeEventListener("pointerdown", handler);
+      document.removeEventListener("keydown", escHandler);
+    };
+  }, [open]);
+
+  // Re-measure after menu mounts to get correct height
+  useEffect(() => {
+    if (!open || !menuRef.current || !btnRef.current) return;
+    const rect = btnRef.current.getBoundingClientRect();
+    const scrollY = window.scrollY || document.documentElement.scrollTop;
+    const scrollX = window.scrollX || document.documentElement.scrollLeft;
+    const menuH = menuRef.current.offsetHeight;
+    const menuW = menuRef.current.offsetWidth;
+    setPos({
+      top: Math.max(4, rect.top + scrollY - menuH - 4),
+      left: Math.max(4, rect.right + scrollX - menuW),
+    });
+  }, [open]);
+
+  return (
+    <>
+      <button
+        ref={btnRef}
+        type="button"
+        aria-label="Tùy chọn"
+        onClick={() => setOpen((o) => !o)}
+        className={`grid h-9 w-9 place-items-center rounded-lg transition-colors duration-150 ${
+          open
+            ? "bg-[var(--card-bg-hover)] text-[var(--foreground)]"
+            : "text-[var(--muted)] hover:bg-[var(--card-bg-hover)] hover:text-[var(--foreground)]"
+        }`}
+      >
+        <span className="material-symbols-outlined icon-thin text-[18px]">more_vert</span>
+      </button>
+      {open && createPortal(
+        <div
+          ref={menuRef}
+          className="absolute z-[9999] overflow-hidden whitespace-nowrap rounded-[var(--radius-control)] border border-[var(--border-color)] bg-[var(--card-bg)] py-1 shadow-[0_12px_32px_oklch(12%_0.018_238/0.24)]"
+          style={{ top: pos.top, left: pos.left, animation: "dialog-enter 120ms ease-out" }}
+        >
+          {items.map((item, i) => (
+            <button
+              key={i}
+              type="button"
+              disabled={item.disabled}
+              onClick={() => { setOpen(false); item.onClick(); }}
+              className={`flex w-full items-center gap-2.5 px-3 py-2 text-left text-[12px] font-semibold transition-colors duration-100 disabled:opacity-50 ${
+                item.tone === "danger"
+                  ? "text-[hsl(4_72%_52%)] hover:bg-[hsl(4_72%_52%/0.06)]"
+                  : "text-[var(--foreground)] hover:bg-[var(--card-bg-hover)]"
+              }`}
+            >
+              <span className={`material-symbols-outlined icon-thin text-[16px] ${
+                item.tone === "danger" ? "" : "text-[var(--muted)]"
+              }`}>{item.icon}</span>
+              {item.label}
+            </button>
+          ))}
+        </div>,
+        document.body
+      )}
+    </>
+  );
+}
+
+function DocumentActions({ doc, defaultAction, deletingId, retryingId, onDelete, onRetry, onShare }) {
   const status = normalizeDocumentStatus(doc.status);
   const deleting = deletingId === doc.id;
 
@@ -241,21 +336,26 @@ function DocumentActions({ doc, defaultAction, deletingId, retryingId, onDelete,
         <ActionIcon fullMobile label={DOCUMENT_LIBRARY_TEXTS.actions.quiz} icon="quiz" to={`/quiz/${doc.id}`} />
         <ActionIcon fullMobile label={DOCUMENT_LIBRARY_TEXTS.actions.mindmap} icon="account_tree" to={`/mindmap/${doc.id}`} />
         <span className="mx-0.5 h-5 w-px bg-[var(--border-subtle)]" aria-hidden="true" />
-        <ActionIcon
-          label={DOCUMENT_LIBRARY_TEXTS.actions.delete}
-          icon="delete"
-          tone="danger"
-          onClick={() => onDelete(doc)}
-          disabled={deleting}
-          fullMobile
-          className={deleting ? "opacity-55" : ""}
-        />
+        <MoreMenu items={[
+          !doc.is_sample && !doc._shared_doc_id && {
+            icon: "share",
+            label: "Chia sẻ",
+            onClick: () => onShare(doc),
+          },
+          {
+            icon: "delete",
+            label: DOCUMENT_LIBRARY_TEXTS.actions.delete,
+            tone: "danger",
+            disabled: deleting,
+            onClick: () => onDelete(doc),
+          },
+        ].filter(Boolean)} />
       </div>
     </div>
   );
 }
 
-function DocumentCard({ doc, defaultAction, deletingId, retryingId, onDelete, onRetry }) {
+function DocumentCard({ doc, defaultAction, deletingId, retryingId, onDelete, onRetry, onShare }) {
   const navigate = useNavigate();
   const ready = normalizeDocumentStatus(doc.status) === "ready";
   const target = getRedirectUrl(doc.id, defaultAction);
@@ -296,6 +396,7 @@ function DocumentCard({ doc, defaultAction, deletingId, retryingId, onDelete, on
           retryingId={retryingId}
           onDelete={onDelete}
           onRetry={onRetry}
+          onShare={onShare}
         />
       </div>
     </article>
@@ -460,6 +561,8 @@ function PaginationControls({
   );
 }
 
+
+
 export default function DocumentTable({
   showActions = false,
   defaultAction = null,
@@ -482,6 +585,7 @@ export default function DocumentTable({
   const [deletingId, setDeletingId] = useState(null);
   const [retryingId, setRetryingId] = useState(null);
   const [pendingDelete, setPendingDelete] = useState(null);
+  const [pendingShare, setPendingShare] = useState(null);
 
   // Đồng bộ search query với debounce
   useEffect(() => {
@@ -575,6 +679,18 @@ export default function DocumentTable({
     }
   };
 
+  const confirmShare = async () => {
+    if (!pendingShare) return;
+    const docId = pendingShare.id;
+    setPendingShare(null);
+    try {
+      await toggleDocumentShare(docId);
+      await refreshDocuments(true);
+    } catch (err) {
+      alert(err.message || "Lỗi chia sẻ tài liệu");
+    }
+  };
+
   const openReadyDocument = (doc) => {
     if (normalizeDocumentStatus(doc.status) !== "ready") return;
     navigate(getRedirectUrl(doc.id, defaultAction));
@@ -664,6 +780,7 @@ export default function DocumentTable({
                   retryingId={retryingId}
                   onDelete={setPendingDelete}
                   onRetry={handleRetry}
+                  onShare={setPendingShare}
                 />
               ))}
             </div>
@@ -750,6 +867,7 @@ export default function DocumentTable({
                           retryingId={retryingId}
                           onDelete={setPendingDelete}
                           onRetry={handleRetry}
+                          onShare={setPendingShare}
                         />
                       </td>
                     )}
@@ -804,6 +922,35 @@ export default function DocumentTable({
         variant="danger"
         onConfirm={confirmDelete}
         onCancel={() => setPendingDelete(null)}
+      />
+
+      <ConfirmDialog
+        open={!!pendingShare}
+        title={pendingShare?.is_sample ? "Hủy chia sẻ tài liệu" : "Chia sẻ tài liệu"}
+        message={
+          pendingShare?.is_sample ? (
+            <>
+              Tài liệu{" "}
+              <span className="break-all font-semibold">
+                "{pendingShare?.file_name || pendingShare?.fileName || ""}"
+              </span>{" "}
+              sẽ bị gỡ khỏi danh sách gợi ý. Người dùng khác sẽ không còn thấy tài liệu này.
+            </>
+          ) : (
+            <>
+              Chia sẻ{" "}
+              <span className="break-all font-semibold">
+                "{pendingShare?.file_name || pendingShare?.fileName || ""}"
+              </span>{" "}
+              cho mọi người? Tài liệu sẽ xuất hiện trong tab Tài liệu mẫu để tất cả người dùng có thể sử dụng.
+            </>
+          )
+        }
+        confirmLabel={pendingShare?.is_sample ? "Hủy chia sẻ" : "Chia sẻ"}
+        cancelLabel="Hủy"
+        variant={pendingShare?.is_sample ? "warning" : "info"}
+        onConfirm={confirmShare}
+        onCancel={() => setPendingShare(null)}
       />
 
     </>

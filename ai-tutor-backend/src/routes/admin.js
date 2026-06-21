@@ -825,7 +825,7 @@ router.get('/overview', async (req, res) => {
   } catch (err) {
     if (isMongoUnavailableError(err)) {
       console.warn('Admin overview MongoDB timeout, refreshing connections:', err.message);
-      refreshConnections().catch(() => {});
+      refreshConnections().catch(() => { });
       if (overviewCache) {
         res.set('X-Admin-Overview-Cache', 'stale');
         return res.json(overviewCache);
@@ -988,7 +988,7 @@ router.patch('/users/:id', async (req, res) => {
         const sockets = notificationManager._connections.get(target.id);
         if (sockets) {
           for (const ws of sockets) {
-            try { ws.close(1000, 'account_blocked'); } catch {}
+            try { ws.close(1000, 'account_blocked'); } catch { }
           }
           notificationManager._connections.delete(target.id);
         }
@@ -1140,7 +1140,7 @@ router.get('/revenue', async (req, res) => {
   } catch (err) {
     if (isMongoUnavailableError(err)) {
       console.warn('Admin revenue MongoDB timeout, refreshing connections:', err.message);
-      refreshConnections().catch(() => {});
+      refreshConnections().catch(() => { });
     } else {
       console.error('Admin revenue error:', err);
     }
@@ -1302,7 +1302,7 @@ router.post('/documents/:id/retry', async (req, res) => {
 // DELETE /api/v1/admin/documents/:id
 router.delete('/documents/:id', async (req, res) => {
   try {
-    const doc = await deleteDocumentResources(req.params.id);
+    const doc = await deleteDocumentResources(req.params.id, { cascade: true });
     clearOverviewCache();
     await logAudit(req, DANGEROUS_ACTIONS.DOCUMENT_DELETED, 'document', req.params.id, {
       owner_id: doc.owner_id,
@@ -1312,6 +1312,29 @@ router.delete('/documents/:id', async (req, res) => {
     res.status(204).send();
   } catch (err) {
     res.status(err.statusCode || 500).json({ detail: err.message || 'Lỗi xóa tài liệu' });
+  }
+});
+
+// PATCH /api/v1/admin/documents/:id/toggle-sample
+// Mark/unmark a document as a public sample for new users.
+router.patch('/documents/:id/toggle-sample', async (req, res) => {
+  try {
+    const doc = await Document.findOne({ id: req.params.id });
+    if (!doc) return res.status(404).json({ detail: 'Tài liệu không tồn tại' });
+    if (doc.status !== 'READY') return res.status(400).json({ detail: 'Tài liệu chưa sẵn sàng' });
+
+    doc.is_sample = !doc.is_sample;
+    doc.updated_at = new Date();
+    await doc.save();
+
+    await logAudit(req, 'DOCUMENT_SAMPLE_TOGGLED', 'document', req.params.id, {
+      is_sample: doc.is_sample,
+      file_name: doc.file_name,
+    });
+
+    res.json({ id: doc.id, is_sample: doc.is_sample });
+  } catch (err) {
+    res.status(500).json({ detail: 'Lỗi cập nhật tài liệu mẫu' });
   }
 });
 
@@ -1386,24 +1409,24 @@ router.patch('/plans/:id', async (req, res) => {
     clearOverviewCache();
     clearPlanCache();
     const updated = await SubscriptionPlan.findOne({ id: plan.id }).lean();
-    
+
     // Only log fields that actually changed
     const logMetadata = {};
     for (const key of Object.keys(updates)) {
       if (key === 'updated_at') continue;
-      
+
       let oldVal = plan[key];
       if (key.startsWith('quota.')) {
         const field = key.replace('quota.', '');
         oldVal = plan.quota?.[field];
       }
-      
+
       const newVal = updates[key];
       if (oldVal !== newVal) {
         logMetadata[key] = newVal;
       }
     }
-    
+
     await logAudit(req, DANGEROUS_ACTIONS.PLAN_UPDATED, 'plan', plan.id, logMetadata);
     res.json(serializePlan(updated));
   } catch (err) {

@@ -157,6 +157,40 @@ export async function retryDocument(documentId) {
   if (!res.ok) throw new Error('Yêu cầu xử lý lại thất bại');
   return safeJson(res, {});
 }
+export async function fetchSampleDocuments() {
+  const res = await authFetch(`${API_BASE}/documents/samples`);
+  if (!res.ok) return [];
+  return safeJson(res, []);
+}
+export async function cloneSampleDocument(documentId) {
+  const res = await authFetch(`${API_BASE}/documents/clone-sample`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ document_id: documentId }),
+  });
+  if (!res.ok) {
+    const err = await safeJson(res, {});
+    throw new Error(err.detail || 'Không thể thêm tài liệu mẫu vào thư viện');
+  }
+  return safeJson(res);
+}
+export async function toggleSampleDocument(documentId) {
+  const res = await authFetch(`${API_BASE}/admin/documents/${documentId}/toggle-sample`, {
+    method: 'PATCH',
+  });
+  if (!res.ok) throw new Error('Lỗi cập nhật tài liệu mẫu');
+  return safeJson(res);
+}
+export async function toggleDocumentShare(documentId) {
+  const res = await authFetch(`${API_BASE}/documents/${documentId}/toggle-share`, {
+    method: 'PATCH',
+  });
+  if (!res.ok) {
+    const err = await safeJson(res, {});
+    throw new Error(err.detail || 'Lỗi cập nhật trạng thái chia sẻ');
+  }
+  return safeJson(res);
+}
 export async function askQuestion(documentId, request, signal) {
   const headers = { 'Content-Type': 'application/json' };
 
@@ -629,6 +663,19 @@ export async function createChatShareLink(sessionId) {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ session_id: sessionId }),
   });
+  return safeJson(res);
+}
+
+export async function createDocumentShareLink(documentId) {
+  const res = await authFetch(`${API_BASE}/share`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ document_id: documentId }),
+  });
+  if (!res.ok) {
+    const err = await safeJson(res, {});
+    throw new Error(err.detail || 'Lỗi tạo link chia sẻ');
+  }
   return safeJson(res);
 }
 

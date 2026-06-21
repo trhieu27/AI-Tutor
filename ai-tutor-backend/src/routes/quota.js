@@ -35,15 +35,15 @@ router.get('/me', authMiddleware, async (req, res) => {
       is_pro: isPro,
       plan: planId,
       limits: {
-        documents:        limitDocs,
-        chat_messages:    limitChat,
-        ai_features:      limitAi,
+        documents: limitDocs,
+        chat_messages: limitChat,
+        ai_features: limitAi,
         max_file_size_mb: limitFileSize,
       },
       usage: {
-        documents:     docCount,
+        documents: docCount,
         chat_messages: chatUsed,
-        ai_features:   aiUsed,
+        ai_features: aiUsed,
       },
     });
   } catch (err) {

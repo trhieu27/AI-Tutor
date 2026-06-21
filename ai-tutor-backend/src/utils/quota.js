@@ -74,7 +74,7 @@ function requireDocQuota() {
     try {
       const userId = req.userId;
       const user = await getUser(userId);
-      
+
       const limit = await getUserQuotaLimit(userId, 'max_documents', 3);
       if (limit === -1) return next();
 
