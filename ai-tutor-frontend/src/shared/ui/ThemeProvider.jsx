@@ -60,12 +60,12 @@ function applyTheme(theme) {
   // The sticky header reads var(--glass-bg) which would take 1 frame to update
   // via CSS cascade. Setting it inline is synchronous → Safari sees final color.
   if (theme === "light") {
-    root.style.setProperty("--header-bg",    "oklch(98% 0.010 210 / 0.84)");
-    root.style.setProperty("--glass-bg",     "oklch(99% 0.006 205 / 0.76)");
-    root.style.setProperty("--glass-border", "oklch(82% 0.020 218 / 0.75)");
+    root.style.setProperty("--header-bg",    "oklch(98% 0.010 210)");
+    root.style.setProperty("--glass-bg",     "oklch(99% 0.006 205)");
+    root.style.setProperty("--glass-border", "oklch(82% 0.020 218 / 0.75)");;
   } else {
-    root.style.setProperty("--header-bg",    "oklch(15% 0.018 238 / 0.84)");
-    root.style.setProperty("--glass-bg",     "oklch(19% 0.020 238 / 0.72)");
+    root.style.setProperty("--header-bg",    "oklch(15% 0.018 238)");
+    root.style.setProperty("--glass-bg",     "oklch(19% 0.020 238)");
     root.style.setProperty("--glass-border", "oklch(35% 0.022 238 / 0.72)");
   }
 
