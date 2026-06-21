@@ -17,6 +17,7 @@
   font-display: swap;
   src: url('/fonts/material-symbols-outlined.ttf') format('truetype');
 }
+
 @plugin "@tailwindcss/typography";
 
 /* ── 1. TAILWIND v4 @theme BLOCK ──────────────────────────────────────── */
@@ -71,7 +72,8 @@
 
 
 /* ── GLOBAL OVERFLOW FIX (iOS Safari) ─────────────────────────────────── */
-html, body {
+html,
+body {
   overflow-x: clip;
   max-width: 100%;
 }
@@ -308,7 +310,7 @@ h6 {
 
   /* Glassmorphism surface */
   .glass {
-    background: var(--surface-overlay);
+    background: var(--glass-bg);
     backdrop-filter: blur(20px) saturate(180%);
     -webkit-backdrop-filter: blur(20px) saturate(180%);
     border: 1px solid var(--border-color);
@@ -469,9 +471,17 @@ h6 {
   }
 
   @keyframes slideBar {
-    0% { transform: translateX(-100%); }
-    50% { transform: translateX(200%); }
-    100% { transform: translateX(-100%); }
+    0% {
+      transform: translateX(-100%);
+    }
+
+    50% {
+      transform: translateX(200%);
+    }
+
+    100% {
+      transform: translateX(-100%);
+    }
   }
 
   .shimmer {
@@ -1166,22 +1176,28 @@ select:focus-visible {
   box-shadow: 0 10px 24px hsl(222 29% 12% / 0.16);
   transition: transform 200ms;
 }
+
 .brand-mark:hover,
 .group:hover .brand-mark {
   transform: translateY(-1px);
 }
+
 .brand-mark-icon {
   color: var(--background);
 }
+
 .brand-mark-accent {
   display: none;
 }
+
 .brand-mark-quiet {
   background: rgba(255, 255, 255, 0.12);
 }
+
 .brand-mark-quiet .brand-mark-icon {
   color: white;
 }
+
 .brand-mark-quiet .brand-mark-accent {
   border-color: var(--auth-dark-bg);
 }
@@ -1479,26 +1495,22 @@ select:focus-visible {
   position: absolute;
   inset: 0;
   transform: translateX(-100%);
-  background: linear-gradient(
-    90deg,
-    transparent 0%,
-    oklch(96% 0.008 215 / 0.7) 40%,
-    oklch(98% 0.006 205 / 0.9) 50%,
-    oklch(96% 0.008 215 / 0.7) 60%,
-    transparent 100%
-  );
+  background: linear-gradient(90deg,
+      transparent 0%,
+      oklch(96% 0.008 215 / 0.7) 40%,
+      oklch(98% 0.006 205 / 0.9) 50%,
+      oklch(96% 0.008 215 / 0.7) 60%,
+      transparent 100%);
   animation: premium-shimmer 1.6s ease-in-out infinite;
 }
 
 .dark .premium-skeleton::after {
-  background: linear-gradient(
-    90deg,
-    transparent 0%,
-    oklch(30% 0.020 238 / 0.6) 40%,
-    oklch(35% 0.018 238 / 0.8) 50%,
-    oklch(30% 0.020 238 / 0.6) 60%,
-    transparent 100%
-  );
+  background: linear-gradient(90deg,
+      transparent 0%,
+      oklch(30% 0.020 238 / 0.6) 40%,
+      oklch(35% 0.018 238 / 0.8) 50%,
+      oklch(30% 0.020 238 / 0.6) 60%,
+      transparent 100%);
 }
 
 @keyframes premium-shimmer {
@@ -1736,7 +1748,7 @@ input[type="datetime-local"].premium-input {
   background: var(--card-bg);
 }
 
-.document-picker-list > * {
+.document-picker-list>* {
   display: block;
 }
 
@@ -1750,12 +1762,12 @@ input[type="datetime-local"].premium-input {
     transform 180ms var(--ease-reveal);
 }
 
-.document-picker-list > *:nth-child(even) .document-picker-row {
+.document-picker-list>*:nth-child(even) .document-picker-row {
   background: var(--admin-table-row-alt);
 }
 
-.document-picker-list > *:hover .document-picker-row,
-.document-picker-list > *:focus-visible .document-picker-row,
+.document-picker-list>*:hover .document-picker-row,
+.document-picker-list>*:focus-visible .document-picker-row,
 .document-picker-row:hover {
   background: var(--admin-table-row-hover);
   box-shadow: inset 3px 0 0 var(--brand-primary);
@@ -1910,8 +1922,15 @@ input[type="datetime-local"].premium-input {
 }
 
 @keyframes limit-dropdown-in {
-  from { opacity: 0; transform: translateY(4px); }
-  to   { opacity: 1; transform: translateY(0); }
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 .limit-dropdown-item {
@@ -2424,7 +2443,7 @@ input[type="datetime-local"].premium-input {
   opacity: 0;
 }
 
-.admin-metric > * {
+.admin-metric>* {
   position: relative;
   z-index: 1;
 }
@@ -2455,7 +2474,7 @@ input[type="datetime-local"].premium-input {
   opacity: 0.35;
 }
 
-.admin-metric-skeleton > * {
+.admin-metric-skeleton>* {
   position: relative;
   z-index: 1;
 }
@@ -3278,12 +3297,10 @@ input[type="datetime-local"].premium-input {
 }
 
 .premium-skeleton::after {
-  background: linear-gradient(
-    90deg,
-    transparent 0%,
-    var(--admin-skeleton-shine) 50%,
-    transparent 100%
-  );
+  background: linear-gradient(90deg,
+      transparent 0%,
+      var(--admin-skeleton-shine) 50%,
+      transparent 100%);
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -3303,18 +3320,17 @@ input[type="datetime-local"].premium-input {
   0% {
     background-position: 200% 0;
   }
+
   100% {
     background-position: -200% 0;
   }
 }
 
 .shiny-text {
-  background: linear-gradient(
-    120deg,
-    color-mix(in oklch, var(--foreground) 0%, transparent) 35%,
-    color-mix(in oklch, var(--foreground) 85%, transparent) 50%,
-    color-mix(in oklch, var(--foreground) 0%, transparent) 65%
-  );
+  background: linear-gradient(120deg,
+      color-mix(in oklch, var(--foreground) 0%, transparent) 35%,
+      color-mix(in oklch, var(--foreground) 85%, transparent) 50%,
+      color-mix(in oklch, var(--foreground) 0%, transparent) 65%);
   background-size: 200% 100%;
   -webkit-background-clip: text;
   background-clip: text;
