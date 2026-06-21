@@ -10,27 +10,36 @@ const { generateText } = require('../rag/gemini');
 
 /**
  * Classify a document's topic via Gemini lite and save to DB.
- * Uses document summary + file name for best accuracy.
+ * Uses file name + sample chunks spread across the document for accuracy.
+ * Normalizes against existing topics to avoid duplicates (e.g. "AI" vs "Trí tuệ nhân tạo").
  */
 async function classifyAndSaveTopic(documentId, fileName) {
   let name = (fileName || '').replace(/\.[^.]+$/, '');
   try { name = decodeURIComponent(name); } catch (e) { /* ignore */ }
   name = name.replace(/[_-]/g, ' ').replace(/%20/g, ' ').replace(/\s+/g, ' ').trim();
 
-  // Gather context: summary from DB + sample text from ChromaDB
+  // ── Gather context: spread chunks across the document ──
   let context = '';
   try {
     const doc = await Document.findOne({ id: documentId }).select('summary chroma_collection_id').lean();
     if (doc?.summary) {
-      context = doc.summary.slice(0, 300);
+      context = doc.summary.slice(0, 500);
     }
-    // Also try to get first chunks from ChromaDB for more context
     if (!context && doc?.chroma_collection_id) {
       try {
         const vectorstore = require('../rag/vectorstore');
         const allDocs = await vectorstore.getAllDocuments(doc.chroma_collection_id);
         if (allDocs?.length) {
-          context = allDocs.slice(0, 2).join(' ').slice(0, 400);
+          // Sample chunks from start, middle, and end for broader coverage
+          const indices = [
+            0,
+            Math.floor(allDocs.length * 0.25),
+            Math.floor(allDocs.length * 0.5),
+            Math.floor(allDocs.length * 0.75),
+            allDocs.length - 1,
+          ];
+          const unique = [...new Set(indices)].filter(i => i >= 0 && i < allDocs.length);
+          context = unique.map(i => allDocs[i]).join('\n').slice(0, 800);
         }
       } catch (e) { /* ignore chromadb errors */ }
     }
@@ -43,14 +52,45 @@ async function classifyAndSaveTopic(documentId, fileName) {
 
   if (!input) return;
 
-  const result = await generateText(
+  // ── Step 1: Classify topic ──
+  const rawResult = await generateText(
     `Phân loại tài liệu học thuật này vào MỘT chủ đề ngắn gọn (2-5 từ, tiếng Việt hoặc thuật ngữ gốc nếu phổ biến hơn). Chỉ trả về tên chủ đề, không giải thích.\n\n${input}`,
     { temperature: 0.1, maxTokens: 30, modelTier: 'lite' }
   );
-  const topic = result.trim().replace(/^["']+|["']+$/g, '').replace(/^chủ đề:\s*/i, '').slice(0, 50);
-  if (topic) {
-    await Document.updateOne({ id: documentId }, { $set: { topic } });
-    console.log(`[Topic] ${fileName} → "${topic}"`);
+  const rawTopic = rawResult.trim().replace(/^["']+|["']+$/g, '').replace(/^chủ đề:\s*/i, '').slice(0, 50);
+  if (!rawTopic) return;
+
+  // ── Step 2: Normalize against existing topics ──
+  let finalTopic = rawTopic;
+  try {
+    const existingTopics = await Document.distinct('topic', { topic: { $ne: null } });
+    if (existingTopics.length > 0) {
+      const normalizeResult = await generateText(
+        `Nhiệm vụ: kiểm tra chủ đề mới có THUỘC CÙNG LĨNH VỰC/MÔN HỌC với chủ đề nào đã có không.
+
+Chủ đề mới: "${rawTopic}"
+Danh sách chủ đề đã có: ${existingTopics.map(t => `"${t}"`).join(', ')}
+
+Quy tắc:
+- Nếu chủ đề mới là NHÁNH CON, CHUYÊN ĐỀ, hoặc CÙNG MÔN HỌC với một chủ đề đã có → trả về CHÍNH XÁC tên chủ đề đã có đó
+  Ví dụ: "Hồi quy tuyến tính" thuộc "Học máy", "KNN" thuộc "Trí tuệ nhân tạo", "UML" thuộc "Phân tích thiết kế hướng đối tượng"
+- Nếu chủ đề mới TRÙNG NGHĨA (dù khác ngôn ngữ, viết tắt) với chủ đề đã có → trả về CHÍNH XÁC tên chủ đề đã có đó
+- Nếu KHÔNG liên quan đến bất kỳ chủ đề nào → trả về CHÍNH XÁC "${rawTopic}"
+- Chỉ trả về tên chủ đề, không giải thích`,
+        { temperature: 0, maxTokens: 50, modelTier: 'lite' }
+      );
+      const normalized = normalizeResult.trim().replace(/^["']+|["']+$/g, '').slice(0, 50);
+      if (normalized) finalTopic = normalized;
+    }
+  } catch (e) {
+    console.warn('[Topic] Normalization failed, using raw topic:', e.message);
+  }
+
+  await Document.updateOne({ id: documentId }, { $set: { topic: finalTopic } });
+  if (finalTopic !== rawTopic) {
+    console.log(`[Topic] ${fileName} → "${rawTopic}" → normalized to "${finalTopic}"`);
+  } else {
+    console.log(`[Topic] ${fileName} → "${finalTopic}"`);
   }
 }
 
