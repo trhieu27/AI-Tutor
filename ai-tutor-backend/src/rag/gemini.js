@@ -177,6 +177,7 @@ async function* chatStream(systemInstruction, history, userMessage, opts = {}) {
 /**
  * Send a PDF buffer to Gemini Vision and get descriptions of images/diagrams.
  * Only describes pages where PDF.js detected image operators.
+ * Batches pages into groups to avoid token limits on large documents.
  * @param {Buffer} pdfBuffer - Raw PDF file buffer
  * @param {number} pageCount - Total pages in the PDF
  * @param {number[]} imagePageNums - Page numbers with detected images
@@ -185,50 +186,69 @@ async function* chatStream(systemInstruction, history, userMessage, opts = {}) {
 async function describeDocumentImages(pdfBuffer, pageCount, imagePageNums) {
     if (!imagePageNums || imagePageNums.length === 0) return [];
 
-    const model = genAI.getGenerativeModel({
-        model: VISION_MODEL,
-        generationConfig: { temperature: 0.2, maxOutputTokens: 4096 },
-    });
-
     const base64 = pdfBuffer.toString('base64');
-    const pageList = imagePageNums.join(', ');
-    const prompt = [
-        'Bạn là chuyên gia phân tích tài liệu học thuật.',
-        'Nhiệm vụ: mô tả CHI TIẾT mọi hình ảnh, biểu đồ, sơ đồ, bảng biểu trong tài liệu PDF này.',
-        '',
-        'CHỈ tập trung vào các trang: ' + pageList + '. BỎ QUA hoàn toàn các trang khác.',
-        '',
-        'Với mỗi trang có hình, trả về theo định dạng:',
-        '---PAGE X---',
-        '1. Loại hình: (biểu đồ UML, flowchart, ER diagram, bảng, đồ thị, ảnh minh họa...)',
-        '2. Thành phần chính: (tên class, node, cột, hàng, nhãn...)',
-        '3. Mối quan hệ: (kế thừa, phụ thuộc, luồng dữ liệu, mũi tên...)',
-        '4. Nội dung text trong hình: (ghi chú, nhãn, số liệu...)',
-        '5. Ý nghĩa tổng thể: (hình này minh họa điều gì trong ngữ cảnh tài liệu)',
-        '',
-        'Trả lời bằng tiếng Việt, chi tiết và chính xác.',
-    ].join('\n');
+    const BATCH = 15; // pages per request — balances speed vs token limits
+    const allPages = [];
 
-    const result = await model.generateContent([{
-            inlineData: {
-                mimeType: 'application/pdf',
-                data: base64,
-            },
-        },
-        prompt,
-    ]);
+    for (let i = 0; i < imagePageNums.length; i += BATCH) {
+        const batchPages = imagePageNums.slice(i, i + BATCH);
+        const batchIndex = Math.floor(i / BATCH) + 1;
+        const totalBatches = Math.ceil(imagePageNums.length / BATCH);
 
-    const text = result.response.text();
-    const pages = [];
-    const sections = text.split(/---PAGE\s*(\d+)---/i);
-    for (let i = 1; i < sections.length; i += 2) {
-        const pageNum = parseInt(sections[i], 10);
-        const desc = (sections[i + 1] || '').trim();
-        if (pageNum > 0 && pageNum <= pageCount && desc.length > 20) {
-            pages.push({ page_number: pageNum, description: desc });
+        console.log(`   📦 Batch ${batchIndex}/${totalBatches}: trang [${batchPages.join(', ')}]`);
+
+        const model = genAI.getGenerativeModel({
+            model: VISION_MODEL,
+            generationConfig: { temperature: 0.2, maxOutputTokens: 8192 },
+        });
+
+        const pageList = batchPages.join(', ');
+        const prompt = [
+            'Bạn là chuyên gia phân tích tài liệu học thuật.',
+            'Nhiệm vụ: mô tả CHI TIẾT mọi hình ảnh, biểu đồ, sơ đồ, bảng biểu trong tài liệu PDF này.',
+            '',
+            'CHỈ tập trung vào các trang: ' + pageList + '. BỎ QUA hoàn toàn các trang khác.',
+            '',
+            'Với mỗi trang có hình, trả về theo định dạng:',
+            '---PAGE X---',
+            '1. Loại hình: (biểu đồ UML, flowchart, ER diagram, bảng, đồ thị, ảnh minh họa...)',
+            '2. Thành phần chính: (tên class, node, cột, hàng, nhãn...)',
+            '3. Mối quan hệ: (kế thừa, phụ thuộc, luồng dữ liệu, mũi tên...)',
+            '4. Nội dung text trong hình: (ghi chú, nhãn, số liệu...)',
+            '5. Ý nghĩa tổng thể: (hình này minh họa điều gì trong ngữ cảnh tài liệu)',
+            '',
+            'Trả lời bằng tiếng Việt, chi tiết và chính xác.',
+        ].join('\n');
+
+        try {
+            const result = await model.generateContent([{
+                    inlineData: {
+                        mimeType: 'application/pdf',
+                        data: base64,
+                    },
+                },
+                prompt,
+            ]);
+
+            const text = result.response.text();
+            const sections = text.split(/---PAGE\s*(\d+)---/i);
+            let batchDescribed = 0;
+            for (let j = 1; j < sections.length; j += 2) {
+                const pageNum = parseInt(sections[j], 10);
+                const desc = (sections[j + 1] || '').trim();
+                if (pageNum > 0 && pageNum <= pageCount && desc.length > 20) {
+                    allPages.push({ page_number: pageNum, description: desc });
+                    batchDescribed++;
+                }
+            }
+            console.log(`   ✔️  Batch ${batchIndex}: mô tả ${batchDescribed}/${batchPages.length} trang`);
+        } catch (batchErr) {
+            console.warn(`   ⚠️  Batch ${batchIndex} lỗi (bỏ qua): ${batchErr.message}`);
+            // Continue with next batch — don't fail the entire vision process
         }
     }
-    return pages;
+
+    return allPages;
 }
 
 // ── Vision: Describe images in DOCX ──────────────────────────────────────────
