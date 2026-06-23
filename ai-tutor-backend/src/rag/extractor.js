@@ -107,13 +107,52 @@ async function extractText(filePath) {
     const pdfPath = convertDocxToPdf(filePath);
     if (pdfPath) {
       const pdfBuffer = fs.readFileSync(pdfPath);
-      return extractPdfText(pdfBuffer);
+      const result = await extractPdfText(pdfBuffer);
+
+      // Override page count with Word's own metadata (more accurate than
+      // LibreOffice conversion which may render slightly different page counts)
+      if (ext === '.docx') {
+        const wordPageCount = readDocxPageCount(buffer);
+        if (wordPageCount && wordPageCount !== result.pageCount) {
+          console.log(`[Extractor] DOCX metadata pages: ${wordPageCount} (LibreOffice: ${result.pageCount})`);
+          result.pageCount = wordPageCount;
+        }
+      }
+
+      return result;
     }
     // Fallback: mammoth (no page boundaries)
     return extractDocxTextFallback(buffer);
   }
 
   throw new Error(`Định dạng file không hỗ trợ: ${ext}`);
+}
+
+/**
+ * Read page count from DOCX metadata (docProps/app.xml).
+ * Word saves the exact page count here when the file is saved.
+ * @param {Buffer} buffer - DOCX file buffer
+ * @returns {number|null} - Page count from Word, or null if unavailable
+ */
+function readDocxPageCount(buffer) {
+  try {
+    const { execFileSync } = require('child_process');
+    const tmpPath = path.join(require('os').tmpdir(), `docx_meta_${Date.now()}.docx`);
+    fs.writeFileSync(tmpPath, buffer);
+    try {
+      const xml = execFileSync('unzip', ['-p', tmpPath, 'docProps/app.xml'], {
+        encoding: 'utf8',
+        timeout: 5000,
+      });
+      const match = xml.match(/<Pages>(\d+)<\/Pages>/);
+      if (match) return parseInt(match[1], 10);
+    } finally {
+      try { fs.unlinkSync(tmpPath); } catch (_) {}
+    }
+  } catch (err) {
+    console.warn('[Extractor] Could not read DOCX page metadata:', err.message);
+  }
+  return null;
 }
 
 /**
@@ -150,18 +189,21 @@ async function extractDocxImages(buffer) {
   const images = [];
   let imageIndex = 0;
 
-  await mammoth.convertToHtml({ buffer }, {
-    convertImage: function(element) {
-      return element.read('base64').then(function(imageData) {
-        images.push({
-          contentType: element.contentType || 'image/png',
-          base64: imageData,
-          index: ++imageIndex,
+  await mammoth.convertToHtml(
+    { buffer },
+    {
+      convertImage: mammoth.images.imgElement(function(element) {
+        return element.read('base64').then(function(imageData) {
+          images.push({
+            contentType: element.contentType || 'image/png',
+            base64: imageData,
+            index: ++imageIndex,
+          });
+          return { src: 'data:' + (element.contentType || 'image/png') + ';base64,' + imageData.slice(0, 20) };
         });
-        return { src: '' };
-      });
+      })
     }
-  });
+  );
 
   return images;
 }

@@ -70,9 +70,7 @@ const ChatMessage = memo(function ChatMessage({ message, onRetry, onOpenSource, 
           )}
         </div>
 
-        {!isUser && message.sources?.length > 0 && (
-          <SourceCitationList sources={message.sources} compact inline className="mt-2 w-full" onOpenSource={onOpenSource} />
-        )}
+        {/* Sources ẩn trong chat bubble — vẫn hiển thị ở panel bên phải */}
 
         {!isUser && onRetry && (
           <div className="mt-2 flex gap-2">

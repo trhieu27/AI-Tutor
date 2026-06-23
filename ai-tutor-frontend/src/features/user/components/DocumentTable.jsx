@@ -698,8 +698,8 @@ export default function DocumentTable({
 
   return (
     <>
-      <section className={cx("doc-library-section rounded-[var(--radius-panel)] border border-[var(--border-color)] bg-[var(--card-bg)] shadow-[var(--premium-shadow-sm)] relative transition-opacity duration-200", fetching && "opacity-50 pointer-events-none")}>
-        {fetching && (
+      <section className={cx("doc-library-section rounded-[var(--radius-panel)] border border-[var(--border-color)] bg-[var(--card-bg)] shadow-[var(--premium-shadow-sm)] relative transition-opacity duration-200", (fetching || deletingId) && "opacity-50 pointer-events-none")}>
+        {(fetching || deletingId) && (
           <div className="absolute inset-x-0 top-0 z-20 h-0.5 overflow-hidden rounded-t-[var(--radius-panel)] bg-[var(--border-subtle)]">
             <div className="h-full w-1/3 bg-[var(--brand-primary)]" style={{ animation: 'slideBar 1s ease-in-out infinite' }} />
           </div>

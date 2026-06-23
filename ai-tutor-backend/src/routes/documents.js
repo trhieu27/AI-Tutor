@@ -200,20 +200,26 @@ router.get('/samples', async (req, res) => {
         }
 
         // ── Behavior-based topic ranking ──────────────────────────────
-        // Count how many chat sessions the user has per topic
+        // Aggregate by unique document (not raw sessions) so a single
+        // heavily-chatted file doesn't dominate all slots.
         let userTopicScores = {};
         if (userId) {
             try {
                 const { ChatSession } = require('../db/models');
-                const recentSessions = await ChatSession.find({ user_id: userId })
-                    .select('document_id updated_at')
-                    .sort({ updated_at: -1 })
-                    .limit(20)
-                    .lean();
+                const recentDocs = await ChatSession.aggregate([
+                    { $match: { user_id: userId } },
+                    { $sort: { updated_at: -1 } },
+                    { $group: {
+                        _id: '$document_id',
+                        last_chat: { $first: '$updated_at' },
+                        session_count: { $sum: 1 },
+                    }},
+                    { $sort: { last_chat: -1 } },
+                    { $limit: 10 },
+                ]);
 
-                if (recentSessions.length > 0) {
-                    // Get document IDs → look up their topics
-                    const docIds = [...new Set(recentSessions.map(s => s.document_id))];
+                if (recentDocs.length > 0) {
+                    const docIds = recentDocs.map(d => d._id);
                     const userDocs = await Document.find({ id: { $in: docIds } })
                         .select('id topic')
                         .lean();
@@ -223,12 +229,13 @@ router.get('/samples', async (req, res) => {
                         docTopicMap[d.id] = d.topic || null;
                     }
 
-                    // Score: more recent sessions = higher weight
-                    for (let i = 0; i < recentSessions.length; i++) {
-                        const topic = docTopicMap[recentSessions[i].document_id];
+                    // Score: recency weight + session volume bonus (capped)
+                    for (let i = 0; i < recentDocs.length; i++) {
+                        const topic = docTopicMap[recentDocs[i]._id];
                         if (topic && topic !== 'Khác') {
-                            // Recent sessions get higher scores (decay by position)
-                            userTopicScores[topic] = (userTopicScores[topic] || 0) + (20 - i);
+                            const recencyWeight = 10 - i;
+                            const volumeBonus = Math.min(recentDocs[i].session_count, 5);
+                            userTopicScores[topic] = (userTopicScores[topic] || 0) + recencyWeight + volumeBonus;
                         }
                     }
                 }
@@ -238,18 +245,19 @@ router.get('/samples', async (req, res) => {
         }
 
         // Build response — top 4 named topics
+        // User-active topics first, then backfill with popular topics
         const topicNames = Object.keys(groups)
             .filter(name => name !== 'Khác' && groups[name].length > 0);
 
-        // Sort: user's active topics first (by score), then by file count
-        topicNames.sort((a, b) => {
-            const scoreA = userTopicScores[a] || 0;
-            const scoreB = userTopicScores[b] || 0;
-            if (scoreA !== scoreB) return scoreB - scoreA; // Higher score first
-            return groups[b].length - groups[a].length;    // Fallback: more files first
-        });
+        const userTopics = topicNames
+            .filter(name => userTopicScores[name] > 0)
+            .sort((a, b) => userTopicScores[b] - userTopicScores[a]);
 
-        const top = topicNames.slice(0, 4);
+        const remainingTopics = topicNames
+            .filter(name => !userTopicScores[name])
+            .sort((a, b) => groups[b].length - groups[a].length);
+
+        const top = [...userTopics, ...remainingTopics].slice(0, 4);
 
         const topics = top.map((name) => ({
             id: name.toLowerCase().replace(/\s+/g, '-').slice(0, 30),

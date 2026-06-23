@@ -50,6 +50,11 @@ export default function Header({ onMenuClick }) {
       return;
     }
 
+    // Refresh bảng tài liệu ngay khi bắt đầu xử lý (trước cả convert LibreOffice)
+    if (notification.type === 'document_processing') {
+      notifyDocReady();
+      return;
+    }
     setNotifications(prev => [{ ...notification, is_read: false }, ...prev]);
     // Refresh danh sách tài liệu khi xử lý xong
     if (notification.type === 'document_ready' || notification.type === 'document_failed') {

@@ -153,6 +153,16 @@ async function processDocumentBackground(documentId, filePath, ownerId) {
     await Document.updateOne({ id: documentId }, { $set: { status: 'PROCESSING', updated_at: new Date() } });
     clearAdminOverviewCache();
     sendAdminRealtimeEvent('document_status_changed', { id: documentId, status: 'PROCESSING', file_name: doc.file_name }).catch(console.error);
+
+    // Push cho owner để frontend refresh bảng ngay (trước khi LibreOffice convert)
+    const { notificationManager } = require('./notifications');
+    console.log(`[Doc] Pushing document_processing WS event to owner ${ownerId} for ${documentId}`);
+    notificationManager.push(ownerId, {
+      type: 'document_processing',
+      metadata: { document_id: documentId },
+      created_at: new Date().toISOString(),
+    }).catch(console.error);
+
     const { collection_name, page_count } = await rag.ingest(filePath, documentId, { signal: ac.signal });
 
     const stillExists = await Document.findOne({ id: documentId });
