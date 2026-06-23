@@ -1,7 +1,10 @@
 const mammoth = require('mammoth');
 const fs = require('fs');
 const path = require('path');
-const { execFileSync } = require('child_process');
+const { execFile } = require('child_process');
+const { promisify } = require('util');
+
+const execFileAsync = promisify(execFile);
 
 // Cache the ESM import (pdfjs-dist v4 is ESM-only)
 let _pdfjs = null;
@@ -13,13 +16,13 @@ async function getPdfjs() {
 }
 
 /**
- * Convert DOCX/DOC to PDF using LibreOffice headless.
+ * Convert DOCX/DOC to PDF using LibreOffice headless (async — không block event loop).
  * Returns the path to the converted PDF, or null if LibreOffice is unavailable.
  *
  * @param {string} filePath - Absolute path to the DOCX/DOC file
- * @returns {string|null} - Path to converted PDF, or null on failure
+ * @returns {Promise<string|null>} - Path to converted PDF, or null on failure
  */
-function convertDocxToPdf(filePath) {
+async function convertDocxToPdf(filePath) {
   const dir = path.dirname(filePath);
   const baseName = path.basename(filePath, path.extname(filePath));
   const pdfPath = path.join(dir, `${baseName}.pdf`);
@@ -28,7 +31,7 @@ function convertDocxToPdf(filePath) {
   if (fs.existsSync(pdfPath)) return pdfPath;
 
   try {
-    execFileSync('libreoffice', [
+    await execFileAsync('libreoffice', [
       '--headless',
       '--norestore',
       '--convert-to', 'pdf',
@@ -36,7 +39,6 @@ function convertDocxToPdf(filePath) {
       filePath,
     ], {
       timeout: 120_000, // 2 phút timeout cho file lớn
-      stdio: 'pipe',
     });
 
     if (fs.existsSync(pdfPath)) {
@@ -104,7 +106,7 @@ async function extractText(filePath) {
 
   if (ext === '.docx' || ext === '.doc') {
     // Try converting to PDF first for accurate page-level extraction
-    const pdfPath = convertDocxToPdf(filePath);
+    const pdfPath = await convertDocxToPdf(filePath);
     if (pdfPath) {
       const pdfBuffer = fs.readFileSync(pdfPath);
       const result = await extractPdfText(pdfBuffer);
