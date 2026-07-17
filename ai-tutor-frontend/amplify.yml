@@ -1,0 +1,19 @@
+version: 1
+frontend:
+  phases:
+    preBuild:
+      commands:
+        - echo "Node version $(node -v), NPM version $(npm -v)"
+        - npm ci --prefer-offline
+    build:
+      commands:
+        - echo "Building Vite app..."
+        - npm run build
+        - echo "Build complete!"
+  artifacts:
+    baseDirectory: dist
+    files:
+      - '**/*'
+  cache:
+    paths:
+      - node_modules/**/*

@@ -1,0 +1,85 @@
+services:
+  # -------------------------------------------------------
+  # ChromaDB — Vector Database cho RAG
+  # -------------------------------------------------------
+  chromadb:
+    image: chromadb/chroma:latest
+    container_name: ai_tutor_chromadb
+    restart: always
+    volumes:
+      - chroma_data:/data
+    networks:
+      - ai_tutor_network
+    # no healthcheck — ChromaDB image does not include curl or wget
+
+  # -------------------------------------------------------
+  # Backend Node.js (production)
+  # -------------------------------------------------------
+  backend:
+    build:
+      context: ./ai-tutor-backend
+      dockerfile: Dockerfile
+    container_name: ai_tutor_backend
+    restart: always
+    volumes:
+      - ./ai-tutor-backend/storage:/app/storage
+    env_file:
+      - ./ai-tutor-backend/.env
+    environment:
+      - CHROMA_URL=http://chromadb:8000
+    depends_on:
+      - chromadb
+    networks:
+      - ai_tutor_network
+    # no healthcheck — nginx depends_on handles startup order
+
+  # -------------------------------------------------------
+  # Frontend React/Vite (production)
+  # -------------------------------------------------------
+  frontend:
+    build:
+      context: ./ai-tutor-frontend
+      dockerfile: Dockerfile
+      args:
+        VITE_API_URL: https://aitutor.click/api/v1
+        VITE_GOOGLE_CLIENT_ID: 801791613238-tqiu8qenj6uqitun0qv3emr7lda965eo.apps.googleusercontent.com
+        VITE_WS_URL: wss://aitutor.click
+    container_name: ai_tutor_frontend
+    restart: always
+    networks:
+      - ai_tutor_network
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:3000"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+  # -------------------------------------------------------
+  # Nginx Reverse Proxy
+  # -------------------------------------------------------
+  nginx:
+    image: nginx:alpine
+    container_name: ai_tutor_nginx
+    restart: always
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
+      - ./nginx/ssl:/etc/nginx/ssl:ro
+      - /etc/letsencrypt:/etc/letsencrypt:ro
+    depends_on:
+      - backend
+      - frontend
+    networks:
+      - ai_tutor_network
+
+networks:
+  ai_tutor_network:
+    name: ai_tutor_network
+    driver: bridge
+
+volumes:
+  chroma_data:
+    name: ai_tutor_chroma_data

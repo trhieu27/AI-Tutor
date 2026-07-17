@@ -1,44 +1,104 @@
-# AI Tutor - Nền tảng Giáo dục Thông minh
+# 🎓 AI Tutor — Nền tảng Học tập Thông minh
 
-**AI Tutor** là một ứng dụng hỗ trợ học tập thông minh (Intelligent Mentoring System). Dự án cho phép học sinh và sinh viên tải lên các tài liệu học thuật (PDF, DOC) để tự động trích xuất kiến thức bằng công nghệ RAG, sinh đề kiểm tra tự động và tạo sơ đồ tư duy động trực quan.
+AI Tutor là ứng dụng hỗ trợ học tập dựa trên AI, cho phép sinh viên tải lên tài liệu (PDF, DOCX), chat hỏi đáp với AI có trích dẫn nguồn (RAG), tự động sinh quiz, tạo sơ đồ tư duy, và ghi chú — tất cả xoay quanh tài liệu của người dùng.
 
-## Cấu trúc Dự án (Project Structure)
-
-Thư mục chính bao gồm:
-
-* **`ai-tutor-frontend/`**: Ứng dụng Frontend xây dựng bằng Next.js, TypeScript và Tailwind CSS.
-* **`ai-tutor-backend/`**: Ứng dụng Backend xử lý logic AI, trích xuất dữ liệu và quản lý API (Python FastAPI).
+**🌐 Live:** [https://aitutor.click](https://aitutor.click)
 
 ---
 
-## Các thành phần chính
+## 📁 Cấu trúc Dự án
 
-### 1. Frontend (ai-tutor-frontend)
-- **Hệ thống Xác thực**: Đăng nhập, đăng ký, quên mật khẩu và xác minh mã code.
-- **Không gian Dashboard**: Quản lý tài liệu học tập, kéo-thả tải lên.
-- **Giao diện Modern UI**: Thiết kế responsive, tương thích với mọi thiết bị.
-
-### 2. Backend (ai-tutor-backend)
-- **FastAPI**: Xử lý API RESTful nhanh chóng.
-- **RAG Engine**: Trích xuất kiến thức từ tài liệu (PDF, Word).
-- **AI Logic**: Sinh đề thi và sơ đồ tư duy dựa trên nội dung bài học.
+```
+AI-Tutor/
+├── ai-tutor-frontend/       # React 19 + Vite + TailwindCSS 4
+├── ai-tutor-backend/        # Node.js + Express + MongoDB + ChromaDB
+├── nginx/                   # Reverse proxy (SSL + WebSocket + SSE)
+├── docker-compose.yml       # Docker Compose (development)
+├── docker-compose.prod.yml  # Docker Compose (production)
+└── .github/workflows/       # CI/CD — GitHub Actions
+```
 
 ---
 
-## Hướng dẫn khởi chạy
+## 🛠️ Tech Stack
+
+| Layer | Công nghệ |
+|---|---|
+| **Frontend** | React 19, Vite 6, TailwindCSS 4, React Router 7, MUI X Charts, Mermaid, PDF.js |
+| **Backend** | Node.js 18+, Express 4, MongoDB (Mongoose), ChromaDB, Google Gemini API |
+| **Auth** | JWT, bcrypt, Google OAuth 2.0 |
+| **Realtime** | WebSocket (`ws`), SSE streaming |
+| **Storage** | AWS S3, Multer |
+| **Payment** | PayOS (QR code) |
+| **Infra** | Docker, Nginx, AWS EC2, Let's Encrypt, GitHub Actions CI/CD |
+
+---
+
+## 📋 Tính năng chính
+
+### Người dùng
+
+- Đăng ký / Đăng nhập (email + Google OAuth), quên mật khẩu qua OTP
+- Upload tài liệu PDF, DOCX — tự động trích xuất nội dung
+- **Chat AI (RAG)** — hỏi đáp dựa trên tài liệu, trích dẫn nguồn, SSE streaming
+- **Quiz tự động** — trắc nghiệm từ nội dung tài liệu
+- **Mindmap** — sơ đồ tư duy tương tác
+- **Tóm tắt** — AI summary tài liệu
+- **Ghi chú** — lưu theo tài liệu
+- Thư viện tài liệu, hệ thống gói Free / Pro, thanh toán QR
+- Thông báo realtime, Light / Dark theme
+
+### Admin
+
+- Dashboard thống kê tổng quan
+- Quản lý người dùng, tài liệu, gói subscription
+- Báo cáo doanh thu, hoạt động người dùng, audit log
+
+---
+
+## ⚙️ Cài đặt & Chạy Local
+
+### Yêu cầu
+
+- Node.js ≥ 18, npm ≥ 9
+- Docker (cho ChromaDB)
+- MongoDB Atlas hoặc MongoDB local
 
 ### Frontend
-1. Di chuyển vào thư mục: `cd ai-tutor-frontend`
-2. Cài đặt thư viện: `npm install`
-3. Chạy server phát triển: `npm run dev`
+
+```bash
+cd ai-tutor-frontend
+npm install
+npm run dev          # → http://localhost:5173
+```
+
+Tạo file `.env.local`:
+
+```env
+VITE_API_URL=http://127.0.0.1:8081/api/v1
+VITE_GOOGLE_CLIENT_ID=<your-google-client-id>
+VITE_WS_URL=ws://127.0.0.1:8081
+```
 
 ### Backend
-1. Di chuyển vào thư mục: `cd ai-tutor-backend`
-2. (Tùy chọn) Cài đặt môi trường ảo: `python -m venv venv`
-3. Cài đặt thư viện: `pip install -r requirements.txt`
-4. Chạy server: `python main.py`
 
----
+```bash
+cd ai-tutor-backend
+npm install
+npm run dev          # → http://localhost:8081
+```
 
-## Thông tin bổ sung
-Dự án được thực hiện với cấu trúc module hóa cao, dễ dàng mở rộng và tích hợp thêm các công nghệ AI mới.
+Tạo file `.env` (xem `.env.example` để biết các biến cần thiết).
+
+### ChromaDB
+
+```bash
+docker run -d --name chromadb -p 8000:8000 chromadb/chroma:latest
+```
+
+Hoặc chạy toàn bộ stack:
+
+```bash
+docker compose up -d
+```
+

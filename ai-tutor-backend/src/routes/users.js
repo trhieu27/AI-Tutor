@@ -1,0 +1,192 @@
+const express = require('express');
+const router = express.Router();
+const bcrypt = require('bcryptjs');
+const { User, UserSession } = require('../db/models');
+const { cacheAuthUser } = require('../db/authDb');
+const { authMiddleware } = require('../middleware/auth');
+const { sendSupportEmail } = require('../utils/email');
+const { isUserPro } = require('../utils/quota');
+const { presenceOfflineUpdate, presenceOnlineUpdate } = require('../utils/presence');
+const { sendAdminRealtimeEvent } = require('../utils/notifications');
+const { buildPagination, parsePagination, sendPaginated } = require('../utils/pagination');
+const { clearAdminOverviewCache } = require('../utils/cacheInvalidation');
+
+async function serializeUser(user) {
+  let isPro = false;
+  try {
+    isPro = await isUserPro(user.id);
+  } catch (err) {
+    console.warn(`Could not resolve Pro status for user ${user.id}:`, err.message);
+  }
+
+  return {
+    id: user.id,
+    student_id: user.student_id || '',
+    full_name: user.full_name || '',
+    email: user.email || '',
+    role: user.role || 'STUDENT',
+    status: user.status || 'active',
+    is_pro: isPro,
+    created_at: user.created_at ? String(user.created_at) : '',
+  };
+}
+
+// GET /api/v1/users/me
+router.get('/me', authMiddleware, async (req, res) => {
+  try {
+    res.json(await serializeUser(req.user));
+  } catch (err) {
+    res.status(500).json({ detail: 'Lỗi server' });
+  }
+});
+
+// PUT /api/v1/users/profile
+router.put('/profile', authMiddleware, async (req, res) => {
+  try {
+    const { full_name } = req.body;
+    const updates = { updated_at: new Date() };
+    if (full_name !== undefined) {
+      if (!full_name.trim()) return res.status(400).json({ detail: 'Tên không được để trống' });
+      updates.full_name = full_name.trim();
+    }
+
+    await User.updateOne({ id: req.userId }, { $set: updates });
+    const user = await User.findOne({ id: req.userId });
+    if (user) cacheAuthUser(user);
+    clearAdminOverviewCache();
+    res.json(await serializeUser(user));
+  } catch (err) {
+    res.status(500).json({ detail: 'Lỗi server' });
+  }
+});
+
+// PUT /api/v1/users/password
+router.put('/password', authMiddleware, async (req, res) => {
+  try {
+    const { current_password, new_password, confirm_password } = req.body;
+    const user = await User.findOne({ id: req.userId });
+    if (!user) return res.status(404).json({ detail: 'Người dùng không tồn tại' });
+
+    const ok = await bcrypt.compare(current_password, user.hashed_password);
+    if (!ok) return res.status(400).json({ detail: 'Mật khẩu hiện tại không đúng' });
+    if (new_password !== confirm_password) return res.status(400).json({ detail: 'Mật khẩu mới không khớp' });
+    if (new_password.length < 8) return res.status(400).json({ detail: 'Mật khẩu mới phải có ít nhất 8 ký tự' });
+
+    const hashed = await bcrypt.hash(new_password, 12);
+    await User.updateOne({ id: req.userId }, { $set: { hashed_password: hashed, updated_at: new Date() } });
+    const updatedUser = await User.findOne({ id: req.userId });
+    if (updatedUser) cacheAuthUser(updatedUser);
+    res.json({ message: 'Mật khẩu đã được cập nhật thành công' });
+  } catch (err) {
+    res.status(500).json({ detail: 'Lỗi server' });
+  }
+});
+
+// (upgrade-pro endpoint removed — Pro status is determined by subscription)
+
+// POST /api/v1/users/presence
+router.post('/presence', authMiddleware, async (req, res) => {
+  try {
+    if (!req.sessionId) {
+      return res.json({ is_online: false, last_active: null, online_until: null });
+    }
+
+    const now = new Date();
+    const wantsOffline = req.body?.state === 'offline';
+    const update = wantsOffline ? presenceOfflineUpdate(now) : presenceOnlineUpdate(now);
+
+    const previousSession = await UserSession.findOne({ id: req.sessionId, user_id: req.userId }).lean();
+    const wasOnline = Boolean(previousSession?.is_online && previousSession?.online_until && new Date(previousSession.online_until) > now);
+    const isOnline = !wantsOffline;
+
+    await UserSession.updateOne(
+      { id: req.sessionId, user_id: req.userId },
+      { $set: update }
+    );
+
+    // Fire event when status changes OR on first online presence call
+    if (wasOnline !== isOnline || (isOnline && !previousSession?.online_until)) {
+      clearAdminOverviewCache();
+      sendAdminRealtimeEvent('presence_changed', {
+        user_id: req.userId,
+        session_id: req.sessionId,
+        is_online: isOnline,
+        last_active: update.last_active,
+        online_until: update.online_until,
+      }).catch((err) => console.warn('[AdminRealtime] presence_changed failed:', err.message));
+    }
+
+    res.json({
+      is_online: isOnline,
+      last_active: update.last_active,
+      online_until: update.online_until,
+    });
+  } catch (err) {
+    console.warn('[Presence] DB error:', err.message);
+    res.json({ is_online: false, last_active: null, online_until: null });
+  }
+});
+
+
+
+// GET /api/v1/users/sessions
+router.get('/sessions', authMiddleware, async (req, res) => {
+  try {
+    const { page, limit, skip } = parsePagination(req.query, { defaultLimit: 20, maxLimit: 100 });
+    const query = { user_id: req.userId };
+    const [total, sessions] = await Promise.all([
+      UserSession.countDocuments(query),
+      UserSession.find(query).sort({ last_active: -1 }).skip(skip).limit(limit).lean(),
+    ]);
+    const items = sessions.map((session) => {
+      const clean = { ...session };
+      delete clean._id;
+      return clean;
+    });
+    sendPaginated(res, items, buildPagination({ page, limit, total }), req.query);
+  } catch (err) {
+    res.status(500).json({ detail: 'Lỗi server' });
+  }
+});
+
+// DELETE /api/v1/users/sessions/:sessionId
+router.delete('/sessions/:sessionId', authMiddleware, async (req, res) => {
+  try {
+    const result = await UserSession.deleteOne({ id: req.params.sessionId, user_id: req.userId });
+    if (result.deletedCount === 0) return res.status(404).json({ detail: 'Không tìm thấy phiên đăng nhập' });
+    res.json({ message: 'Đã thu hồi phiên đăng nhập' });
+  } catch (err) {
+    res.status(500).json({ detail: 'Lỗi server' });
+  }
+});
+
+// DELETE /api/v1/users/sessions
+router.delete('/sessions', authMiddleware, async (req, res) => {
+  try {
+    await UserSession.deleteMany({ user_id: req.userId });
+    res.json({ message: 'Đã đăng xuất khỏi tất cả thiết bị' });
+  } catch (err) {
+    res.status(500).json({ detail: 'Lỗi server' });
+  }
+});
+
+// POST /api/v1/users/support
+router.post('/support', authMiddleware, async (req, res) => {
+  try {
+    const { subject, message } = req.body;
+    if (!subject?.trim()) return res.status(400).json({ detail: 'Chủ đề không được để trống' });
+    if (!message?.trim() || message.trim().length < 20) return res.status(400).json({ detail: 'Nội dung phải có ít nhất 20 ký tự' });
+
+    const user = await User.findOne({ id: req.userId });
+    if (!user) return res.status(404).json({ detail: 'Người dùng không tồn tại' });
+
+    const ok = await sendSupportEmail(user.full_name, user.email, subject.trim(), message.trim());
+    if (!ok) console.warn(`Support email not sent (SMTP not configured) from ${user.email}`);
+
+    res.json({ message: 'Yêu cầu hỗ trợ đã được gửi thành công' });
+  } catch (err) {
+    res.status(500).json({ detail: 'Lỗi server' });
+  }
+});
+
+module.exports = router;
